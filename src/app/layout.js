@@ -15,7 +15,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata = {
-  title: "Patrik International Products",
+  title: "Patrik Partner Portal",
   description: "Product overview for Patrik International.",
   icons: {
     icon: "https://www.patrikinternational.com/favicon.ico",
