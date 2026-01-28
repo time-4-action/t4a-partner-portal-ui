@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
-
+import { useState, useEffect, useRef } from "react";
+import { useUser } from "@auth0/nextjs-auth0/client";
+ 
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/product", label: "Products" }, // Both links point to the homepage for now
@@ -12,7 +13,23 @@ const navLinks = [
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const { user, isLoading } = useUser();
+  const profileMenuRef = useRef(null);
 
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+  
   return (
     <div>
       {/* Overlay for mobile menu */}
@@ -38,16 +55,73 @@ const Navbar = () => {
                 </span>
               </Link>
             </div>
-            {/* Desktop Menu */}
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-4">
+            {/* Desktop Menu & Auth */}
+            <div className="hidden md:flex md:items-center md:gap-x-6">
+              <div className="flex items-baseline space-x-4">
                 {navLinks.map((link) => (
                   <Link
                     key={link.label}
                     href={link.href}
                     className="relative text-neutral-300 hover:text-[#01a0be] px-3 py-2 text-sm font-medium transition-colors after:content-[''] after:absolute after:left-0 after:bottom-[6px] after:h-[2px] after:w-full after:bg-[#01a0be] after:scale-x-0 after:origin-left after:transition-transform after:duration-300 hover:after:scale-x-100"
-                  >{link.label}</Link>
+                  >
+                    {link.label}
+                  </Link>
                 ))}
+              </div>
+              <div className="flex items-center">
+                {isLoading ? (
+                  <div className="w-8 h-8 bg-neutral-700 rounded-full animate-pulse"></div>
+                ) : user ? (
+                  <div className="ml-3 relative" ref={profileMenuRef}>
+                    <button
+                      onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                      type="button"
+                      className="flex items-center gap-x-2 rounded-full bg-neutral-800/50 hover:bg-neutral-700/80 p-1 pr-3 text-sm text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-800 focus:ring-white"
+                      id="user-menu-button"
+                      aria-expanded={isProfileMenuOpen}
+                      aria-haspopup="true"
+                    >
+                      <span className="sr-only">Open user menu</span>
+                      <div className="relative h-8 w-8">
+                        <Image
+                          className="h-8 w-8 rounded-full"
+                          src={user.picture}
+                          alt={user.name}
+                          layout="fill"
+                          objectFit="cover"
+                        />
+                      </div>
+                      <span className="hidden sm:block font-medium truncate max-w-[150px]">{user.name}</span>
+                    </button>
+                    {isProfileMenuOpen && (
+                      <div
+                        className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-neutral-800 ring-1 ring-black ring-opacity-5 focus:outline-none"
+                        role="menu"
+                        aria-orientation="vertical"
+                        aria-labelledby="user-menu-button"
+                      >
+                        <div className="px-4 py-2 text-sm text-neutral-300 border-b border-neutral-700 cursor-pointer">
+                          <p className="font-semibold truncate">{user.name}</p>
+                          <p className="text-xs text-neutral-400 truncate">{user.email}</p>
+                        </div>
+                        <a
+                          href="/auth/logout"
+                          className="block px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-700 hover:text-white w-full text-left"
+                          role="menuitem"
+                        >
+                          Log Out
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <a
+                    href="/auth/login"
+                    className="rounded-md bg-[#01a0be] px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#018a9f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#01a0be]"
+                  >
+                    Partner Login
+                  </a>
+                )}
               </div>
             </div>
             {/* Mobile Menu Button */}
@@ -86,6 +160,18 @@ const Navbar = () => {
                   className="text-neutral-300 hover:bg-neutral-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
                 >{link.label}</Link>
               ))}
+              {/* Auth buttons for mobile */}
+              <div className="border-t border-neutral-700 pt-4 mt-4">
+                {user ? (
+                   <a href="/auth/logout" className="text-neutral-300 hover:bg-neutral-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">
+                     Log Out
+                   </a>
+                ) : (
+                  <a href="/auth/login" className="text-neutral-300 hover:bg-neutral-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">
+                    Partner Login
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         )}
