@@ -9,7 +9,7 @@ const ProductNotFound = () => (
 );
 
 async function getProduct(token) {
-  const apiUrl = process.env.PRODUCT_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.EXPORT_API_URL || "http://localhost:3000";
   const res = await fetch(`${apiUrl}/product/${token}`, {
     cache: "no-store",
   });

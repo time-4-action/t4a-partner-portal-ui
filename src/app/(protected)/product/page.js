@@ -1,7 +1,7 @@
 import ProductGrid from "@/components/ProductGrid";
 
 async function getProducts() {
-  const apiUrl = process.env.PRODUCT_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.EXPORT_API_URL || "http://localhost:3000";
   console.log(`${apiUrl}/product`);
   const res = await fetch(`${apiUrl}/product`, {
     cache: "no-store",
