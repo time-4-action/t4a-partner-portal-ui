@@ -7,7 +7,8 @@ import { useUser } from "@auth0/nextjs-auth0/client";
  
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/product", label: "Products" }, // Both links point to the homepage for now
+  { href: "/product", label: "Products" },
+  { href: "/export", label: "Export" },
   { href: "/contact", label: "Contact" },
 ];
 
