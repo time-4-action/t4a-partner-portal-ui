@@ -1,17 +1,51 @@
+/**
+ * Product Grid Component
+ *
+ * This client component displays products in either a grid or list view with selection capabilities.
+ * Features include:
+ * - Toggle between grid and list views
+ * - Product selection (desktop: multi-select, mobile: navigate to detail)
+ * - LocalStorage persistence of selected products
+ * - Copy selected product tokens to clipboard
+ * - Select/deselect all functionality
+ *
+ * @module ProductGrid
+ */
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
+/**
+ * Product Card Component
+ *
+ * Renders a single product in either grid or list view.
+ * Calculates minimum price from all variants and displays product information.
+ *
+ * @param {Object} props - Component props
+ * @param {Object} props.product - Product object with child_products, images, etc.
+ * @param {boolean} props.isSelected - Whether the product is currently selected
+ * @param {Function} props.onSelect - Callback when product is clicked/selected
+ * @param {string} props.view - Display mode: "grid" or "list"
+ * @param {Function} props.onProductNameClick - Callback for detail button click
+ * @returns {JSX.Element} Product card in grid or list layout
+ */
 function ProductCard({
   product,
   isSelected,
   onSelect,
   view,
   onProductNameClick,
-}) {  const getMinPrice = () => {
-    // useMemo will prevent recalculating the price on every render
+}) {
+  /**
+   * Calculates and memoizes the minimum price from all product variants.
+   * Searches through all child products' pricelists to find the lowest price.
+   *
+   * @returns {string} Formatted price string like "From €19.99" or "N/A"
+   */
+  const getMinPrice = () => {
     return useMemo(() => {
       if (!product.child_products || product.child_products.length === 0) {
         return "N/A";
@@ -129,6 +163,19 @@ function ProductCard({
   );
 }
 
+/**
+ * Custom hook for responsive media query matching.
+ *
+ * Listens to window.matchMedia changes and updates the component when
+ * the media query match state changes. Used to detect desktop vs mobile
+ * for different selection behaviors.
+ *
+ * @param {string} query - CSS media query string (e.g., "(min-width: 640px)")
+ * @returns {boolean} Whether the media query currently matches
+ *
+ * @example
+ * const isDesktop = useMediaQuery("(min-width: 640px)");
+ */
 function useMediaQuery(query) {
   const [matches, setMatches] = useState(false);
 
@@ -147,6 +194,23 @@ function useMediaQuery(query) {
   return matches;
 }
 
+/**
+ * Product Grid Component
+ *
+ * Main component that displays a collection of products with selection and view options.
+ *
+ * Selection behavior:
+ * - Desktop (≥640px): Click to toggle multi-select, "Details" button for navigation
+ * - Mobile (<640px): Click to navigate directly to product detail page
+ *
+ * Persistence:
+ * - Selected product tokens are saved to localStorage under "selectedProductTokens"
+ * - Selection persists across page reloads and navigation
+ *
+ * @param {Object} props - Component props
+ * @param {Array} props.initialProducts - Array of product objects from the API
+ * @returns {JSX.Element} Product grid with controls
+ */
 export default function ProductGrid({ initialProducts = [] }) {
   const router = useRouter();
   const [products] = useState(initialProducts);
@@ -155,7 +219,7 @@ export default function ProductGrid({ initialProducts = [] }) {
   const [copyStatus, setCopyStatus] = useState("");
   const isDesktop = useMediaQuery("(min-width: 640px)");
 
-  // Load selection from local storage on initial client-side render
+  // Load selection from localStorage on initial client-side render
   useEffect(() => {
     const savedSelection = localStorage.getItem("selectedProductTokens");
     if (savedSelection) {
@@ -163,11 +227,19 @@ export default function ProductGrid({ initialProducts = [] }) {
     }
   }, []);
 
-  // Save selection to local storage whenever it changes
+  // Save selection to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem("selectedProductTokens", JSON.stringify(selectedProducts));
   }, [selectedProducts]);
 
+  /**
+   * Handles product selection/navigation.
+   * Behavior differs based on screen size:
+   * - Desktop: toggles product selection
+   * - Mobile: navigates to product detail page
+   *
+   * @param {string} token - Product token
+   */
   const handleSelectProduct = (token) => {
     if (isDesktop) {
       setSelectedProducts((prevSelected) =>
@@ -180,6 +252,10 @@ export default function ProductGrid({ initialProducts = [] }) {
     }
   };
 
+  /**
+   * Copies selected product tokens to clipboard as JSON.
+   * Shows a temporary "Copied!" status message for 2 seconds.
+   */
   const handleCopyToClipboard = () => {
     if (selectedProducts.length === 0) return;
     const jsonString = JSON.stringify(selectedProducts, null, 2);
@@ -189,10 +265,19 @@ export default function ProductGrid({ initialProducts = [] }) {
     });
   };
 
+  /**
+   * Navigates to the product detail page.
+   *
+   * @param {string} token - Product token
+   */
   const handleProductNameClick = (token) => {
     router.push(`/product/${token}`);
   };
 
+  /**
+   * Toggles selection of all products.
+   * If all are selected, deselects all; otherwise selects all.
+   */
   const handleSelectAll = () => {
     if (selectedProducts.length === products.length) {
       // Deselect all

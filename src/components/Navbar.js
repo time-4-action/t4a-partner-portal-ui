@@ -1,10 +1,28 @@
+/**
+ * Navbar Component
+ *
+ * Main navigation bar with Auth0 integration for user authentication.
+ * Features include:
+ * - Responsive desktop and mobile layouts
+ * - Auth0 user authentication status
+ * - Profile dropdown menu (desktop)
+ * - Mobile hamburger menu
+ * - Sticky positioning with backdrop blur
+ *
+ * @module Navbar
+ */
+
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
- 
+
+/**
+ * Navigation links configuration.
+ * Defines all main navigation items displayed in both desktop and mobile menus.
+ */
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/product", label: "Products" },
@@ -12,13 +30,33 @@ const navLinks = [
   { href: "/contact", label: "Contact" },
 ];
 
+/**
+ * Navbar Component
+ *
+ * Renders the application's main navigation with Auth0 authentication integration.
+ * Displays user profile when logged in, or login button when logged out.
+ *
+ * Mobile Behavior:
+ * - Hamburger menu with overlay
+ * - Simplified auth buttons
+ *
+ * Desktop Behavior:
+ * - Inline navigation links with hover effects
+ * - Profile dropdown with user info and logout
+ * - Click-outside detection to close dropdown
+ *
+ * @returns {JSX.Element} Navigation bar with authentication
+ */
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { user, isLoading } = useUser();
+  const { user, isLoading } = useUser(); // Auth0 hook for user state
   const profileMenuRef = useRef(null);
 
-  // Close profile menu when clicking outside
+  /**
+   * Effect to close profile dropdown when clicking outside.
+   * Uses ref detection to identify clicks outside the dropdown element.
+   */
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {

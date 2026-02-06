@@ -1,8 +1,46 @@
+/**
+ * Export Page Component
+ *
+ * Advanced product export system with multiple format presets and configuration options.
+ *
+ * Features:
+ * - Multiple export presets (Shopify, Simple, Detailed, Inventory)
+ * - Field selection and customization
+ * - Advanced filtering (stock status, price range, categories, AI categories)
+ * - Pricelist priority configuration with drag-and-drop
+ * - Save/load export configurations
+ * - CSV generation and download
+ * - Preview functionality
+ * - Direct download and shareable API links
+ *
+ * The export system transforms product data from the backend API into various
+ * formats suitable for different use cases (e-commerce platforms, inventory management,
+ * data analysis, etc.).
+ *
+ * @module ExportPage
+ */
+
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 
-// Export presets configuration
+/**
+ * Export preset configurations.
+ *
+ * Each preset defines:
+ * - name: Display name
+ * - description: Brief explanation of use case
+ * - icon: SVG icon component
+ * - fields: Array of available fields with labels and default selection
+ *
+ * Preset Types:
+ * - shopify: Standard Shopify product import CSV format
+ * - simple: Basic product list for general use
+ * - detailed: Comprehensive data export with all metadata
+ * - inventory: Stock levels and pricing information
+ *
+ * @type {Object}
+ */
 const EXPORT_PRESETS = {
   shopify: {
     name: "Shopify",
@@ -119,11 +157,36 @@ const EXPORT_PRESETS = {
   },
 };
 
+/**
+ * Strips HTML tags from a string.
+ * Used to sanitize HTML descriptions for CSV export.
+ *
+ * @param {string} html - HTML string to sanitize
+ * @returns {string} Plain text without HTML tags
+ *
+ * @example
+ * stripHtml("<p>Hello <strong>World</strong></p>") // Returns "Hello World"
+ */
 function stripHtml(html) {
   if (!html) return "";
   return html.replace(/<[^>]*>/g, "").trim();
 }
 
+/**
+ * Escapes a value for safe CSV output.
+ *
+ * Wraps values in double quotes if they contain:
+ * - Commas
+ * - Double quotes (which are escaped as "")
+ * - Newlines
+ *
+ * @param {*} value - Value to escape (converted to string)
+ * @returns {string} CSV-safe value
+ *
+ * @example
+ * escapeCSV('Test, value') // Returns '"Test, value"'
+ * escapeCSV('Say "hello"') // Returns '"Say ""hello"""'
+ */
 function escapeCSV(value) {
   if (value === null || value === undefined) return "";
   const str = String(value);
@@ -133,6 +196,15 @@ function escapeCSV(value) {
   return str;
 }
 
+/**
+ * Formats a date string to YYYY-MM-DD format.
+ *
+ * @param {string} dateStr - ISO date string or parseable date
+ * @returns {string} Formatted date or empty string if invalid
+ *
+ * @example
+ * formatDate("2024-01-15T10:30:00Z") // Returns "2024-01-15"
+ */
 function formatDate(dateStr) {
   if (!dateStr) return "";
   try {
@@ -185,8 +257,18 @@ const RefreshIcon = () => (
   </svg>
 );
 
+/**
+ * Export Page Component
+ *
+ * Main component for configuring and generating product data exports.
+ *
+ * @param {Object} props - Component props
+ * @param {Array} props.initialProducts - Product data from API
+ * @param {string} props.apiUrl - Backend API URL for saved exports
+ * @returns {JSX.Element} Export configuration UI
+ */
 export default function ExportPage({ initialProducts = [], apiUrl = "http://localhost:4000" }) {
-  // State
+  // State management
   const [selectedPreset, setSelectedPreset] = useState("shopify");
   const [selectedFields, setSelectedFields] = useState(() => {
     const preset = EXPORT_PRESETS.shopify;
@@ -215,11 +297,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
   const [isLoadingExports, setIsLoadingExports] = useState(false);
   const [previewLimit, setPreviewLimit] = useState(5);
   const [draggedIndex, setDraggedIndex] = useState(null);
-  const [dropIndicator, setDropIndicator] = useState(null); // index where indicator shows
-  const [copiedId, setCopiedId] = useState(null); // track which export link was copied
-  const [downloadingId, setDownloadingId] = useState(null); // track which export is downloading
+  const [dropIndicator, setDropIndicator] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
 
-  // Extract all unique pricelists from products
+  /**
+   * Extracts and memoizes all unique pricelists from products.
+   * Sorts by validity date (newest first) for default priority ordering.
+   *
+   * @type {Array<Object>} Array of pricelist objects with name and validFrom
+   */
   const availablePricelists = useMemo(() => {
     const pricelistMap = new Map();
     initialProducts.forEach((product) => {

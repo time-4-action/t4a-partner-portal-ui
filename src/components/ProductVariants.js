@@ -1,9 +1,34 @@
+/**
+ * Product Variants Component
+ *
+ * Displays a product's detailed information with variant selection, pricing, and image gallery.
+ * Handles complex image aggregation from multiple sources to provide comprehensive product imagery.
+ *
+ * Features:
+ * - Variant selection with highlighting
+ * - Dynamic image gallery based on selected variant
+ * - Price formatting with VAT calculation
+ * - Stock status display
+ * - HTML product descriptions
+ *
+ * @module ProductVariants
+ */
+
 "use client";
 
 import { useState, useMemo } from "react";
 import ProductImageGallery from "@/components/ProductImageGallery";
 
-// Helper to format price
+/**
+ * Formats a price with VAT included.
+ *
+ * @param {number} price - Base price before VAT
+ * @param {number} vat - VAT percentage (e.g., 22 for 22%)
+ * @returns {string} Formatted price string with currency (e.g., "€24.40") or "N/A"
+ *
+ * @example
+ * formatPrice(20, 22) // Returns "€24.40"
+ */
 const formatPrice = (price, vat) => {
   if (typeof price !== "number") return "N/A";
   const priceWithVat = price * (1 + (vat || 0) / 100);
@@ -13,11 +38,29 @@ const formatPrice = (price, vat) => {
   }).format(priceWithVat);
 };
 
-// Helper to get the most relevant price from a pricelist
+/**
+ * Extracts the first (most relevant) price from a pricelist array.
+ *
+ * @param {Array} pricelist - Array of price objects with price and vat properties
+ * @returns {Object|null} First price object or null if empty
+ */
 const getDisplayPrice = (pricelist = []) => {
   return pricelist.length > 0 ? pricelist[0] : null;
 };
 
+/**
+ * Product Variants Component
+ *
+ * Main component for displaying product details with variant selection.
+ *
+ * @param {Object} props - Component props
+ * @param {Object} props.product - Product object containing child_products, images, descriptions, etc.
+ * @param {Array} props.product.child_products - Array of variant objects
+ * @param {Array} props.product.images - Parent product images
+ * @param {string} props.product.short_description - HTML short description
+ * @param {string} props.product.detailed_description - HTML detailed description
+ * @returns {JSX.Element} Product details with variant selector and image gallery
+ */
 export default function ProductVariants({ product }) {
   const [selectedVariant, setSelectedVariant] = useState(
     product.child_products?.[0] || null
@@ -28,22 +71,37 @@ export default function ProductVariants({ product }) {
     [selectedVariant]
   );
 
+  /**
+   * Aggregates images from multiple sources in priority order.
+   *
+   * Image Priority:
+   * 1. Selected variant's images (most specific)
+   * 2. Parent product images (excluding first, which is used as thumbnail)
+   * 3. All other variant images (for comprehensive view)
+   *
+   * This complex aggregation ensures users see all available product imagery
+   * while prioritizing the most relevant images for the selected variant.
+   * Duplicates are removed while preserving order.
+   *
+   * @type {Array<Object>} Array of image objects with `url` property
+   */
   const imagesToShow = useMemo(() => {
-    // Start with the selected variant's images.
+    // Start with the selected variant's images
     const variantImages = selectedVariant?.images || [];
-    // Then, add the parent product's images, but skip the first one.
+
+    // Add parent product's images, excluding the first one (used as thumbnail elsewhere)
     const parentImages = (product.images || []).slice(1);
-    // Finally, add all images from all child products.
+
+    // Add images from all other child products for comprehensive view
     const allChildImages = (product.child_products || []).flatMap(p => p.images || []);
 
-    // Combine them in order of priority: selected variant -> parent (minus first) -> other variants.
+    // Combine in priority order: selected variant -> parent -> other variants
     const combinedImages = [...variantImages, ...parentImages, ...allChildImages];
 
-    // Create a unique list of images based on the URL, preserving the order.
+    // Remove duplicates while preserving order using Set
     const uniqueImageUrls = [...new Set(combinedImages.filter(Boolean))];
 
-    // The ProductImageGallery component expects an array of objects with a 'url' property.
-    // We map the unique URLs to this structure.
+    // Transform to ProductImageGallery's expected format
     return uniqueImageUrls.map(url => ({ url }));
   }, [product, selectedVariant]);
 

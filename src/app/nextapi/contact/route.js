@@ -1,16 +1,53 @@
+/**
+ * Contact Form API Route
+ *
+ * Handles contact form submissions by sending emails via nodemailer with Gmail SMTP.
+ *
+ * Required Environment Variables:
+ * - GMAIL_EMAIL: Gmail address to send emails from
+ * - GMAIL_APP_PASSWORD: Gmail App Password (not regular password)
+ *
+ * Security Note:
+ * GMAIL_APP_PASSWORD must be an App Password generated from Google Account settings,
+ * not the regular Gmail password. Enable 2FA first, then generate an app password at:
+ * https://myaccount.google.com/apppasswords
+ *
+ * @module ContactRoute
+ */
+
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
-// This is a placeholder for a real email sending service.
-// You would replace this with a library like nodemailer, Resend, or SendGrid.
+/**
+ * Sends an email using nodemailer with Gmail SMTP.
+ *
+ * Configures a Gmail transporter and sends a formatted email with both
+ * plain text and HTML versions. The email is sent to a fixed recipient
+ * (grega@etiam.si) with the form submitter's email as the reply-to address.
+ *
+ * @async
+ * @param {Object} params - Email parameters
+ * @param {string} params.name - Sender's name
+ * @param {string} params.company - Sender's company
+ * @param {string} params.email - Sender's email address (used for reply-to)
+ * @param {string} params.message - Message content
+ * @returns {Promise<void>}
+ * @throws {Error} If email sending fails due to auth or network issues
+ *
+ * @example
+ * await sendEmail({
+ *   name: "John Doe",
+ *   company: "ACME Corp",
+ *   email: "john@acme.com",
+ *   message: "I'm interested in your products"
+ * });
+ */
 async function sendEmail({ name, company, email, message }) {
-  // In a real application, you would have your email sending logic here.
-  // For example, using nodemailer with Gmail:
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: process.env.GMAIL_EMAIL,
-      pass: process.env.GMAIL_APP_PASSWORD, // IMPORTANT: Use an App Password here
+      pass: process.env.GMAIL_APP_PASSWORD, // IMPORTANT: Use an App Password, not regular password
     },
   });
 
@@ -20,7 +57,7 @@ async function sendEmail({ name, company, email, message }) {
     replyTo: email,
     subject: 'New Contact Form Submission from Patrik Products Portal',
     text: `You have a new submission from the contact form.
-    
+
 Name: ${name}
 Company: ${company}
 Email: ${email}
@@ -40,6 +77,30 @@ ${message}`,
   await transporter.sendMail(mailOptions);
 }
 
+/**
+ * POST handler for contact form submissions.
+ *
+ * Receives JSON body with contact form data, sends email, and returns success/error response.
+ *
+ * @async
+ * @param {Request} request - Next.js request object with JSON body
+ * @returns {Promise<NextResponse>} JSON response with success or error message
+ *
+ * @example
+ * // Request body:
+ * {
+ *   "name": "John Doe",
+ *   "company": "ACME Corp",
+ *   "email": "john@acme.com",
+ *   "message": "I'm interested in your products"
+ * }
+ *
+ * // Success response:
+ * { "message": "Email sent successfully" }
+ *
+ * // Error response (500):
+ * { "error": "Failed to send email" }
+ */
 export async function POST(request) {
   try {
     const body = await request.json();

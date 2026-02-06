@@ -1,33 +1,77 @@
+/**
+ * Product Image Gallery Component
+ *
+ * A responsive image carousel for displaying product photos with navigation controls.
+ * Features include:
+ * - Keyboard and button navigation (previous/next)
+ * - Dot indicators for direct slide access
+ * - Automatic index reset when images change (variant selection)
+ * - Placeholder image fallback
+ * - Infinite loop navigation
+ *
+ * @module ProductImageGallery
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
+/**
+ * Product Image Gallery Component
+ *
+ * Displays a carousel of product images with navigation controls.
+ * Automatically resets to the first image when the images array changes.
+ *
+ * @param {Object} props - Component props
+ * @param {Array<Object>} props.images - Array of image objects with `url` property
+ * @param {string} props.altText - Alt text for images (product name)
+ * @returns {JSX.Element} Image gallery with navigation
+ *
+ * @example
+ * <ProductImageGallery
+ *   images={[{ url: "https://..." }, { url: "https://..." }]}
+ *   altText="Product Name"
+ * />
+ */
 const ProductImageGallery = ({ images, altText }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Reset index when images change (e.g., when a new variant is selected)
+  // Reset to first image when images array changes (e.g., variant selection)
   useEffect(() => {
     setCurrentIndex(0);
   }, [images]);
 
-  // Handle cases where images might be missing and provide a placeholder
+  // Provide placeholder if no images available
   const safeImages = (!images || images.length === 0)
     ? [{ url: "https://via.placeholder.com/800" }]
     : images;
 
+  /**
+   * Navigates to the previous image in the gallery.
+   * Wraps to the last image if currently on the first.
+   */
   const goToPrevious = () => {
     const isFirstSlide = currentIndex === 0;
     const newIndex = isFirstSlide ? safeImages.length - 1 : currentIndex - 1;
     setCurrentIndex(newIndex);
   };
 
+  /**
+   * Navigates to the next image in the gallery.
+   * Wraps to the first image if currently on the last.
+   */
   const goToNext = () => {
     const isLastSlide = currentIndex === safeImages.length - 1;
     const newIndex = isLastSlide ? 0 : currentIndex + 1;
     setCurrentIndex(newIndex);
   };
 
+  /**
+   * Jumps directly to a specific slide by index.
+   *
+   * @param {number} slideIndex - Index of the slide to display
+   */
   const goToSlide = (slideIndex) => {
     setCurrentIndex(slideIndex);
   };
