@@ -2,37 +2,14 @@ import { auth0 } from "@/lib/auth0";
 import ProductGrid from "@/components/ProductGrid";
 
 async function getProducts() {
-  // ✅ Get a proper API access token (best practice with nextjs-auth0)
-  const {  token } = await auth0.getAccessToken({
-    authorizationParams: {
-      // Must match your Auth0 API Identifier (Audience)
-      audience: 'https://api.time-4-action.com',
-      // If you use API scopes, add them here:
-      scope: "read:products",
-    },
-    refresh: true,
-  });
-  console.log(token);
-
-  // Safe debug (does not leak token)
-  console.log("accessToken segments:", token?.split(".").length);
-
-  if (!token) {
-    throw new Error("Not authenticated to fetch products.");
-  }
-
-  // ✅ Stronger env handling
+    // ✅ Stronger env handling
   const apiUrl =
     process.env.EXPORT_API_URL ||
     process.env.NEXT_PUBLIC_EXPORT_API_URL ||
     "http://localhost:4000"; // <-- default to your API port (not Next.js port)
 
   const res = await fetch(`${apiUrl}/product`, {
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
+    cache: "no-store"
   });
 
   if (!res.ok) {
