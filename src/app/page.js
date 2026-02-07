@@ -7,8 +7,8 @@ async function HomePage() {
   if (user) {
     // Logged-in partner view
     return (
-      <div className="relative flex h-full items-center px-6 pt-14 lg:px-8 p-8">
-        <div className="relative mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
+      <div className="relative flex h-[calc(100vh-4rem)] items-center justify-center overflow-hidden px-6 lg:px-8">
+        <div className="relative mx-auto max-w-2xl">
           <div className="text-center">
             <h1 className="text-4xl font-bold tracking-tight text-neutral-100 sm:text-5xl">
               Your Direct Source for Patrik's Product Data
@@ -35,8 +35,8 @@ async function HomePage() {
 
   // Public view for non-logged-in users
   return (
-    <div className="relative flex h-full items-center px-6 pt-14 lg:px-8 p-8">
-      <div className="relative mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
+    <div className="relative flex h-[calc(100vh-4rem)] items-center justify-center overflow-hidden px-6 lg:px-8">
+      <div className="relative mx-auto max-w-2xl">
         <div className="text-center">
           <h1 className="text-4xl font-bold tracking-tight text-neutral-100 sm:text-5xl">
             Welcome to the Patrik Partner Portal
