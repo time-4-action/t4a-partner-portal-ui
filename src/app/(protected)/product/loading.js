@@ -1,44 +1,43 @@
 function SkeletonCard() {
   return (
-    <div className="bg-neutral-800 rounded-lg overflow-hidden shadow-lg flex flex-col h-full">
-      {/* Image Placeholder */}
-      <div className="bg-neutral-700 w-full aspect-square animate-pulse"></div>
-      <div className="p-4 flex flex-col flex-grow">
-        {/* Title Placeholder - making it taller to simulate multi-line titles */}
-        <div className="h-14 bg-neutral-700 rounded w-full animate-pulse"></div>
-        <div className="mt-auto pt-4">
-          <div className="flex justify-between items-end mb-4">
-            <div>
-              <div className="h-3 bg-neutral-700 rounded w-12 mb-2 animate-pulse"></div>
-              <div className="h-8 bg-neutral-700 rounded w-24 animate-pulse"></div>
-            </div>
-            <div className="h-5 bg-neutral-700 rounded w-28 animate-pulse"></div>
-          </div>
-          {/* Button Placeholder */}
-          <div className="h-10 bg-neutral-700 rounded-lg w-full animate-pulse"></div>
+    <div className="bg-neutral-900/70 border border-neutral-800/60 rounded-xl overflow-hidden">
+      <div className="aspect-square bg-neutral-800 animate-pulse" />
+      <div className="p-3 space-y-2">
+        <div className="h-3 bg-neutral-700/60 rounded w-full animate-pulse" />
+        <div className="h-3 bg-neutral-700/60 rounded w-3/4 animate-pulse" />
+        <div className="flex justify-between mt-1">
+          <div className="h-2.5 bg-neutral-700/40 rounded w-16 animate-pulse" />
+          <div className="h-2.5 bg-neutral-700/40 rounded w-12 animate-pulse" />
         </div>
+        <div className="flex gap-1 mt-1">
+          <div className="h-4 bg-neutral-800 rounded-md w-16 animate-pulse" />
+          <div className="h-4 bg-neutral-800 rounded-md w-14 animate-pulse" />
+        </div>
+        <div className="h-7 bg-neutral-800 rounded-lg w-full animate-pulse mt-1" />
       </div>
     </div>
   );
 }
 
 export default function Loading() {
-  // You can add any UI inside Loading, including a Skeleton.
   return (
     <div className="relative p-8 bg-transparent">
       <div className="relative max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
         {/* Header Skeleton */}
-        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
-          <div className="h-9 w-64 bg-neutral-700 rounded animate-pulse"></div>
-          <div className="flex items-center gap-4">
-            <div className="h-9 w-24 bg-neutral-800 rounded-lg animate-pulse"></div>
-            <div className="h-9 w-24 bg-neutral-800 rounded-lg animate-pulse"></div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <div className="h-8 w-56 bg-neutral-700 rounded-lg animate-pulse mb-2" />
+            <div className="h-4 w-24 bg-neutral-700/40 rounded animate-pulse" />
+          </div>
+          <div className="flex bg-neutral-800/80 border border-neutral-700/50 rounded-xl p-1 gap-0.5 w-fit">
+            <div className="w-8 h-8 bg-neutral-700/40 rounded-lg animate-pulse" />
+            <div className="w-8 h-8 bg-neutral-700/40 rounded-lg animate-pulse" />
           </div>
         </div>
 
         {/* Grid Skeleton */}
-        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {Array.from({ length: 10 }).map((_, i) => <SkeletonCard key={i} />)}
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          {Array.from({ length: 18 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       </div>
     </div>

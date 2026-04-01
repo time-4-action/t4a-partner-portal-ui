@@ -59,7 +59,7 @@ const EXPORT_PRESETS = {
             { key: "vendor", label: "Vendor", default: true },
             { key: "type", label: "Type", default: false },
             { key: "tags", label: "Tags (Categories)", default: true },
-            { key: "ai_tags", label: "Tags (AI Categories)", default: false },
+            { key: "ai_tags", label: "Tags (Custom Categories)", default: false },
             { key: "published", label: "Published", default: true },
             { key: "variant_sku", label: "Variant SKU", default: true },
             { key: "variant_title", label: "Variant Title", default: true },
@@ -90,7 +90,7 @@ const EXPORT_PRESETS = {
             { key: "price_with_vat", label: "Price with VAT", default: false },
             { key: "stock", label: "Stock", default: true },
             { key: "categories", label: "Categories", default: true },
-            { key: "ai_category_names", label: "AI Categories", default: false },
+            { key: "ai_category_names", label: "Custom Categories", default: false },
             { key: "image_url", label: "Image URL", default: true },
         ],
     },
@@ -117,9 +117,9 @@ const EXPORT_PRESETS = {
             { key: "stock", label: "Stock Amount", default: true },
             { key: "categories", label: "Categories", default: true },
             { key: "ai_export_ids", label: "AI Export IDs", default: false },
-            { key: "ai_category_names", label: "AI Category Names", default: false },
-            { key: "ai_category_ids", label: "AI Category IDs", default: false },
-            { key: "ai_category_full", label: "AI Categories (Full)", default: false },
+            { key: "ai_category_names", label: "Custom Category Names", default: false },
+            { key: "ai_category_ids", label: "Custom Category IDs", default: false },
+            { key: "ai_category_full", label: "Custom Categories (Full)", default: false },
             { key: "short_description", label: "Short Description", default: false },
             { key: "detailed_description", label: "Detailed Description", default: false },
             { key: "is_new", label: "New Product", default: true },
@@ -214,7 +214,8 @@ function formatDate(dateStr) {
     }
 }
 
-// Icons
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
 const ChevronUpIcon = () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -228,13 +229,13 @@ const ChevronDownIcon = () => (
 );
 
 const SaveIcon = () => (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
     </svg>
 );
 
-const DownloadIcon = () => (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const DownloadIcon = ({ size = 4 }) => (
+    <svg className={`w-${size} h-${size}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
 );
@@ -245,17 +246,82 @@ const TrashIcon = () => (
     </svg>
 );
 
-const LinkIcon = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-    </svg>
-);
-
 const RefreshIcon = () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
     </svg>
 );
+
+const KeyIcon = () => (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+    </svg>
+);
+
+const UsersIcon = () => (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+);
+
+const LoadIcon = () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+    </svg>
+);
+
+const FilterIcon = () => (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+    </svg>
+);
+
+const SpinnerIcon = () => (
+    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    </svg>
+);
+
+// Format metadata: color schemes, icons, labels
+const FORMAT_META = {
+    csv: {
+        label: 'CSV',
+        color: 'emerald',
+        bg: 'bg-emerald-500/15 hover:bg-emerald-500/25',
+        text: 'text-emerald-400',
+        activeBg: 'bg-emerald-500/20',
+        icon: (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M10 3v18M14 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" />
+            </svg>
+        ),
+    },
+    json: {
+        label: 'JSON',
+        color: 'amber',
+        bg: 'bg-amber-500/15 hover:bg-amber-500/25',
+        text: 'text-amber-400',
+        activeBg: 'bg-amber-500/20',
+        icon: (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+        ),
+    },
+    xml: {
+        label: 'XML',
+        color: 'orange',
+        bg: 'bg-orange-500/15 hover:bg-orange-500/25',
+        text: 'text-orange-400',
+        activeBg: 'bg-orange-500/20',
+        icon: (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8l-4 4 4 4m10-8l4 4-4 4M14 4l-4 16" />
+            </svg>
+        ),
+    },
+};
 
 /**
  * Export Page Component
@@ -267,7 +333,54 @@ const RefreshIcon = () => (
  * @param {string} props.apiUrl - Backend API URL for saved exports
  * @returns {JSX.Element} Export configuration UI
  */
-export default function ExportPage({ initialProducts = [], apiUrl = "http://localhost:4000" }) {
+// Client-side filter application for preview — mirrors backend applyFilters, backwards-compatible
+function applyFiltersLocal(products, filters) {
+    if (!filters) return products;
+    return products.filter(product => {
+        if (filters.search?.trim()) {
+            const s = filters.search.toLowerCase();
+            const match = product.product_name?.toLowerCase().includes(s) ||
+                product.code?.toLowerCase().includes(s) ||
+                product.child_products?.some(v => v.code?.toLowerCase().includes(s) || v.ean_code?.toLowerCase().includes(s));
+            if (!match) return false;
+        }
+        if (filters.stockStatus !== 'all') {
+            const hasStock = product.child_products?.some(v => v.stock_amount > 0);
+            if (filters.stockStatus === 'in_stock' && !hasStock) return false;
+            if (filters.stockStatus === 'out_of_stock' && hasStock) return false;
+        }
+        if (filters.minPrice || filters.maxPrice) {
+            const prices = product.child_products?.flatMap(v => v.pricelist?.map(p => p.price) || []).filter(p => p > 0) || [];
+            if (!prices.length) return false;
+            if (filters.minPrice && Math.max(...prices) < parseFloat(filters.minPrice)) return false;
+            if (filters.maxPrice && Math.min(...prices) > parseFloat(filters.maxPrice)) return false;
+        }
+        const categories = Array.isArray(filters.category) ? filters.category : (filters.category && filters.category !== 'all' ? [filters.category] : []);
+        if (categories.length > 0 && !categories.some(cat => product.categories?.includes(cat))) return false;
+        if (filters.aiExportId && filters.aiExportId !== 'all' && !product.ai_categories?.some(c => c.exportId === filters.aiExportId)) return false;
+        const aiCategories = Array.isArray(filters.aiCategory) ? filters.aiCategory : (filters.aiCategory && filters.aiCategory !== 'all' ? [filters.aiCategory] : []);
+        if (aiCategories.length > 0) {
+            const hasAi = aiCategories.some(prefix =>
+                product.ai_categories?.some(c =>
+                    (c.categoryName === prefix || c.categoryName?.startsWith(prefix + ' / ')) &&
+                    (filters.aiExportId === 'all' || c.exportId === filters.aiExportId)
+                )
+            );
+            if (!hasAi) return false;
+        }
+        if (filters.imageFilter && filters.imageFilter !== 'all') {
+            const hasImg = (product.images || []).length > 0 || product.child_products?.some(v => (v.images || []).length > 0);
+            if (filters.imageFilter === 'with_images' && !hasImg) return false;
+            if (filters.imageFilter === 'without_images' && hasImg) return false;
+        }
+        if (filters.showNew && !product.new) return false;
+        if (filters.showRecommended && !product.recomended) return false;
+        if (filters.publishedOnly && !product.published) return false;
+        return true;
+    });
+}
+
+export default function ExportPage({ initialProducts = [], apiUrl = '', allowedExports = null }) {
     // State management
     const [selectedPreset, setSelectedPreset] = useState("shopify");
     const [selectedFields, setSelectedFields] = useState(() => {
@@ -279,9 +392,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
         stockStatus: "all",
         minPrice: "",
         maxPrice: "",
-        category: "all",
+        category: [],
         aiExportId: "all",
-        aiCategory: "all",
+        aiCategory: [],
+        imageFilter: "all",
         showNew: false,
         showRecommended: false,
         publishedOnly: false,
@@ -300,6 +414,25 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
     const [dropIndicator, setDropIndicator] = useState(null);
     const [copiedId, setCopiedId] = useState(null);
     const [downloadingId, setDownloadingId] = useState(null);
+    const [showKeysModal, setShowKeysModal] = useState(false);
+    const [showAccessModal, setShowAccessModal] = useState(false);
+    const [activeExportId, setActiveExportId] = useState(null);
+    const [exportKeys, setExportKeys] = useState([]);
+    const [exportAccess, setExportAccess] = useState([]);
+    const [newKeyName, setNewKeyName] = useState('');
+    const [createdKeyRaw, setCreatedKeyRaw] = useState(null);
+    const [newGrantEmail, setNewGrantEmail] = useState('');
+    const [isKeyLoading, setIsKeyLoading] = useState(false);
+    const [isAccessLoading, setIsAccessLoading] = useState(false);
+    const [copiedField, setCopiedField] = useState(null); // 'key' | 'csv' | 'json' | 'xml' | null
+    const [createdKeyTab, setCreatedKeyTab] = useState('key'); // 'key' | 'endpoints' | 'usage'
+    const [expandedKeyId, setExpandedKeyId] = useState(null);
+    const [expandedCategories, setExpandedCategories] = useState(new Set()); // paths expanded in category tree
+    const [exportStep, setExportStep] = useState('format'); // 'format' | 'filters' | 'fields' | 'export'
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewConfig, setPreviewConfig] = useState(null); // null = live filteredProducts, or saved config object
+    const [previewView, setPreviewView] = useState('grid'); // 'grid' | 'list'
+    const [previewSearch, setPreviewSearch] = useState('');
 
     /**
      * Extracts and memoizes all unique pricelists from products.
@@ -348,8 +481,68 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
         return Array.from(categories).sort();
     }, [initialProducts]);
 
-    // Extract all unique AI exports
+    // Categories available given current filters (excluding the category filter itself) with per-category product counts
+    const { dynamicCategories, categoryProductCounts } = useMemo(() => {
+        const catCounts = new Map();
+        initialProducts.forEach(product => {
+            if (filters.search) {
+                const sl = filters.search.toLowerCase();
+                const match = product.product_name?.toLowerCase().includes(sl) ||
+                    product.code?.toLowerCase().includes(sl) ||
+                    product.short_description?.toLowerCase().includes(sl) ||
+                    product.child_products?.some(v => v.code?.toLowerCase().includes(sl) || v.ean_code?.toLowerCase().includes(sl));
+                if (!match) return;
+            }
+            if (filters.stockStatus !== 'all') {
+                const hasStock = product.child_products?.some(v => v.stock_amount > 0);
+                if (filters.stockStatus === 'in_stock' && !hasStock) return;
+                if (filters.stockStatus === 'out_of_stock' && hasStock) return;
+            }
+            if (filters.minPrice || filters.maxPrice) {
+                const prices = product.child_products?.map(v => {
+                    const p = v.pricelist?.[0]; return p?.price || 0;
+                }).filter(p => p > 0) || [];
+                if (!prices.length) return;
+                const lo = Math.min(...prices), hi = Math.max(...prices);
+                if (filters.minPrice && hi < parseFloat(filters.minPrice)) return;
+                if (filters.maxPrice && lo > parseFloat(filters.maxPrice)) return;
+            }
+            if (filters.aiExportId !== 'all') {
+                if (!product.ai_categories?.some(c => c.exportId === filters.aiExportId)) return;
+            }
+            if (filters.aiCategory.length > 0) {
+                if (!filters.aiCategory.some(prefix =>
+                    product.ai_categories?.some(c =>
+                        (c.categoryName === prefix || c.categoryName?.startsWith(prefix + ' / ')) &&
+                        (filters.aiExportId === 'all' || c.exportId === filters.aiExportId)))) return;
+            }
+            if (filters.imageFilter !== 'all') {
+                const hasImg = (product.images || []).length > 0 ||
+                    (product.child_products || []).some(v => (v.images || []).length > 0);
+                if (filters.imageFilter === 'with_images' && !hasImg) return;
+                if (filters.imageFilter === 'without_images' && hasImg) return;
+            }
+            if (filters.showNew && !product.new) return;
+            if (filters.showRecommended && !product.recomended) return;
+            if (filters.publishedOnly && !product.published) return;
+            product.categories?.forEach(cat => catCounts.set(cat, (catCounts.get(cat) || 0) + 1));
+        });
+        return { dynamicCategories: Array.from(catCounts.keys()).sort(), categoryProductCounts: catCounts };
+    }, [initialProducts, filters.search, filters.stockStatus, filters.minPrice, filters.maxPrice,
+        filters.aiExportId, filters.aiCategory, filters.imageFilter,
+        filters.showNew, filters.showRecommended, filters.publishedOnly]);
+
+    // Extract AI exports: role-filtered when allowedExports is provided, otherwise derived from product data
     const availableAiExports = useMemo(() => {
+        if (allowedExports !== null) {
+            // Role-based: only show exports this user is allowed to see that also have product data
+            const inProducts = new Set();
+            initialProducts.forEach(p => p.ai_categories?.forEach(c => { if (c.exportId) inProducts.add(c.exportId); }));
+            return allowedExports
+                .filter(exp => inProducts.has(String(exp._id)))
+                .map(exp => ({ exportId: String(exp._id), name: exp.name, logo: exp.logo || null }));
+        }
+        // Fallback: derive from product data (no role filtering)
         const exportMap = new Map();
         initialProducts.forEach((product) => {
             product.ai_categories?.forEach((cat) => {
@@ -357,23 +550,22 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                     exportMap.set(cat.exportId, {
                         exportId: cat.exportId,
                         name: cat.categoryName?.split(" / ")[0] || cat.exportId.slice(-6),
+                        logo: null,
                     });
                 }
             });
         });
         return Array.from(exportMap.values());
-    }, [initialProducts]);
+    }, [initialProducts, allowedExports]);
 
-    // Extract AI categories filtered by selected exportId
+    // Extract AI categories filtered by selected exportId (keyed by name for tree deduplication)
     const availableAiCategories = useMemo(() => {
         const categoryMap = new Map();
         initialProducts.forEach((product) => {
             product.ai_categories?.forEach((cat) => {
-                if (filters.aiExportId !== "all" && cat.exportId !== filters.aiExportId) {
-                    return;
-                }
-                if (cat.categoryId && cat.categoryName && !categoryMap.has(cat.categoryId)) {
-                    categoryMap.set(cat.categoryId, {
+                if (filters.aiExportId !== "all" && cat.exportId !== filters.aiExportId) return;
+                if (cat.categoryName && !categoryMap.has(cat.categoryName)) {
+                    categoryMap.set(cat.categoryName, {
                         exportId: cat.exportId,
                         categoryId: cat.categoryId,
                         categoryName: cat.categoryName,
@@ -385,6 +577,58 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
             a.categoryName.localeCompare(b.categoryName)
         );
     }, [initialProducts, filters.aiExportId]);
+
+    // Build a nested tree from flat "A / B / C" category names
+    const categoryTree = useMemo(() => {
+        const root = {};
+        availableAiCategories.forEach(({ categoryName }) => {
+            if (!categoryName) return;
+            const parts = categoryName.split(" / ").map(p => p.trim());
+            let node = root;
+            let path = "";
+            parts.forEach((part, i) => {
+                path = i === 0 ? part : `${path} / ${part}`;
+                if (!node[part]) node[part] = { _path: path, children: {} };
+                node = node[part].children;
+            });
+        });
+        return root;
+    }, [availableAiCategories]);
+
+    // Count products per category prefix (so "Furniture" shows count of all furniture products)
+    const productCountByPrefix = useMemo(() => {
+        const counts = {};
+        initialProducts.forEach(p => {
+            p.ai_categories?.forEach(c => {
+                if (filters.aiExportId !== "all" && c.exportId !== filters.aiExportId) return;
+                if (!c.categoryName) return;
+                const parts = c.categoryName.split(" / ").map(s => s.trim());
+                let prefix = "";
+                parts.forEach((part, i) => {
+                    prefix = i === 0 ? part : `${prefix} / ${part}`;
+                    counts[prefix] = (counts[prefix] || 0) + 1;
+                });
+            });
+        });
+        return counts;
+    }, [initialProducts, filters.aiExportId]);
+
+    // Auto-select the export when there is exactly one available (single-company user)
+    useEffect(() => {
+        if (availableAiExports.length === 1 && filters.aiExportId === "all") {
+            setFilters(prev => ({ ...prev, aiExportId: availableAiExports[0].exportId, aiCategory: [] }));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [availableAiExports]);
+
+    // Auto-remove categories that no longer have matching products given other active filters
+    useEffect(() => {
+        if (filters.category.length === 0) return;
+        const valid = filters.category.filter(cat => dynamicCategories.includes(cat));
+        if (valid.length !== filters.category.length) {
+            setFilters(prev => ({ ...prev, category: valid }));
+        }
+    }, [dynamicCategories, filters.category]);
 
     // Get price from pricelist priority (first enabled pricelist that has a price)
     const getPriceFromPriority = useCallback((variant) => {
@@ -443,9 +687,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                 if (filters.maxPrice && minProductPrice > parseFloat(filters.maxPrice)) return false;
             }
 
-            if (filters.category !== "all") {
-                const hasCategory = product.categories?.includes(filters.category);
-                if (!hasCategory) return false;
+            if (filters.category.length > 0) {
+                if (!filters.category.some(cat => product.categories?.includes(cat))) return false;
             }
 
             if (filters.aiExportId !== "all") {
@@ -453,12 +696,22 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                 if (!hasExport) return false;
             }
 
-            if (filters.aiCategory !== "all") {
-                const hasAiCategory = product.ai_categories?.some(
-                    (c) => c.categoryId === filters.aiCategory &&
-                        (filters.aiExportId === "all" || c.exportId === filters.aiExportId)
+            if (filters.aiCategory.length > 0) {
+                const hasAiCategory = filters.aiCategory.some(prefix =>
+                    product.ai_categories?.some(
+                        (c) => (c.categoryName === prefix || c.categoryName?.startsWith(prefix + " / ")) &&
+                            (filters.aiExportId === "all" || c.exportId === filters.aiExportId)
+                    )
                 );
                 if (!hasAiCategory) return false;
+            }
+
+            if (filters.imageFilter && filters.imageFilter !== "all") {
+                const parentImages = product.images || [];
+                const childImages = (product.child_products || []).flatMap((v) => v.images || []);
+                const hasImages = parentImages.length > 0 || childImages.length > 0;
+                if (filters.imageFilter === "with_images" && !hasImages) return false;
+                if (filters.imageFilter === "without_images" && hasImages) return false;
             }
 
             if (filters.showNew && !product.new) return false;
@@ -468,6 +721,22 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
             return true;
         });
     }, [initialProducts, filters, getPriceFromPriority]);
+
+    // Products to show in the preview panel
+    const previewBaseProducts = useMemo(() => {
+        if (previewConfig) return applyFiltersLocal(initialProducts, previewConfig.filters);
+        return filteredProducts;
+    }, [previewConfig, filteredProducts, initialProducts]);
+
+    const previewDisplayProducts = useMemo(() => {
+        if (!previewSearch.trim()) return previewBaseProducts;
+        const s = previewSearch.toLowerCase();
+        return previewBaseProducts.filter(p =>
+            p.product_name?.toLowerCase().includes(s) ||
+            p.code?.toLowerCase().includes(s) ||
+            p.categories?.some(c => c.toLowerCase().includes(s))
+        );
+    }, [previewBaseProducts, previewSearch]);
 
     // Handle preset change
     const handlePresetChange = (presetKey) => {
@@ -744,20 +1013,106 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
         return rows.join("\n");
     }, [selectedPreset, selectedFields, filteredProducts, getPriceFromPriority, filters.aiExportId, pricelistPriority]);
 
-    // Download CSV
-    const handleDownload = () => {
+    // Shared row generator — same logic as generateCSVData but returns array of {fieldKey: value} objects
+    const generateRows = useCallback(() => {
+        const preset = EXPORT_PRESETS[selectedPreset];
+        const isShopify = selectedPreset === "shopify";
+        const rows = [];
+
+        filteredProducts.forEach((product) => {
+            const variants = product.child_products || [];
+            const allImages = [...new Set([
+                ...(product.images || []),
+                ...variants.flatMap((v) => v.images || []),
+            ])];
+
+            if (isShopify) {
+                const maxRows = Math.max(variants.length, allImages.length, 1);
+                for (let rowIdx = 0; rowIdx < maxRows; rowIdx++) {
+                    const variant = variants[rowIdx] || null;
+                    const isImageOnlyRow = !variant && rowIdx < allImages.length;
+                    const currentImage = allImages[rowIdx] || "";
+                    const priceInfo = variant ? getPriceFromPriority(variant) : { price: 0, vat: 0, name: "" };
+                    const row = {};
+                    preset.fields.forEach((field) => {
+                        if (!selectedFields.includes(field.key)) return;
+                        row[field.key] = getFieldValue(field.key, product, variant, rowIdx, currentImage, priceInfo, isImageOnlyRow, true);
+                    });
+                    rows.push(row);
+                }
+            } else {
+                const variantsToExport = variants.length > 0 ? variants : [null];
+                variantsToExport.forEach((variant, idx) => {
+                    const priceInfo = variant ? getPriceFromPriority(variant) : { price: 0, vat: 0, name: "" };
+                    const row = {};
+                    preset.fields.forEach((field) => {
+                        if (!selectedFields.includes(field.key)) return;
+                        row[field.key] = getFieldValue(field.key, product, variant, idx, "", priceInfo, false, false);
+                    });
+                    rows.push(row);
+                });
+            }
+        });
+        return rows;
+    }, [selectedPreset, selectedFields, filteredProducts, getPriceFromPriority, filters.aiExportId, pricelistPriority]);
+
+    // Generate JSON: array of objects keyed by column label, respecting selectedFields
+    const generateJsonData = useCallback(() => {
+        const preset = EXPORT_PRESETS[selectedPreset];
+        const activeFields = preset.fields.filter(f => selectedFields.includes(f.key));
+        return generateRows().map(row => {
+            const obj = {};
+            activeFields.forEach(f => { obj[f.label] = row[f.key]; });
+            return obj;
+        });
+    }, [generateRows, selectedPreset, selectedFields]);
+
+    // Generate XML: row-based, respecting selectedFields, CDATA for HTML fields
+    const generateXmlData = useCallback(() => {
+        const HTML_FIELDS = new Set(['body_html', 'short_description', 'detailed_description']);
+        const escXml = (val) => String(val ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        const rowXmls = generateRows().map(row => {
+            const lines = selectedFields.map(key => {
+                const val = String(row[key] ?? '');
+                const content = HTML_FIELDS.has(key) ? `<![CDATA[${val}]]>` : escXml(val);
+                return `    <${key}>${content}</${key}>`;
+            }).join('\n');
+            return `  <product>\n${lines}\n  </product>`;
+        });
+        return `<?xml version="1.0" encoding="UTF-8"?>\n<products>\n${rowXmls.join('\n')}\n</products>`;
+    }, [generateRows, selectedFields]);
+
+    // Download in the chosen format
+    const handleDownload = (format = 'csv') => {
         if (filteredProducts.length === 0) {
             setExportStatus("No products to export");
             setTimeout(() => setExportStatus(""), 3000);
             return;
         }
 
-        const csvData = generateCSVData();
-        const blob = new Blob(["\ufeff" + csvData], { type: "text/csv;charset=utf-8;" });
+        let content, mimeType, ext;
+        if (format === 'json') {
+            content = JSON.stringify(generateJsonData(), null, 2);
+            mimeType = 'application/json;charset=utf-8;';
+            ext = 'json';
+        } else if (format === 'xml') {
+            content = generateXmlData();
+            mimeType = 'application/xml;charset=utf-8;';
+            ext = 'xml';
+        } else {
+            content = "\ufeff" + generateCSVData();
+            mimeType = 'text/csv;charset=utf-8;';
+            ext = 'csv';
+        }
+
+        const blob = new Blob([content], { type: mimeType });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `patrik-export-${selectedPreset}-${new Date().toISOString().split("T")[0]}.csv`;
+        link.download = `patrik-export-${selectedPreset}-${new Date().toISOString().split("T")[0]}.${ext}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -785,7 +1140,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                 pricelistPriority,
             };
 
-            const response = await fetch(`${apiUrl}/custom-export`, {
+            const response = await fetch(`/nextapi/export/custom-export`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(exportConfig),
@@ -821,12 +1176,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
         }
     };
 
-    // Load saved exports - GET {EXPORT_API_URL}/custom-export
+    // Load saved exports - GET /nextapi/export/custom-export
     const loadSavedExports = async () => {
         setIsLoadingExports(true);
         try {
-            console.log(apiUrl)
-            const response = await fetch(`${apiUrl}/custom-export`);
+            const response = await fetch(`/nextapi/export/custom-export`);
 
             if (!response.ok) {
                 console.error("Failed to load exports:", response.status);
@@ -861,6 +1215,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
             category: "all",
             aiExportId: "all",
             aiCategory: "all",
+            imageFilter: "all",
             showNew: false,
             showRecommended: false,
             publishedOnly: false,
@@ -873,14 +1228,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
         }
 
         setActiveTab("configure");
+        setExportStep("format");
         setExportStatus("Configuration loaded!");
         setTimeout(() => setExportStatus(""), 3000);
     };
 
-    // Delete export - DELETE {EXPORT_API_URL}/custom-export/:id
+    // Delete export - DELETE /nextapi/export/custom-export/:id
     const deleteExport = async (id) => {
         try {
-            const response = await fetch(`${apiUrl}/custom-export/${id}`, {
+            const response = await fetch(`/nextapi/export/custom-export/${id}`, {
                 method: "DELETE",
             });
 
@@ -901,11 +1257,12 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
         }
     };
 
-    // Download CSV directly from API - GET {EXPORT_API_URL}/custom-export/:id/csv
-    const downloadFromAPI = async (configId) => {
-        setDownloadingId(configId);
+    // Download via API proxy - supports csv, json, xml formats
+    const downloadFromAPI = async (configId, format = 'csv') => {
+        const downloadKey = `${configId}-${format}`;
+        setDownloadingId(downloadKey);
         try {
-            const response = await fetch(`${apiUrl}/custom-export/${configId}/csv`);
+            const response = await fetch(`/nextapi/export/custom-export/${configId}/${format}`);
 
             if (!response.ok) {
                 throw new Error(`Failed to download: ${response.status}`);
@@ -915,7 +1272,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
-            link.download = `patrik_products_${configId}.csv`;
+            link.download = `patrik_products_${configId}.${format}`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -929,18 +1286,118 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
         }
     };
 
-    // Copy export link to clipboard
+    // Open Keys modal (replaces old "copy link" — links now require an API key)
     const copyExportLink = async (configId) => {
-        const exportUrl = `${apiUrl}/custom-export/${configId}/csv`;
+        openKeysModal(configId);
+    };
+
+    // Keys modal handlers
+    const openKeysModal = async (exportId) => {
+        setActiveExportId(exportId);
+        setCreatedKeyRaw(null);
+        setNewKeyName('');
+        setShowKeysModal(true);
+        setIsKeyLoading(true);
         try {
-            await navigator.clipboard.writeText(exportUrl);
-            setCopiedId(configId);
-            setTimeout(() => setCopiedId(null), 2000);
-        } catch (error) {
-            console.error("Failed to copy link:", error);
-            setExportStatus("Failed to copy link");
-            setTimeout(() => setExportStatus(""), 2000);
+            const res = await fetch(`/nextapi/export/custom-export/${exportId}/keys`);
+            const data = await res.json();
+            setExportKeys(data.success ? data.data : []);
+        } catch (_) {
+            setExportKeys([]);
+        } finally {
+            setIsKeyLoading(false);
         }
+    };
+
+    const closeKeysModal = () => {
+        setShowKeysModal(false);
+        setActiveExportId(null);
+        setCreatedKeyRaw(null);
+        setNewKeyName('');
+        setCopiedField(null);
+        setCreatedKeyTab('key');
+        setExpandedKeyId(null);
+    };
+
+    const handleCreateKey = async () => {
+        if (!newKeyName.trim() || !activeExportId) return;
+        setIsKeyLoading(true);
+        try {
+            const res = await fetch(`/nextapi/export/custom-export/${activeExportId}/keys`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newKeyName.trim() })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setCreatedKeyRaw(data.data.rawKey);
+                setCreatedKeyTab('key');
+                setExpandedKeyId(null);
+                setNewKeyName('');
+                // Refresh key list
+                const listRes = await fetch(`/nextapi/export/custom-export/${activeExportId}/keys`);
+                const listData = await listRes.json();
+                setExportKeys(listData.success ? listData.data : []);
+            }
+        } catch (_) {}
+        setIsKeyLoading(false);
+    };
+
+    const handleRevokeKey = async (keyId) => {
+        if (!activeExportId) return;
+        try {
+            await fetch(`/nextapi/export/custom-export/${activeExportId}/keys/${keyId}`, { method: 'DELETE' });
+            setExportKeys(prev => prev.map(k => k.keyId === keyId ? { ...k, isActive: false } : k));
+        } catch (_) {}
+    };
+
+    // Access modal handlers
+    const openAccessModal = async (exportId) => {
+        setActiveExportId(exportId);
+        setNewGrantEmail('');
+        setShowAccessModal(true);
+        setIsAccessLoading(true);
+        try {
+            const res = await fetch(`/nextapi/export/custom-export/${exportId}/access`);
+            const data = await res.json();
+            setExportAccess(data.success ? data.data : []);
+        } catch (_) {
+            setExportAccess([]);
+        } finally {
+            setIsAccessLoading(false);
+        }
+    };
+
+    const closeAccessModal = () => {
+        setShowAccessModal(false);
+        setActiveExportId(null);
+        setNewGrantEmail('');
+    };
+
+    const handleGrantAccess = async () => {
+        if (!newGrantEmail.trim() || !activeExportId) return;
+        setIsAccessLoading(true);
+        try {
+            const res = await fetch(`/nextapi/export/custom-export/${activeExportId}/access`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: newGrantEmail.trim() })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setNewGrantEmail('');
+                setExportAccess(prev => [...prev, data.data]);
+            }
+        } catch (_) {}
+        setIsAccessLoading(false);
+    };
+
+    const handleRevokeAccess = async (email) => {
+        if (!activeExportId) return;
+        try {
+            await fetch(`/nextapi/export/custom-export/${activeExportId}/access/${encodeURIComponent(email)}`, { method: 'DELETE' });
+            setExportAccess(prev => prev.filter(a => a.email !== email));
+        } catch (_) {}
     };
 
     // Load exports on tab change
@@ -968,6 +1425,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
     }, [filteredProducts, selectedPreset]);
 
     const currentPreset = EXPORT_PRESETS[selectedPreset];
+    const activeExportName = savedExports.find(e => e._id === activeExportId)?.name ?? '';
 
     const clearFilters = () => {
         setFilters({
@@ -975,9 +1433,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
             stockStatus: "all",
             minPrice: "",
             maxPrice: "",
-            category: "all",
+            category: [],
             aiExportId: "all",
-            aiCategory: "all",
+            aiCategory: [],
+            imageFilter: "all",
             showNew: false,
             showRecommended: false,
             publishedOnly: false,
@@ -1002,137 +1461,198 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                                 Product Export
                             </h1>
                             <p className="text-neutral-400 mt-1">
-                                Create and manage custom CSV exports
+                                Create and manage custom product exports
                             </p>
                         </div>
-
-                        {/* Action Buttons */}
-                        {activeTab === "configure" && (
-                            <div className="flex items-center gap-3">
-                                {exportStatus && (
-                                    <span className={`text-sm font-medium ${exportStatus.includes("!") ? "text-green-400" : "text-amber-400"}`}>
-                                        {exportStatus}
-                                    </span>
-                                )}
-                                <button
-                                    onClick={() => setShowSaveModal(true)}
-                                    disabled={selectedFields.length === 0}
-                                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-5 rounded-xl transition-all"
-                                >
-                                    <SaveIcon />
-                                    Save Export
-                                </button>
-                                <button
-                                    onClick={handleDownload}
-                                    disabled={selectedFields.length === 0 || filteredProducts.length === 0}
-                                    className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 disabled:from-neutral-600 disabled:to-neutral-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-5 rounded-xl transition-all shadow-lg shadow-cyan-500/25 disabled:shadow-none"
-                                >
-                                    <DownloadIcon />
-                                    Download CSV
-                                </button>
-                            </div>
-                        )}
                     </div>
 
-                    {/* Tab Switcher */}
-                    <div className="flex bg-neutral-800/50 rounded-xl p-1 w-fit">
+                    {/* Tab Switcher + Preview button on the same row */}
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex bg-neutral-900/60 border border-neutral-700/50 rounded-xl p-1 w-fit gap-1">
+                            <button
+                                onClick={() => setActiveTab("configure")}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "configure"
+                                        ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20"
+                                        : "text-neutral-400 hover:text-white hover:bg-neutral-800/60"
+                                    }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                </svg>
+                                Configure
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("saved")}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "saved"
+                                        ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20"
+                                        : "text-neutral-400 hover:text-white hover:bg-neutral-800/60"
+                                    }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                </svg>
+                                Saved
+                                {savedExports.length > 0 && (
+                                    <span className={`px-1.5 py-0.5 text-[11px] rounded-full font-semibold ${activeTab === "saved" ? "bg-white/20 text-white" : "bg-cyan-500/20 text-cyan-400"}`}>
+                                        {savedExports.length}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Preview button — lives in the header, always accessible */}
                         <button
-                            onClick={() => setActiveTab("configure")}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "configure"
-                                    ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg"
-                                    : "text-neutral-400 hover:text-white"
-                                }`}
+                            onClick={() => { setPreviewConfig(null); setPreviewSearch(''); setShowPreview(true); }}
+                            className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 hover:bg-neutral-700/80 border border-neutral-700/50 hover:border-neutral-600/60 text-neutral-400 hover:text-white rounded-xl text-sm font-medium transition-all"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
-                            Configure Export
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("saved")}
-                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "saved"
-                                    ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg"
-                                    : "text-neutral-400 hover:text-white"
-                                }`}
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                            </svg>
-                            Saved Exports
-                            {savedExports.length > 0 && (
-                                <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-neutral-700 text-neutral-300">
-                                    {savedExports.length}
-                                </span>
-                            )}
+                            Preview
+                            <span className="text-[11px] font-semibold tabular-nums px-1.5 py-0.5 bg-neutral-700/60 text-neutral-400 rounded-md">
+                                {filteredProducts.length}
+                            </span>
                         </button>
                     </div>
                 </div>
             </div>
 
             {activeTab === "configure" ? (
-                <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-                    {/* Left Sidebar */}
-                    <div className="xl:col-span-1 space-y-6">
-                        {/* Preset Cards */}
-                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
-                            <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider mb-4">
-                                Export Format
-                            </h2>
-                            <div className="space-y-2">
-                                {Object.entries(EXPORT_PRESETS).map(([key, preset]) => (
-                                    <button
-                                        key={key}
-                                        onClick={() => handlePresetChange(key)}
-                                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${selectedPreset === key
-                                                ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-white"
-                                                : "bg-neutral-800/50 border border-transparent text-neutral-400 hover:bg-neutral-700/50 hover:text-white"
-                                            }`}
-                                    >
-                                        <div className={`p-2 rounded-lg ${selectedPreset === key ? "bg-cyan-500/20" : "bg-neutral-700/50"}`}>
-                                            {preset.icon}
-                                        </div>
-                                        <div className="text-left">
-                                            <div className="font-medium text-sm">{preset.name}</div>
-                                            <div className="text-xs text-neutral-500">{preset.description}</div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Pricelist Priority */}
-                        {pricelistPriority.length > 0 && (
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
-                                {/* Header */}
-                                <div className="px-5 py-4 border-b border-neutral-700/50">
-                                    <div className="flex items-center gap-2">
-                                        <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                                        </svg>
-                                        <h2 className="text-sm font-semibold text-white">Pricelist Priority</h2>
-                                    </div>
-                                    <p className="text-xs text-neutral-500 mt-1.5">
-                                        Drag to reorder • First enabled pricelist wins
-                                    </p>
+                <div className="space-y-6">
+                    {/* Step Indicator */}
+                    {(() => {
+                        const stepsOrder = ['format', 'filters', 'fields', 'export'];
+                        const currentIdx = stepsOrder.indexOf(exportStep);
+                        const activeFilterCount = [
+                            filters.search, filters.stockStatus !== 'all' && filters.stockStatus,
+                            filters.minPrice, filters.maxPrice,
+                            filters.category.length > 0 && 'cat',
+                            filters.aiExportId !== 'all' && filters.aiExportId,
+                            filters.aiCategory.length > 0 && 'aiCat',
+                            filters.imageFilter !== 'all' && filters.imageFilter,
+                            filters.showNew, filters.showRecommended, filters.publishedOnly,
+                        ].filter(Boolean).length;
+                        const STEP_META = [
+                            {
+                                id: 'format', label: 'Format',
+                                sub: currentPreset.name,
+                                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+                            },
+                            {
+                                id: 'filters', label: 'Filters',
+                                sub: activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount !== 1 ? 's' : ''} · ${filteredProducts.length} products` : `${filteredProducts.length} products`,
+                                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
+                            },
+                            {
+                                id: 'fields', label: 'Fields',
+                                sub: selectedFields.length > 0 ? `${selectedFields.length} of ${currentPreset.fields.length} selected` : 'None selected',
+                                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
+                            },
+                            {
+                                id: 'export', label: 'Export',
+                                sub: `${filteredProducts.length} products · ${totalRows} rows`,
+                                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+                            },
+                        ];
+                        return (
+                            <div className="bg-neutral-900/60 border border-neutral-700/50 rounded-2xl overflow-hidden">
+                                <div className="flex divide-x divide-neutral-800">
+                                    {STEP_META.map(({ id, label, sub, icon }, i) => {
+                                        const thisIdx = stepsOrder.indexOf(id);
+                                        const isDone = thisIdx < currentIdx;
+                                        const isActive = id === exportStep;
+                                        return (
+                                            <button
+                                                key={id}
+                                                onClick={() => setExportStep(id)}
+                                                className={`relative flex-1 flex items-center gap-3 px-4 py-3.5 text-left transition-all min-w-0 ${
+                                                    isActive ? 'bg-gradient-to-b from-cyan-950/60 to-transparent'
+                                                    : isDone ? 'hover:bg-neutral-800/40 cursor-pointer'
+                                                    : 'cursor-pointer hover:bg-neutral-800/20'
+                                                }`}
+                                            >
+                                                {isActive && (
+                                                    <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-cyan-500 to-blue-500" />
+                                                )}
+                                                <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                                                    isActive ? 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25'
+                                                    : isDone ? 'bg-green-500/10 text-green-400 ring-1 ring-green-500/20'
+                                                    : 'bg-neutral-800 text-neutral-600'
+                                                }`}>
+                                                    {isDone
+                                                        ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                                        : icon
+                                                    }
+                                                </div>
+                                                <div className="min-w-0 hidden sm:block">
+                                                    <p className={`text-xs font-semibold truncate ${isActive ? 'text-white' : isDone ? 'text-neutral-300' : 'text-neutral-600'}`}>{label}</p>
+                                                    <p className={`text-[11px] truncate mt-0.5 ${isActive ? 'text-cyan-400/70' : isDone ? 'text-neutral-500' : 'text-neutral-700'}`}>{sub}</p>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                            </div>
+                        );
+                    })()}
 
-                                {/* Draggable List */}
-                                <div className="p-3">
-                                    {/* Drop indicator at top */}
-                                    {dropIndicator === 0 && draggedIndex !== 0 && (
-                                        <div className="h-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
-                                    )}
+                    {/* ── Step 1: Format ──────────────────────────────────────────── */}
+                    {exportStep === 'format' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Preset Cards */}
+                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-6 border border-neutral-700/50">
+                                <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider mb-5">Export Format</h2>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {Object.entries(EXPORT_PRESETS).map(([key, preset]) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => handlePresetChange(key)}
+                                            className={`flex flex-col items-start gap-3 p-5 rounded-2xl border transition-all duration-200 text-left ${selectedPreset === key
+                                                ? 'bg-gradient-to-br from-cyan-500/15 to-blue-500/15 border-cyan-500/50 shadow-lg shadow-cyan-500/10'
+                                                : 'bg-neutral-800/50 border-neutral-700/40 hover:bg-neutral-700/50 hover:border-neutral-600/60'
+                                            }`}
+                                        >
+                                            <div className={`p-2.5 rounded-xl ${selectedPreset === key ? 'bg-cyan-500/20 text-cyan-400' : 'bg-neutral-700/50 text-neutral-400'}`}>
+                                                {preset.icon}
+                                            </div>
+                                            <div>
+                                                <div className={`font-semibold text-sm ${selectedPreset === key ? 'text-white' : 'text-neutral-300'}`}>{preset.name}</div>
+                                                <div className="text-xs text-neutral-500 mt-0.5 leading-relaxed">{preset.description}</div>
+                                            </div>
+                                            {selectedPreset === key && (
+                                                <span className="text-xs text-cyan-400 font-medium">Selected ✓</span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
 
-                                    {pricelistPriority.map((pl, idx) => (
-                                        <div key={pl.name}>
-                                            <div
-                                                draggable
-                                                onDragStart={() => onDragStart(idx)}
-                                                onDragOver={(e) => onDragOver(e, idx)}
-                                                onDragEnd={onDragEnd}
-                                                onDragLeave={onDragLeave}
-                                                className={`
+                            {/* Pricelist Priority */}
+                            {pricelistPriority.length > 0 ? (
+                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden flex flex-col">
+                                    <div className="px-6 py-5 border-b border-neutral-700/50">
+                                        <div className="flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                            </svg>
+                                            <h2 className="text-sm font-semibold text-white">Pricelist Priority</h2>
+                                        </div>
+                                        <p className="text-xs text-neutral-500 mt-1.5">Drag to reorder · First enabled pricelist wins</p>
+                                    </div>
+                                    <div className="p-4 flex-1">
+                                        {dropIndicator === 0 && draggedIndex !== 0 && (
+                                            <div className="h-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
+                                        )}
+                                        {pricelistPriority.map((pl, idx) => (
+                                            <div key={pl.name}>
+                                                <div
+                                                    draggable
+                                                    onDragStart={() => onDragStart(idx)}
+                                                    onDragOver={(e) => onDragOver(e, idx)}
+                                                    onDragEnd={onDragEnd}
+                                                    onDragLeave={onDragLeave}
+                                                    className={`
                           flex items-center gap-3 p-3 rounded-xl mb-2 last:mb-0
                           transition-all duration-150 ease-out
                           cursor-grab active:cursor-grabbing select-none
@@ -1144,21 +1664,18 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                                                     }
                           group
                         `}
-                                            >
-                                                {/* Drag Handle */}
-                                                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-neutral-700/30 text-neutral-500 group-hover:bg-cyan-500/20 group-hover:text-cyan-400 transition-colors">
-                                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                        <circle cx="9" cy="6" r="1.5" />
-                                                        <circle cx="15" cy="6" r="1.5" />
-                                                        <circle cx="9" cy="12" r="1.5" />
-                                                        <circle cx="15" cy="12" r="1.5" />
-                                                        <circle cx="9" cy="18" r="1.5" />
-                                                        <circle cx="15" cy="18" r="1.5" />
-                                                    </svg>
-                                                </div>
-
-                                                {/* Priority Badge */}
-                                                <div className={`
+                                                >
+                                                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-neutral-700/30 text-neutral-500 group-hover:bg-cyan-500/20 group-hover:text-cyan-400 transition-colors">
+                                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                                            <circle cx="9" cy="6" r="1.5" />
+                                                            <circle cx="15" cy="6" r="1.5" />
+                                                            <circle cx="9" cy="12" r="1.5" />
+                                                            <circle cx="15" cy="12" r="1.5" />
+                                                            <circle cx="9" cy="18" r="1.5" />
+                                                            <circle cx="15" cy="18" r="1.5" />
+                                                        </svg>
+                                                    </div>
+                                                    <div className={`
                           flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold transition-all
                           ${idx === 0 && pl.enabled
                                                         ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30"
@@ -1167,34 +1684,30 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                                                             : "bg-neutral-800 text-neutral-500"
                                                     }
                         `}>
-                                                    {idx + 1}
-                                                </div>
-
-                                                {/* Name */}
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-medium text-white truncate">
-                                                        {pl.name}
+                                                        {idx + 1}
                                                     </div>
-                                                    {idx === 0 && pl.enabled && (
-                                                        <div className="text-[10px] text-amber-400/80 font-medium uppercase tracking-wider mt-0.5">
-                                                            Primary
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium text-white truncate">
+                                                            {pl.name}
                                                         </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Toggle */}
-                                                <label
-                                                    className="relative inline-flex items-center cursor-pointer shrink-0"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={pl.enabled}
-                                                        onChange={() => togglePricelist(idx)}
-                                                        className="sr-only peer"
-                                                    />
-                                                    <div className={`
+                                                        {idx === 0 && pl.enabled && (
+                                                            <div className="text-[10px] text-amber-400/80 font-medium uppercase tracking-wider mt-0.5">
+                                                                Primary
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <label
+                                                        className="relative inline-flex items-center cursor-pointer shrink-0"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={pl.enabled}
+                                                            onChange={() => togglePricelist(idx)}
+                                                            className="sr-only peer"
+                                                        />
+                                                        <div className={`
                             w-10 h-6 rounded-full transition-all duration-200
                             after:content-[''] after:absolute after:top-[3px] after:left-[3px]
                             after:bg-white after:rounded-full after:h-[18px] after:w-[18px]
@@ -1205,334 +1718,701 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                                                             : "bg-neutral-700"
                                                         }
                           `} />
-                                                </label>
+                                                    </label>
+                                                </div>
+                                                {dropIndicator === idx + 1 && draggedIndex !== idx && draggedIndex !== idx + 1 && (
+                                                    <div className="h-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
+                                                )}
                                             </div>
-
-                                            {/* Drop indicator after this item */}
-                                            {dropIndicator === idx + 1 && draggedIndex !== idx && draggedIndex !== idx + 1 && (
-                                                <div className="h-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
-                                            )}
+                                        ))}
+                                    </div>
+                                    {pricelistPriority.filter(p => p.enabled).length === 0 && (
+                                        <div className="px-5 py-3 bg-amber-500/10 border-t border-amber-500/20">
+                                            <p className="text-xs text-amber-400">
+                                                Enable at least one pricelist to export prices
+                                            </p>
                                         </div>
-                                    ))}
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 flex items-center justify-center p-12">
+                                    <div className="text-center">
+                                        <svg className="w-10 h-10 text-neutral-700 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <p className="text-sm text-neutral-600">No pricelists found in product data</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Step 2: Filters ──────────────────────────────────────────── */}
+                    {exportStep === 'filters' && (
+                        <div className="space-y-5">
+                            {/* Unified filter card */}
+                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50">
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-sm font-semibold text-white">Filters</h2>
+                                        {(() => {
+                                            const n = [
+                                                filters.stockStatus !== 'all' && filters.stockStatus,
+                                                filters.minPrice, filters.maxPrice,
+                                                filters.category !== 'all' && filters.category,
+                                                filters.aiExportId !== 'all' && filters.aiExportId,
+                                                filters.aiCategory !== 'all' && filters.aiCategory,
+                                                filters.imageFilter !== 'all' && filters.imageFilter,
+                                                filters.showNew, filters.showRecommended, filters.publishedOnly,
+                                            ].filter(Boolean).length;
+                                            return n > 0 ? (
+                                                <span className="text-xs bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium">{n} active</span>
+                                            ) : null;
+                                        })()}
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-xs tabular-nums">
+                                            <span className="text-white font-semibold">{filteredProducts.length}</span>
+                                            <span className="text-neutral-600"> / {initialProducts.length} products</span>
+                                        </span>
+                                        <button onClick={clearFilters} className="text-xs text-neutral-500 hover:text-red-400 transition-colors font-medium">Reset all</button>
+                                    </div>
                                 </div>
 
-                                {/* Footer hint */}
-                                {pricelistPriority.filter(p => p.enabled).length === 0 && (
-                                    <div className="px-5 py-3 bg-amber-500/10 border-t border-amber-500/20">
-                                        <p className="text-xs text-amber-400">
-                                            Enable at least one pricelist to export prices
-                                        </p>
+                                <div className="p-5 space-y-5">
+                                    {/* Stock + Images */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Stock</p>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                {[
+                                                    { value: "all", label: "All", icon: "M4 6h16M4 10h16M4 14h8" },
+                                                    { value: "in_stock", label: "In Stock", icon: "M5 13l4 4L19 7" },
+                                                    { value: "out_of_stock", label: "No Stock", icon: "M6 18L18 6M6 6l12 12" },
+                                                ].map(({ value, label, icon }) => (
+                                                    <button key={value} onClick={() => setFilters(prev => ({ ...prev, stockStatus: value }))}
+                                                        className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-medium transition-all ${filters.stockStatus === value ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
+                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} /></svg>
+                                                        {label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Images</p>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                {[
+                                                    { value: "all", label: "All", icon: "M4 6h16M4 10h16M4 14h8" },
+                                                    { value: "with_images", label: "Has Images", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" },
+                                                    { value: "without_images", label: "No Images", icon: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" },
+                                                ].map(({ value, label, icon }) => (
+                                                    <button key={value} onClick={() => setFilters(prev => ({ ...prev, imageFilter: value }))}
+                                                        className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-medium transition-all ${filters.imageFilter === value ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
+                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} /></svg>
+                                                        {label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Price + Tags */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Price Range</p>
+                                            <div className="flex items-center gap-2">
+                                                <div className="relative flex-1">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600 text-xs font-mono">€</span>
+                                                    <input type="number" value={filters.minPrice} onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))} placeholder="Min"
+                                                        className="w-full pl-7 pr-3 py-2.5 bg-neutral-900/60 border border-neutral-700/40 rounded-xl text-white text-sm placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all" />
+                                                </div>
+                                                <span className="text-neutral-700 text-sm shrink-0">—</span>
+                                                <div className="relative flex-1">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600 text-xs font-mono">€</span>
+                                                    <input type="number" value={filters.maxPrice} onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))} placeholder="Max"
+                                                        className="w-full pl-7 pr-3 py-2.5 bg-neutral-900/60 border border-neutral-700/40 rounded-xl text-white text-sm placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Tags</p>
+                                            <div className="flex gap-1.5">
+                                                {[
+                                                    { key: "showNew", label: "New", icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" },
+                                                    { key: "showRecommended", label: "Recommended", icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" },
+                                                    { key: "publishedOnly", label: "Published", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
+                                                ].map(({ key, label, icon }) => (
+                                                    <button key={key} onClick={() => setFilters(prev => ({ ...prev, [key]: !prev[key] }))}
+                                                        className={`flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all flex-1 justify-center ${filters[key] ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
+                                                        <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} /></svg>
+                                                        <span className="truncate">{label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                        {/* Custom Categories Tree — full width */}
+                        {availableAiExports.length > 0 && (
+                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
+                                <div className="px-6 py-4 border-b border-neutral-700/50">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <svg className="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                            </svg>
+                                            <h2 className="text-sm font-semibold text-white">Custom Categories</h2>
+                                            {filters.aiCategory.length > 0 && (
+                                                <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
+                                                    {filters.aiCategory.length === 1
+                                                        ? filters.aiCategory[0].split(" / ").pop()
+                                                        : `${filters.aiCategory.length} selected`}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {filters.aiCategory.length > 0 && (
+                                            <button
+                                                onClick={() => setFilters(prev => ({ ...prev, aiCategory: [] }))}
+                                                className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                    {availableAiExports.length > 1 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-3">
+                                            {availableAiExports.map(exp => {
+                                                const isActive = filters.aiExportId === exp.exportId;
+                                                return (
+                                                    <button
+                                                        key={exp.exportId}
+                                                        onClick={() => setFilters(prev => ({ ...prev, aiExportId: isActive ? "all" : exp.exportId, aiCategory: [] }))}
+                                                        className={`flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-medium transition-all ${
+                                                            isActive
+                                                                ? "bg-purple-500/20 text-purple-300 border border-purple-500/50"
+                                                                : "bg-neutral-800/50 text-neutral-400 border border-neutral-700/50 hover:border-neutral-600 hover:text-white"
+                                                        }`}
+                                                    >
+                                                        {exp.logo && <img src={exp.logo} alt="" className="w-3.5 h-3.5 object-contain rounded-sm" />}
+                                                        {exp.name}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                                {filters.aiExportId === "all" && availableAiExports.length > 1 ? (
+                                    <div className="py-10 text-center text-neutral-500 text-sm">
+                                        Select a category set above to browse categories
+                                    </div>
+                                ) : Object.keys(categoryTree).length === 0 ? (
+                                    <div className="py-10 text-center text-neutral-500 text-sm">
+                                        No custom categories found for this export
+                                    </div>
+                                ) : (
+                                    <div className="p-3 overflow-y-auto max-h-[520px]">
+                                        {(() => {
+                                            const renderNodes = (nodes, depth) => Object.entries(nodes).map(([name, node]) => {
+                                                const path = node._path;
+                                                const hasChildren = Object.keys(node.children).length > 0;
+                                                const isExpanded = expandedCategories.has(path);
+                                                const isActive = filters.aiCategory.includes(path);
+                                                const count = productCountByPrefix[path] || 0;
+                                                return (
+                                                    <div key={path}>
+                                                        <div
+                                                            className={`flex items-center gap-1 py-1.5 rounded-xl transition-all group ${
+                                                                isActive ? "bg-purple-500/10" : "hover:bg-neutral-700/40"
+                                                            } ${hasChildren ? "cursor-pointer" : "cursor-default"}`}
+                                                            style={{ paddingLeft: `${8 + depth * 20}px`, paddingRight: "10px" }}
+                                                            onClick={() => {
+                                                                if (hasChildren) {
+                                                                    setExpandedCategories(prev => {
+                                                                        const next = new Set(prev);
+                                                                        next.has(path) ? next.delete(path) : next.add(path);
+                                                                        return next;
+                                                                    });
+                                                                }
+                                                            }}
+                                                        >
+                                                            {/* Expand/collapse chevron */}
+                                                            {hasChildren ? (
+                                                                <span className="w-6 h-6 shrink-0 flex items-center justify-center text-neutral-500 group-hover:text-neutral-300">
+                                                                    <svg className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                                                                    </svg>
+                                                                </span>
+                                                            ) : (
+                                                                <span className="w-6 shrink-0" />
+                                                            )}
+                                                            {/* Checkbox — always toggles selection, stops row expand propagation */}
+                                                            <div
+                                                                onClick={e => {
+                                                                    e.stopPropagation();
+                                                                    setFilters(prev => ({ ...prev, aiCategory: isActive ? prev.aiCategory.filter(p => p !== path) : [...prev.aiCategory, path] }));
+                                                                }}
+                                                                className={`w-4 h-4 shrink-0 rounded border-2 flex items-center justify-center transition-all mr-1 cursor-pointer ${
+                                                                    isActive
+                                                                        ? "bg-purple-500 border-purple-500"
+                                                                        : "border-neutral-600 hover:border-purple-400 bg-transparent"
+                                                                }`}
+                                                            >
+                                                                {isActive && (
+                                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                            <span className={`text-sm flex-1 truncate select-none ${isActive ? "text-purple-300 font-medium" : "text-neutral-300 group-hover:text-white"}`}>{name}</span>
+                                                            {count > 0 && (
+                                                                <span className={`text-xs tabular-nums shrink-0 ml-1.5 ${isActive ? "text-purple-400/70" : "text-neutral-600 group-hover:text-neutral-500"}`}>
+                                                                    {count}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {hasChildren && isExpanded && renderNodes(node.children, depth + 1)}
+                                                    </div>
+                                                );
+                                            });
+                                            return renderNodes(categoryTree, 0);
+                                        })()}
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {/* Filters */}
-                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
-                            {/* Header */}
-                            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-700/50">
-                                <div className="flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                                    </svg>
-                                    <h2 className="text-sm font-semibold text-white">Filters</h2>
+                        {/* Product Category chips — dynamic, only categories still present after other filters */}
+                        {availableCategories.length > 0 && (
+                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50">
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                        </svg>
+                                        <h2 className="text-sm font-semibold text-white">Category</h2>
+                                        {filters.category.length > 0 && (
+                                            <span className="text-xs bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium">
+                                                {filters.category.length === 1 ? filters.category[0] : `${filters.category.length} selected`}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {filters.category.length > 0 && (
+                                        <button onClick={() => setFilters(prev => ({ ...prev, category: [] }))}
+                                            className="text-xs text-neutral-500 hover:text-red-400 transition-colors">Clear</button>
+                                    )}
                                 </div>
-                                <button
-                                    onClick={clearFilters}
-                                    className="text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
-                                >
-                                    Clear all
-                                </button>
+                                <div className="p-4 flex flex-wrap gap-1.5">
+                                    {dynamicCategories.length === 0 ? (
+                                        <span className="text-xs text-neutral-600 italic">No categories match current filters</span>
+                                    ) : (
+                                        dynamicCategories.map(cat => {
+                                            const count = categoryProductCounts.get(cat) || 0;
+                                            const isActive = filters.category.includes(cat);
+                                            return (
+                                                <button
+                                                    key={cat}
+                                                    onClick={() => setFilters(prev => ({ ...prev, category: isActive ? prev.category.filter(c => c !== cat) : [...prev.category, cat] }))}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                                        isActive
+                                                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                                                            : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"
+                                                    }`}
+                                                >
+                                                    {cat}
+                                                    <span className={`tabular-nums text-[10px] ${isActive ? "text-cyan-400/60" : "text-neutral-700"}`}>{count}</span>
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    )}
+
+                    {/* ── Step 3: Fields ───────────────────────────────────────────── */}
+                    {exportStep === 'fields' && (
+                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
+                            <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-700/50">
+                                <div>
+                                    <h2 className="text-sm font-semibold text-white">Select Fields</h2>
+                                    <p className="text-xs text-neutral-500 mt-0.5">Choose which columns to include in your export</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-xs text-neutral-500">{selectedFields.length} / {currentPreset.fields.length} selected</span>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setSelectedFields(currentPreset.fields.map((f) => f.key))}
+                                            className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
+                                        >
+                                            Select all
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedFields([])}
+                                            className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                                    {currentPreset.fields.map((field) => (
+                                        <button
+                                            key={field.key}
+                                            onClick={() => toggleField(field.key)}
+                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all ${selectedFields.includes(field.key)
+                                                    ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-white"
+                                                    : "bg-neutral-800/50 border border-neutral-700/30 text-neutral-400 hover:text-white hover:border-neutral-600"
+                                                }`}
+                                        >
+                                            <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${selectedFields.includes(field.key) ? "bg-cyan-500" : "bg-neutral-700"
+                                                }`}>
+                                                {selectedFields.includes(field.key) && (
+                                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <span className="truncate">{field.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Step 4: Export ───────────────────────────────────────────── */}
+                    {exportStep === 'export' && (
+                        <div className="space-y-6">
+                            {/* Stats Bar */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
+                                    <div className="text-3xl font-bold text-cyan-400">{filteredProducts.length}</div>
+                                    <div className="text-xs text-neutral-500 mt-1">Products</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
+                                    <div className="text-3xl font-bold text-blue-400">{totalRows}</div>
+                                    <div className="text-xs text-neutral-500 mt-1">Export Rows</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
+                                    <div className="text-3xl font-bold text-purple-400">{selectedFields.length}</div>
+                                    <div className="text-xs text-neutral-500 mt-1">Fields</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
+                                    <div className="text-2xl font-bold text-pink-400">{currentPreset.name}</div>
+                                    <div className="text-xs text-neutral-500 mt-1">Format</div>
+                                </div>
                             </div>
 
-                            <div className="p-5 space-y-5">
-                                {/* Search */}
-                                <div className="relative">
-                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                    <input
-                                        type="text"
-                                        value={filters.search}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                                        placeholder="Search name, SKU, EAN..."
-                                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-white text-sm placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition-all"
-                                    />
+                            {/* Download */}
+                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50">
+                                    <div>
+                                        <h2 className="text-sm font-semibold text-white">Download</h2>
+                                        <p className="text-xs text-neutral-500 mt-0.5">{filteredProducts.length} products · {totalRows} rows · {selectedFields.length} fields</p>
+                                    </div>
+                                    {exportStatus && (
+                                        <span className={`text-sm font-medium px-3 py-1.5 rounded-lg ${exportStatus.includes("!") ? "bg-green-500/15 text-green-400" : "bg-amber-500/15 text-amber-400"}`}>
+                                            {exportStatus}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="p-4 grid grid-cols-3 gap-3">
+                                    {['csv', 'json', 'xml'].map((fmt) => {
+                                        const meta = FORMAT_META[fmt];
+                                        const disabled = selectedFields.length === 0 || filteredProducts.length === 0;
+                                        return (
+                                            <button
+                                                key={fmt}
+                                                onClick={() => handleDownload(fmt)}
+                                                disabled={disabled}
+                                                className={`flex flex-col items-center gap-2.5 py-5 px-4 rounded-xl font-medium text-sm transition-all ${
+                                                    disabled
+                                                        ? 'bg-neutral-800/50 text-neutral-600 cursor-not-allowed'
+                                                        : `${meta.bg} ${meta.text} hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] cursor-pointer`
+                                                }`}
+                                            >
+                                                <div className="w-7 h-7 flex items-center justify-center">{meta.icon}</div>
+                                                <div className="text-center">
+                                                    <div className="font-semibold">{meta.label}</div>
+                                                    <div className="text-xs opacity-60 mt-0.5">{fmt === 'csv' ? 'Spreadsheet' : fmt === 'json' ? 'Structured data' : 'Markup'}</div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Preview */}
+                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-6 border border-neutral-700/50">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-white">Preview</h2>
+                                    {filters.aiExportId !== "all" && filters.aiCategory.length > 0 && (
+                                        <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+                                            <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                            </svg>
+                                            {filters.aiCategory.length === 1 ? filters.aiCategory[0].split(" / ").map((part, i, arr) => (
+                                                <span key={i} className="flex items-center gap-1">
+                                                    {i > 0 && <span className="text-neutral-700">›</span>}
+                                                    <span className={i === arr.length - 1 ? "text-purple-300 font-medium" : "text-neutral-600"}>{part}</span>
+                                                </span>
+                                            )) : <span className="text-purple-300 font-medium">{filters.aiCategory.length} categories</span>}
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Categories Section */}
-                                {(availableCategories.length > 0 || availableAiExports.length > 0) && (
-                                    <div className="space-y-3">
-                                        <div className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Categories</div>
+                                {/* Sub-category breakdown — clickable chips when a parent node is selected */}
+                                {filters.aiExportId !== "all" && (() => {
+                                    const prefix = filters.aiCategory.length === 1 ? filters.aiCategory[0] : null;
+                                    const prefixDepth = prefix ? prefix.split(" / ").length : 0;
+                                    const subCounts = new Map();
 
-                                        {availableCategories.length > 0 && (
-                                            <select
-                                                value={filters.category}
-                                                onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
-                                                className="w-full px-3 py-2.5 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none cursor-pointer"
-                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 0.75rem center", backgroundSize: "1rem" }}
-                                            >
-                                                <option value="all">All Categories</option>
-                                                {availableCategories.map((cat) => (
-                                                    <option key={cat} value={cat}>{cat}</option>
-                                                ))}
-                                            </select>
-                                        )}
+                                    filteredProducts.forEach(p => {
+                                        const cat = p.ai_categories?.find(c => c.exportId === filters.aiExportId);
+                                        if (!cat?.categoryName) return;
+                                        let bucketPath;
+                                        if (!prefix) {
+                                            bucketPath = cat.categoryName.split(" / ")[0];
+                                        } else if (cat.categoryName === prefix) {
+                                            bucketPath = prefix;
+                                        } else if (cat.categoryName.startsWith(prefix + " / ")) {
+                                            const parts = cat.categoryName.split(" / ");
+                                            bucketPath = parts.slice(0, prefixDepth + 1).join(" / ");
+                                        } else {
+                                            return;
+                                        }
+                                        subCounts.set(bucketPath, (subCounts.get(bucketPath) || 0) + 1);
+                                    });
 
-                                        {availableAiExports.length > 0 && (
-                                            <select
-                                                value={filters.aiExportId}
-                                                onChange={(e) => setFilters((prev) => ({ ...prev, aiExportId: e.target.value, aiCategory: "all" }))}
-                                                className="w-full px-3 py-2.5 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none cursor-pointer"
-                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 0.75rem center", backgroundSize: "1rem" }}
-                                            >
-                                                <option value="all">All AI Exports</option>
-                                                {availableAiExports.map((exp) => (
-                                                    <option key={exp.exportId} value={exp.exportId}>{exp.name}</option>
-                                                ))}
-                                            </select>
-                                        )}
+                                    if (subCounts.size <= 1) return null;
 
-                                        {availableAiCategories.length > 0 && (
-                                            <select
-                                                value={filters.aiCategory}
-                                                onChange={(e) => setFilters((prev) => ({ ...prev, aiCategory: e.target.value }))}
-                                                className="w-full px-3 py-2.5 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none cursor-pointer"
-                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 0.75rem center", backgroundSize: "1rem" }}
-                                            >
-                                                <option value="all">All AI Categories</option>
-                                                {availableAiCategories.map((cat) => (
-                                                    <option key={cat.categoryId} value={cat.categoryId}>{cat.categoryName}</option>
-                                                ))}
-                                            </select>
-                                        )}
+                                    const sorted = Array.from(subCounts.entries()).sort((a, b) => b[1] - a[1]);
+                                    return (
+                                        <div className="flex flex-wrap gap-1.5 mb-4">
+                                            {sorted.map(([path, count]) => {
+                                                const label = path.split(" / ").pop();
+                                                const isActive = filters.aiCategory.includes(path);
+                                                const isParentExact = prefix && path === prefix;
+                                                return (
+                                                    <button
+                                                        key={path}
+                                                        onClick={() => setFilters(prev => ({
+                                                            ...prev,
+                                                            aiCategory: isActive ? prev.aiCategory.filter(p => p !== path) : [...prev.aiCategory, path]
+                                                        }))}
+                                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                                                            isActive
+                                                                ? "bg-purple-500/20 border-purple-500/30 text-purple-300"
+                                                                : "bg-neutral-800/60 border-neutral-700/40 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700/60 hover:border-neutral-600/50"
+                                                        }`}
+                                                    >
+                                                        {isParentExact && <span className="text-neutral-600">·</span>}
+                                                        <span>{label}</span>
+                                                        <span className={`tabular-nums ${isActive ? "text-purple-400/70" : "text-neutral-600"}`}>{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })()}
+
+                                <div className="overflow-x-auto rounded-xl border border-neutral-700/50">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-neutral-800/80">
+                                                {/* AI Category column — shown when an export is selected */}
+                                                {filters.aiExportId !== "all" && (
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-purple-400/70 uppercase tracking-wider whitespace-nowrap">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                                            </svg>
+                                                            Category
+                                                        </div>
+                                                    </th>
+                                                )}
+                                                {currentPreset.fields
+                                                    .filter((f) => selectedFields.includes(f.key))
+                                                    .slice(0, filters.aiExportId !== "all" ? 4 : 5)
+                                                    .map((field) => (
+                                                        <th key={field.key} className="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider whitespace-nowrap">
+                                                            {field.label}
+                                                        </th>
+                                                    ))}
+                                                {selectedFields.length > (filters.aiExportId !== "all" ? 4 : 5) && (
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500">
+                                                        +{selectedFields.length - (filters.aiExportId !== "all" ? 4 : 5)} more
+                                                    </th>
+                                                )}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-700/50">
+                                            {filteredProducts.slice(0, previewLimit).map((product, idx) => {
+                                                const variant = product.child_products?.[0] || {};
+                                                const priceInfo = getPriceFromPriority(variant);
+                                                const aiCat = filters.aiExportId !== "all"
+                                                    ? product.ai_categories?.find(c => c.exportId === filters.aiExportId)
+                                                    : null;
+                                                return (
+                                                    <tr key={product._id || idx} className="hover:bg-neutral-700/20">
+                                                        {/* AI Category breadcrumb cell */}
+                                                        {filters.aiExportId !== "all" && (
+                                                            <td className="px-4 py-3 whitespace-nowrap max-w-[200px]">
+                                                                {aiCat?.categoryName ? (() => {
+                                                                    const parts = aiCat.categoryName.split(" / ").map(p => p.trim());
+                                                                    const selectedPrefix = Array.isArray(filters.aiCategory) && filters.aiCategory.length === 1
+                                                                        ? filters.aiCategory[0]
+                                                                        : (!Array.isArray(filters.aiCategory) && filters.aiCategory && filters.aiCategory !== "all" ? filters.aiCategory : null);
+                                                                    const prefixParts = selectedPrefix ? selectedPrefix.split(" / ").map(p => p.trim()) : [];
+                                                                    const deeperParts = parts.slice(prefixParts.length);
+
+                                                                    if (!selectedPrefix) {
+                                                                        // Show full path, leaf highlighted
+                                                                        return (
+                                                                            <div className="flex items-center gap-0.5 flex-wrap">
+                                                                                {parts.map((p, i) => (
+                                                                                    <span key={i} className="flex items-center gap-0.5">
+                                                                                        {i > 0 && <span className="text-neutral-700 text-xs">›</span>}
+                                                                                        <span className={`text-xs ${i === parts.length - 1 ? "text-neutral-200" : "text-neutral-500"}`}>{p}</span>
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    if (deeperParts.length === 0) {
+                                                                        // Product is exactly at the selected node
+                                                                        return <span className="text-xs text-purple-300 font-medium">{parts[parts.length - 1]}</span>;
+                                                                    }
+
+                                                                    // Prefix dimmed, deeper path highlighted
+                                                                    return (
+                                                                        <div className="flex items-center gap-0.5 flex-wrap">
+                                                                            {prefixParts.map((p, i) => (
+                                                                                <span key={`pre-${i}`} className="flex items-center gap-0.5">
+                                                                                    {i > 0 && <span className="text-neutral-800 text-xs">›</span>}
+                                                                                    <span className="text-xs text-neutral-700">{p}</span>
+                                                                                </span>
+                                                                            ))}
+                                                                            {deeperParts.map((p, i) => (
+                                                                                <span key={`deep-${i}`} className="flex items-center gap-0.5">
+                                                                                    <span className="text-neutral-600 text-xs">›</span>
+                                                                                    <span className={`text-xs ${i === deeperParts.length - 1 ? "text-purple-300 font-semibold" : "text-neutral-400"}`}>{p}</span>
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    );
+                                                                })() : (
+                                                                    <span className="text-neutral-700 text-xs">—</span>
+                                                                )}
+                                                            </td>
+                                                        )}
+                                                        {currentPreset.fields
+                                                            .filter((f) => selectedFields.includes(f.key))
+                                                            .slice(0, filters.aiExportId !== "all" ? 4 : 5)
+                                                            .map((field) => {
+                                                                let value = getFieldValue(field.key, product, variant, 0, product.images?.[0] || "", priceInfo, false, false);
+                                                                if (typeof value === "number") value = value.toString();
+                                                                if (value && value.length > 30) value = value.slice(0, 30) + "...";
+                                                                return (
+                                                                    <td key={field.key} className="px-4 py-3 text-neutral-300 whitespace-nowrap">
+                                                                        {value || <span className="text-neutral-600">—</span>}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        {selectedFields.length > (filters.aiExportId !== "all" ? 4 : 5) && (
+                                                            <td className="px-4 py-3 text-neutral-600">...</td>
+                                                        )}
+                                                    </tr>
+                                                );
+                                            })}
+                                            {filteredProducts.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={Math.min(selectedFields.length + (filters.aiExportId !== "all" ? 1 : 0), 6) || 1} className="px-4 py-12 text-center text-neutral-500">
+                                                        No products match your filters
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {filteredProducts.length > previewLimit && (
+                                    <div className="flex items-center justify-between mt-4">
+                                        <p className="text-sm text-neutral-500">
+                                            Showing {Math.min(previewLimit, filteredProducts.length)} of {filteredProducts.length} products
+                                        </p>
+                                        <button
+                                            onClick={() => setPreviewLimit((prev) => prev + 10)}
+                                            className="flex items-center gap-2 text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+                                        >
+                                            Load more
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
                                     </div>
                                 )}
-
-                                {/* Stock & Pricing Section */}
-                                <div className="space-y-3">
-                                    <div className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Stock & Pricing</div>
-
-                                    {/* Stock Status Pills */}
-                                    <div className="flex gap-2">
-                                        {[
-                                            { value: "all", label: "All" },
-                                            { value: "in_stock", label: "In Stock" },
-                                            { value: "out_of_stock", label: "Out" },
-                                        ].map(({ value, label }) => (
-                                            <button
-                                                key={value}
-                                                onClick={() => setFilters((prev) => ({ ...prev, stockStatus: value }))}
-                                                className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${filters.stockStatus === value
-                                                        ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
-                                                        : "bg-neutral-800/50 text-neutral-400 border border-neutral-700/50 hover:border-neutral-600 hover:text-white"
-                                                    }`}
-                                            >
-                                                {label}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {/* Price Range */}
-                                    <div className="flex gap-2 items-center">
-                                        <div className="relative flex-1">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-xs">EUR</span>
-                                            <input
-                                                type="number"
-                                                value={filters.minPrice}
-                                                onChange={(e) => setFilters((prev) => ({ ...prev, minPrice: e.target.value }))}
-                                                placeholder="Min"
-                                                className="w-full pl-10 pr-3 py-2 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-white text-sm placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                                            />
-                                        </div>
-                                        <span className="text-neutral-600">—</span>
-                                        <div className="relative flex-1">
-                                            <input
-                                                type="number"
-                                                value={filters.maxPrice}
-                                                onChange={(e) => setFilters((prev) => ({ ...prev, maxPrice: e.target.value }))}
-                                                placeholder="Max"
-                                                className="w-full px-3 py-2 bg-neutral-900/50 border border-neutral-700/50 rounded-xl text-white text-sm placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Quick Filters */}
-                                <div className="space-y-3">
-                                    <div className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Quick Filters</div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {[
-                                            { key: "showNew", label: "New", icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" },
-                                            { key: "showRecommended", label: "Recommended", icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" },
-                                            { key: "publishedOnly", label: "Published", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
-                                        ].map(({ key, label, icon }) => (
-                                            <button
-                                                key={key}
-                                                onClick={() => setFilters((prev) => ({ ...prev, [key]: !prev[key] }))}
-                                                className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${filters[key]
-                                                        ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
-                                                        : "bg-neutral-800/50 text-neutral-400 border border-neutral-700/50 hover:border-neutral-600 hover:text-white"
-                                                    }`}
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
-                                                </svg>
-                                                {label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Main Content */}
-                    <div className="xl:col-span-3 space-y-6">
-                        {/* Stats Bar */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-700/50">
-                                <div className="text-2xl font-bold text-cyan-400">{filteredProducts.length}</div>
-                                <div className="text-xs text-neutral-500 mt-1">Products</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-700/50">
-                                <div className="text-2xl font-bold text-blue-400">{totalRows}</div>
-                                <div className="text-xs text-neutral-500 mt-1">CSV Rows</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-700/50">
-                                <div className="text-2xl font-bold text-purple-400">{selectedFields.length}</div>
-                                <div className="text-xs text-neutral-500 mt-1">Fields</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-4 border border-neutral-700/50">
-                                <div className="text-2xl font-bold text-pink-400">{currentPreset.name}</div>
-                                <div className="text-xs text-neutral-500 mt-1">Format</div>
-                            </div>
-                        </div>
-
-                        {/* Field Selection */}
-                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-6 border border-neutral-700/50">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-semibold text-white">Select Fields</h2>
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setSelectedFields(currentPreset.fields.map((f) => f.key))}
-                                        className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-                                    >
-                                        Select all
-                                    </button>
-                                    <button
-                                        onClick={() => setSelectedFields([])}
-                                        className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-                                    >
-                                        Clear
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                                {currentPreset.fields.map((field) => (
-                                    <button
-                                        key={field.key}
-                                        onClick={() => toggleField(field.key)}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all ${selectedFields.includes(field.key)
-                                                ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-white"
-                                                : "bg-neutral-800/50 border border-neutral-700/30 text-neutral-400 hover:text-white hover:border-neutral-600"
-                                            }`}
-                                    >
-                                        <div className={`w-4 h-4 rounded flex items-center justify-center ${selectedFields.includes(field.key) ? "bg-cyan-500" : "bg-neutral-700"
-                                            }`}>
-                                            {selectedFields.includes(field.key) && (
-                                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            )}
-                                        </div>
-                                        <span className="truncate">{field.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Preview */}
-                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-6 border border-neutral-700/50">
-                            <h2 className="text-lg font-semibold text-white mb-4">Preview</h2>
-                            <div className="overflow-x-auto rounded-xl border border-neutral-700/50">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="bg-neutral-800/80">
-                                            {currentPreset.fields
-                                                .filter((f) => selectedFields.includes(f.key))
-                                                .slice(0, 5)
-                                                .map((field) => (
-                                                    <th key={field.key} className="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider whitespace-nowrap">
-                                                        {field.label}
-                                                    </th>
-                                                ))}
-                                            {selectedFields.length > 5 && (
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500">
-                                                    +{selectedFields.length - 5} more
-                                                </th>
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-neutral-700/50">
-                                        {filteredProducts.slice(0, previewLimit).map((product, idx) => {
-                                            const variant = product.child_products?.[0] || {};
-                                            const priceInfo = getPriceFromPriority(variant);
-                                            return (
-                                                <tr key={product._id || idx} className="hover:bg-neutral-700/20">
-                                                    {currentPreset.fields
-                                                        .filter((f) => selectedFields.includes(f.key))
-                                                        .slice(0, 5)
-                                                        .map((field) => {
-                                                            let value = getFieldValue(field.key, product, variant, 0, product.images?.[0] || "", priceInfo, false, false);
-                                                            if (typeof value === "number") value = value.toString();
-                                                            if (value && value.length > 30) value = value.slice(0, 30) + "...";
-                                                            return (
-                                                                <td key={field.key} className="px-4 py-3 text-neutral-300 whitespace-nowrap">
-                                                                    {value || <span className="text-neutral-600">—</span>}
-                                                                </td>
-                                                            );
-                                                        })}
-                                                    {selectedFields.length > 5 && (
-                                                        <td className="px-4 py-3 text-neutral-600">...</td>
-                                                    )}
-                                                </tr>
-                                            );
-                                        })}
-                                        {filteredProducts.length === 0 && (
-                                            <tr>
-                                                <td colSpan={Math.min(selectedFields.length, 6) || 1} className="px-4 py-12 text-center text-neutral-500">
-                                                    No products match your filters
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {filteredProducts.length > previewLimit && (
-                                <div className="flex items-center justify-between mt-4">
-                                    <p className="text-sm text-neutral-500">
-                                        Showing {Math.min(previewLimit, filteredProducts.length)} of {filteredProducts.length} products
+                                {filteredProducts.length > 0 && filteredProducts.length <= previewLimit && (
+                                    <p className="text-sm text-neutral-500 mt-3">
+                                        Showing all {filteredProducts.length} products
                                     </p>
-                                    <button
-                                        onClick={() => setPreviewLimit((prev) => prev + 10)}
-                                        className="flex items-center gap-2 text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
-                                    >
-                                        Load more
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            )}
-                            {filteredProducts.length > 0 && filteredProducts.length <= previewLimit && (
-                                <p className="text-sm text-neutral-500 mt-3">
-                                    Showing all {filteredProducts.length} products
-                                </p>
-                            )}
+                                )}
+                            </div>
                         </div>
+                    )}
+
+                    {/* Bottom Navigation */}
+                    <div className="flex items-center justify-between pt-4 border-t border-neutral-800/60">
+                        <button
+                            onClick={() => {
+                                const steps = ['format', 'filters', 'fields', 'export'];
+                                const idx = steps.indexOf(exportStep);
+                                if (idx > 0) setExportStep(steps[idx - 1]);
+                            }}
+                            disabled={exportStep === 'format'}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-0 disabled:pointer-events-none bg-neutral-800/80 hover:bg-neutral-700/80 text-neutral-300 hover:text-white border border-neutral-700/50"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            Back
+                        </button>
+
+                        {exportStep !== 'export' ? (
+                            <button
+                                onClick={() => {
+                                    const steps = ['format', 'filters', 'fields', 'export'];
+                                    const idx = steps.indexOf(exportStep);
+                                    if (idx < steps.length - 1) setExportStep(steps[idx + 1]);
+                                }}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-md shadow-cyan-500/20"
+                            >
+                                {exportStep === 'format' && 'Set Filters'}
+                                {exportStep === 'filters' && 'Choose Fields'}
+                                {exportStep === 'fields' && 'Review & Export'}
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setShowSaveModal(true)}
+                                disabled={selectedFields.length === 0}
+                                className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-800/50 disabled:cursor-not-allowed border border-neutral-700 hover:border-neutral-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-sm"
+                            >
+                                <SaveIcon /> Save Config
+                            </button>
+                        )}
                     </div>
                 </div>
+
             ) : (
                 /* Saved Exports Tab */
                 <div className="space-y-6">
@@ -1567,18 +2447,25 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                             </div>
                         </div>
                     ) : savedExports.length === 0 ? (
-                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 p-16">
-                            <div className="flex flex-col items-center justify-center text-center">
-                                <div className="w-20 h-20 mx-auto mb-6 bg-neutral-800 rounded-2xl flex items-center justify-center border border-neutral-700/50">
-                                    <svg className="w-10 h-10 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                                    </svg>
+                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 py-20 px-8">
+                            <div className="flex flex-col items-center justify-center text-center max-w-sm mx-auto">
+                                <div className="relative mb-6">
+                                    <div className="w-20 h-20 bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl flex items-center justify-center border border-neutral-700/50 shadow-xl">
+                                        <svg className="w-9 h-9 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                        </svg>
+                                    </div>
+                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg flex items-center justify-center shadow-lg">
+                                        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                    </div>
                                 </div>
-                                <p className="text-lg font-medium text-white mb-2">No saved exports yet</p>
-                                <p className="text-neutral-500 max-w-sm mb-6">Configure an export with your preferred settings, then save it for quick access later.</p>
+                                <h3 className="text-lg font-semibold text-white mb-2">No saved exports yet</h3>
+                                <p className="text-sm text-neutral-500 mb-6 leading-relaxed">Configure an export with your preferred settings, then save it for quick access and shareable API links.</p>
                                 <button
                                     onClick={() => setActiveTab("configure")}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-cyan-500/25"
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl font-semibold transition-all shadow-lg shadow-cyan-500/25 text-sm"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1588,117 +2475,352 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                             </div>
                         </div>
                     ) : (
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            {savedExports.map((config) => (
+                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                            {savedExports.map((config) => {
+                                const PRESET_STYLE = {
+                                    shopify: { gradient: 'from-emerald-500 to-green-400', badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20', iconBg: 'bg-emerald-500/15 text-emerald-400' },
+                                    simple:  { gradient: 'from-cyan-500 to-blue-400',    badge: 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20',       iconBg: 'bg-cyan-500/15 text-cyan-400' },
+                                    detailed:{ gradient: 'from-violet-500 to-purple-400', badge: 'bg-violet-500/15 text-violet-400 border border-violet-500/20', iconBg: 'bg-violet-500/15 text-violet-400' },
+                                    inventory:{ gradient: 'from-amber-500 to-orange-400', badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/20',   iconBg: 'bg-amber-500/15 text-amber-400' },
+                                };
+                                const style = PRESET_STYLE[config.preset] || PRESET_STYLE.simple;
+                                const preset = EXPORT_PRESETS[config.preset];
+
+                                // Count active filters (backwards-compatible: handles legacy string or new array)
+                                const f = config.filters || {};
+                                const fCats = Array.isArray(f.category) ? f.category : (f.category && f.category !== 'all' ? [f.category] : []);
+                                const fAiCats = Array.isArray(f.aiCategory) ? f.aiCategory : (f.aiCategory && f.aiCategory !== 'all' ? [f.aiCategory] : []);
+                                const activeFilterCount = [
+                                    f.search, f.stockStatus !== 'all' && f.stockStatus,
+                                    f.minPrice, f.maxPrice,
+                                    fCats.length > 0 && 'cat',
+                                    f.aiExportId !== 'all' && f.aiExportId,
+                                    fAiCats.length > 0 && 'aiCat',
+                                    f.imageFilter !== 'all' && f.imageFilter,
+                                    f.showNew, f.showRecommended, f.publishedOnly,
+                                ].filter(Boolean).length;
+
+                                return (
                                 <div
                                     key={config._id}
-                                    className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm border border-neutral-700/50 rounded-2xl overflow-hidden hover:border-neutral-600 transition-all group"
+                                    className="group relative bg-gradient-to-br from-neutral-800/90 to-neutral-900/90 backdrop-blur-sm border border-neutral-700/50 rounded-2xl overflow-hidden hover:border-neutral-500/60 hover:shadow-xl hover:shadow-black/30 transition-all duration-200"
                                 >
-                                    {/* Card Header */}
-                                    <div className="p-5 border-b border-neutral-700/50">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="font-semibold text-white truncate">{config.name}</h3>
-                                                {config.description && (
-                                                    <p className="text-sm text-neutral-500 mt-1 line-clamp-2">{config.description}</p>
+                                    {/* Top gradient accent bar */}
+                                    <div className={`h-[3px] bg-gradient-to-r ${style.gradient}`} />
+
+                                    {/* Card body */}
+                                    <div className="p-5">
+                                        {/* Header row: icon + title + preset badge */}
+                                        <div className="flex items-start gap-3 mb-4">
+                                            <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${style.iconBg}`}>
+                                                {preset?.icon || (
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
                                                 )}
                                             </div>
-                                            <div className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium ${config.preset === "shopify" ? "bg-green-500/20 text-green-400" :
-                                                    config.preset === "simple" ? "bg-blue-500/20 text-blue-400" :
-                                                        config.preset === "detailed" ? "bg-purple-500/20 text-purple-400" :
-                                                            "bg-orange-500/20 text-orange-400"
-                                                }`}>
-                                                {EXPORT_PRESETS[config.preset]?.name || config.preset}
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-semibold text-white truncate text-base leading-tight">{config.name}</h3>
+                                                {config.description ? (
+                                                    <p className="text-xs text-neutral-500 mt-0.5 line-clamp-2 leading-relaxed">{config.description}</p>
+                                                ) : (
+                                                    <p className="text-xs text-neutral-600 mt-0.5 italic">No description</p>
+                                                )}
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Card Meta */}
-                                    <div className="px-5 py-3 bg-neutral-900/30">
-                                        <div className="flex items-center gap-4 text-xs text-neutral-500">
-                                            <span className="flex items-center gap-1.5">
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                </svg>
-                                                {config.selectedFields?.length || 0} fields
+                                            <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase tracking-wide ${style.badge}`}>
+                                                {preset?.name || config.preset}
                                             </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        </div>
+
+                                        {/* Stats chips */}
+                                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-700/50 text-xs text-neutral-400">
+                                                <svg className="w-3 h-3 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h8" />
+                                                </svg>
+                                                <span className="font-medium text-neutral-300">{config.selectedFields?.length || 0}</span> fields
+                                            </span>
+                                            {activeFilterCount > 0 && (
+                                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-400">
+                                                    <FilterIcon />
+                                                    <span className="font-medium">{activeFilterCount}</span> filter{activeFilterCount !== 1 ? 's' : ''}
+                                                </span>
+                                            )}
+                                            {(config.pricelistPriority?.filter(p => p.enabled).length ?? 0) > 0 && (
+                                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-700/50 text-xs text-neutral-400">
+                                                    <svg className="w-3 h-3 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span className="font-medium text-neutral-300">{config.pricelistPriority.filter(p => p.enabled).length}</span> pricelist{config.pricelistPriority.filter(p => p.enabled).length !== 1 ? 's' : ''}
+                                                </span>
+                                            )}
+                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-700/50 text-xs text-neutral-500 ml-auto">
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                 </svg>
                                                 {formatDate(config.createdAt)}
                                             </span>
                                         </div>
+
+                                        {/* Download section */}
+                                        <div className="mb-3">
+                                            <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-widest mb-2">Download</p>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                {['csv', 'json', 'xml'].map((fmt) => {
+                                                    const meta = FORMAT_META[fmt];
+                                                    const dlKey = `${config._id}-${fmt}`;
+                                                    const isLoading = downloadingId === dlKey;
+                                                    return (
+                                                        <button
+                                                            key={fmt}
+                                                            onClick={() => downloadFromAPI(config._id, fmt)}
+                                                            disabled={!!downloadingId}
+                                                            title={`Download as ${meta.label}`}
+                                                            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                                                                isLoading
+                                                                    ? 'bg-neutral-800 text-neutral-500 cursor-wait'
+                                                                    : `${meta.bg} ${meta.text} disabled:opacity-40 disabled:cursor-not-allowed`
+                                                            }`}
+                                                        >
+                                                            {isLoading ? <SpinnerIcon /> : meta.icon}
+                                                            {meta.label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    {/* Card Actions */}
-                                    <div className="p-4 flex gap-2">
+                                    {/* Card footer */}
+                                    <div className="border-t border-neutral-700/40 px-4 py-3 flex items-center gap-2 bg-neutral-900/30">
                                         <button
                                             onClick={() => loadExportConfig(config)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-xl text-sm font-medium transition-colors"
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400 rounded-xl text-xs font-semibold transition-colors border border-cyan-500/20"
                                         >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                            <LoadIcon />
+                                            Load Config
+                                        </button>
+                                        <button
+                                            onClick={() => { setPreviewConfig(config); setPreviewSearch(''); setShowPreview(true); }}
+                                            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-neutral-700/50 hover:bg-neutral-600/50 text-neutral-300 rounded-xl text-xs font-semibold transition-colors border border-neutral-600/30"
+                                            title="Preview products for this export"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                             </svg>
-                                            Load
+                                            Preview
                                         </button>
                                         <button
-                                            onClick={() => copyExportLink(config._id)}
-                                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${copiedId === config._id
-                                                    ? "bg-green-500/20 text-green-400"
-                                                    : "bg-purple-500/20 hover:bg-purple-500/30 text-purple-400"
-                                                }`}
-                                            title="Copy export link"
+                                            onClick={() => openKeysModal(config._id)}
+                                            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-xl text-xs font-semibold transition-colors border border-purple-500/20"
+                                            title="API Keys"
                                         >
-                                            {copiedId === config._id ? (
-                                                <>
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                    Copied!
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <LinkIcon />
-                                                    Get Link
-                                                </>
-                                            )}
+                                            <KeyIcon />
+                                            Keys
                                         </button>
                                         <button
-                                            onClick={() => downloadFromAPI(config._id)}
-                                            disabled={downloadingId === config._id}
-                                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-colors ${downloadingId === config._id
-                                                    ? "bg-neutral-700/50 text-neutral-400 cursor-wait"
-                                                    : "bg-neutral-700/50 hover:bg-neutral-600/50 text-white"
-                                                }`}
+                                            onClick={() => openAccessModal(config._id)}
+                                            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-xl text-xs font-semibold transition-colors border border-blue-500/20"
+                                            title="Manage access"
                                         >
-                                            {downloadingId === config._id ? (
-                                                <>
-                                                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                                    </svg>
-                                                    Downloading...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <DownloadIcon />
-                                                    Download
-                                                </>
-                                            )}
+                                            <UsersIcon />
+                                            Access
                                         </button>
                                         <button
                                             onClick={() => deleteExport(config._id)}
-                                            className="py-2.5 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors"
+                                            className="flex items-center justify-center py-2 px-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors border border-red-500/20"
                                             title="Delete export"
                                         >
                                             <TrashIcon />
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Product Preview Panel */}
+            {showPreview && (
+                <div className="fixed inset-0 z-50 flex" style={{ fontFamily: 'inherit' }}>
+                    {/* Backdrop */}
+                    <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowPreview(false)} />
+                    {/* Drawer */}
+                    <div className="w-full max-w-4xl bg-neutral-950 border-l border-neutral-700/60 flex flex-col shadow-2xl overflow-hidden">
+                        {/* Panel header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800/80 bg-neutral-900/80 shrink-0">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="text-base font-semibold text-white truncate">
+                                        {previewConfig ? previewConfig.name : 'Current Export Preview'}
+                                    </h2>
+                                    <p className="text-xs text-neutral-500 mt-0.5">
+                                        <span className="text-cyan-400 font-medium">{previewDisplayProducts.length}</span>
+                                        {previewSearch.trim() ? ` of ${previewBaseProducts.length} products` : ` product${previewBaseProducts.length !== 1 ? 's' : ''}`} match this export
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {/* Grid / List toggle */}
+                                <div className="flex bg-neutral-800/80 border border-neutral-700/50 rounded-lg p-0.5">
+                                    <button
+                                        onClick={() => setPreviewView('grid')}
+                                        className={`p-1.5 rounded-md transition-all ${previewView === 'grid' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                                        title="Grid view"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={() => setPreviewView('list')}
+                                        className={`p-1.5 rounded-md transition-all ${previewView === 'list' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                                        title="List view"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => setShowPreview(false)}
+                                    className="p-2 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Search bar */}
+                        <div className="px-4 py-3 border-b border-neutral-800/60 shrink-0">
+                            <div className="relative">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    value={previewSearch}
+                                    onChange={e => setPreviewSearch(e.target.value)}
+                                    placeholder="Search within preview..."
+                                    className="w-full pl-9 pr-4 py-2.5 bg-neutral-800/60 border border-neutral-700/40 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 transition-all"
+                                />
+                                {previewSearch && (
+                                    <button onClick={() => setPreviewSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-300">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Product list */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {previewDisplayProducts.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 text-neutral-600">
+                                    <svg className="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                    </svg>
+                                    <p className="text-sm font-medium">{previewSearch ? 'No products match your search' : 'No products match this export'}</p>
+                                </div>
+                            ) : previewView === 'grid' ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {previewDisplayProducts.map((product) => {
+                                        const imgSrc = product.images?.[0] || product.child_products?.find(v => v.images?.[0])?.images?.[0];
+                                        const variants = product.child_products || [];
+                                        const allPrices = variants.flatMap(v => v.pricelist?.map(p => p.price).filter(p => typeof p === 'number') || []);
+                                        const minPrice = allPrices.length ? Math.min(...allPrices) : null;
+                                        const hasStock = variants.some(v => v.stock_amount > 0);
+                                        return (
+                                            <div key={product._id || product.token} className="group bg-neutral-900/70 border border-neutral-800/60 rounded-xl overflow-hidden hover:border-neutral-600/60 hover:shadow-lg hover:shadow-black/30 transition-all">
+                                                <div className="relative aspect-square bg-neutral-800">
+                                                    {imgSrc ? (
+                                                        <img src={imgSrc} alt={product.product_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <svg className="w-10 h-10 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute top-2 right-2">
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${hasStock ? 'bg-emerald-500/90 text-white' : 'bg-neutral-700/90 text-neutral-400'}`}>
+                                                            {hasStock ? '● In Stock' : '○ No Stock'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="p-2.5">
+                                                    <p className="text-xs font-semibold text-white line-clamp-2 leading-snug mb-1.5">{product.product_name}</p>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[11px] text-neutral-500">{variants.length} variant{variants.length !== 1 ? 's' : ''}</span>
+                                                        {minPrice !== null && <span className="text-xs font-semibold text-cyan-400">€{minPrice.toFixed(2)}</span>}
+                                                    </div>
+                                                    {product.categories?.length > 0 && (
+                                                        <div className="mt-1.5 flex flex-wrap gap-1">
+                                                            {product.categories.slice(0, 2).map(cat => (
+                                                                <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-500 rounded-md border border-neutral-700/50 truncate max-w-[80px]">{cat}</span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    {previewDisplayProducts.map((product) => {
+                                        const imgSrc = product.images?.[0] || product.child_products?.find(v => v.images?.[0])?.images?.[0];
+                                        const variants = product.child_products || [];
+                                        const allPrices = variants.flatMap(v => v.pricelist?.map(p => p.price).filter(p => typeof p === 'number') || []);
+                                        const minPrice = allPrices.length ? Math.min(...allPrices) : null;
+                                        const hasStock = variants.some(v => v.stock_amount > 0);
+                                        return (
+                                            <div key={product._id || product.token} className="flex items-center gap-3 p-2.5 bg-neutral-900/60 border border-neutral-800/50 rounded-xl hover:border-neutral-700/60 hover:bg-neutral-800/40 transition-all group">
+                                                <div className="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-neutral-800">
+                                                    {imgSrc ? (
+                                                        <img src={imgSrc} alt={product.product_name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <svg className="w-5 h-5 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-white truncate">{product.product_name}</p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className="text-[11px] text-neutral-600">{variants.length} var.</span>
+                                                        {minPrice !== null && <span className="text-[11px] font-semibold text-cyan-400">€{minPrice.toFixed(2)}</span>}
+                                                        {product.categories?.slice(0, 2).map(cat => (
+                                                            <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-600 rounded border border-neutral-700/40 truncate max-w-[100px]">{cat}</span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0">
+                                                    <span className={`text-[10px] font-semibold px-2 py-1 rounded-lg ${hasStock ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-neutral-800 text-neutral-600 border border-neutral-700/40'}`}>
+                                                        {hasStock ? 'In Stock' : 'No Stock'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -1754,6 +2876,350 @@ export default function ExportPage({ initialProducts = [], apiUrl = "http://loca
                             >
                                 {isSaving ? "Saving..." : "Save Export"}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* API Keys Modal */}
+            {showKeysModal && (
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-neutral-900 rounded-2xl w-full max-w-lg border border-neutral-700/60 max-h-[90vh] flex flex-col shadow-2xl">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-purple-500/15 rounded-lg flex items-center justify-center ring-1 ring-purple-500/20">
+                                    <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-white text-sm">API Keys</h3>
+                                    {activeExportName && <p className="text-xs text-neutral-500 truncate max-w-[220px]">{activeExportName}</p>}
+                                </div>
+                            </div>
+                            <button onClick={closeKeysModal} className="text-neutral-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-neutral-800">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+                            {/* ── New key — one-time display ── */}
+                            {createdKeyRaw && (
+                                <div className="rounded-xl border border-amber-500/20 overflow-hidden">
+                                    {/* Warning strip */}
+                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/8 border-b border-amber-500/15">
+                                        <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        <p className="text-amber-400 font-medium text-xs">Save this key — it won&apos;t be shown again</p>
+                                    </div>
+                                    {/* Tab strip */}
+                                    <div className="flex border-b border-neutral-800 bg-neutral-900/60">
+                                        {[['key', 'Key'], ['endpoints', 'Endpoints'], ['usage', 'Usage']].map(([id, label]) => (
+                                            <button key={id} onClick={() => setCreatedKeyTab(id)}
+                                                className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${createdKeyTab === id ? 'border-purple-500 text-purple-400' : 'border-transparent text-neutral-500 hover:text-neutral-300'}`}>
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {/* Tab content */}
+                                    <div className="p-4 bg-neutral-950/40">
+                                        {createdKeyTab === 'key' && (
+                                            <div className="flex gap-2">
+                                                <code className="flex-1 text-xs text-white bg-neutral-900 px-3 py-2.5 rounded-lg break-all font-mono min-w-0 border border-neutral-800">{createdKeyRaw}</code>
+                                                <button
+                                                    onClick={() => { navigator.clipboard.writeText(createdKeyRaw); setCopiedField('key'); setTimeout(() => setCopiedField(null), 2000); }}
+                                                    className={`shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${copiedField === 'key' ? 'bg-green-500/15 text-green-400 ring-1 ring-green-500/20' : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'}`}
+                                                >
+                                                    {copiedField === 'key' ? '✓ Copied' : 'Copy'}
+                                                </button>
+                                            </div>
+                                        )}
+                                        {createdKeyTab === 'endpoints' && (
+                                            <div className="space-y-2">
+                                                {[['CSV', 'csv', 'text-cyan-400'], ['JSON', 'json', 'text-emerald-400'], ['XML', 'xml', 'text-orange-400']].map(([label, fmt, color]) => (
+                                                    <div key={fmt} className="flex items-center gap-2">
+                                                        <span className={`text-xs font-mono font-semibold w-9 shrink-0 ${color}`}>{label}</span>
+                                                        <code className="flex-1 text-xs text-neutral-300 bg-neutral-900 px-2.5 py-2 rounded-lg font-mono min-w-0 truncate border border-neutral-800">
+                                                            {`${apiUrl}/custom-export/${activeExportId}/${fmt}`}
+                                                        </code>
+                                                        <button
+                                                            onClick={() => { navigator.clipboard.writeText(`${apiUrl}/custom-export/${activeExportId}/${fmt}`); setCopiedField(fmt); setTimeout(() => setCopiedField(null), 2000); }}
+                                                            className={`shrink-0 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${copiedField === fmt ? 'bg-green-500/15 text-green-400 ring-1 ring-green-500/20' : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'}`}
+                                                        >
+                                                            {copiedField === fmt ? '✓' : 'Copy'}
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {createdKeyTab === 'usage' && (
+                                            <div className="space-y-3">
+                                                <p className="text-xs text-neutral-400">Send the key in the <code className="text-purple-400 bg-neutral-800 px-1.5 py-0.5 rounded font-mono">X-Api-Key</code> header — never in the URL.</p>
+                                                {[['csv', 'text-cyan-400'], ['json', 'text-emerald-400'], ['xml', 'text-orange-400']].map(([fmt, color]) => (
+                                                    <div key={fmt}>
+                                                        <p className={`text-xs font-mono font-semibold mb-1 ${color}`}>{fmt.toUpperCase()}</p>
+                                                        <div className="relative">
+                                                            <code className="block text-xs text-green-400 bg-black/60 border border-neutral-800 px-3 py-2.5 rounded-lg font-mono break-all leading-relaxed">
+                                                                {`curl -H "X-Api-Key: ${createdKeyRaw}" \\\n  ${apiUrl}/custom-export/${activeExportId}/${fmt}`}
+                                                            </code>
+                                                            <button
+                                                                onClick={() => { navigator.clipboard.writeText(`curl -H "X-Api-Key: ${createdKeyRaw}" \\\n  ${apiUrl}/custom-export/${activeExportId}/${fmt}`); setCopiedField(`curl-${fmt}`); setTimeout(() => setCopiedField(null), 2000); }}
+                                                                className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium transition-colors ${copiedField === `curl-${fmt}` ? 'bg-green-500/15 text-green-400' : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400'}`}
+                                                            >
+                                                                {copiedField === `curl-${fmt}` ? '✓' : 'Copy'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Create new key ── */}
+                            <div>
+                                <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">New key</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newKeyName}
+                                        onChange={(e) => setNewKeyName(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
+                                        placeholder="e.g. Shopify Integration"
+                                        className="flex-1 px-3.5 py-2.5 bg-neutral-800/60 border border-neutral-700/60 rounded-xl text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/40 text-sm transition-colors"
+                                    />
+                                    <button
+                                        onClick={handleCreateKey}
+                                        disabled={isKeyLoading || !newKeyName.trim()}
+                                        className="px-4 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 disabled:opacity-40 disabled:cursor-not-allowed text-purple-400 rounded-xl text-sm font-medium transition-colors flex items-center gap-1.5 ring-1 ring-purple-500/20"
+                                    >
+                                        {isKeyLoading ? (
+                                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                        )}
+                                        Generate
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-neutral-800" />
+
+                            {/* ── Key list ── */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Keys</p>
+                                    {exportKeys.filter(k => k.isActive).length > 0 && (
+                                        <span className="text-xs text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full ring-1 ring-purple-500/15">
+                                            {exportKeys.filter(k => k.isActive).length} active
+                                        </span>
+                                    )}
+                                </div>
+                                {isKeyLoading ? (
+                                    <div className="flex items-center justify-center py-10 text-neutral-600 text-sm gap-2">
+                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Loading...
+                                    </div>
+                                ) : exportKeys.length === 0 ? (
+                                    <div className="text-center py-10 text-neutral-600">
+                                        <svg className="w-7 h-7 mx-auto mb-2.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                        </svg>
+                                        <p className="text-sm font-medium">No API keys yet</p>
+                                        <p className="text-xs text-neutral-700 mt-1">Generate one above to get started</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {exportKeys.map(key => (
+                                            <div key={key.keyId} className={`rounded-xl border transition-all ${key.isActive ? 'bg-neutral-800/40 border-neutral-700/50' : 'bg-neutral-800/10 border-neutral-800/40 opacity-40'}`}>
+                                                {/* Key row */}
+                                                <div className="flex items-center gap-2 p-3">
+                                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${key.isActive ? 'bg-green-500' : 'bg-neutral-600'}`} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-white truncate leading-tight">{key.name}</p>
+                                                        <p className="text-xs text-neutral-500 font-mono leading-tight">{key.keyPrefix}···</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        {key.isActive && (
+                                                            <button
+                                                                onClick={() => setExpandedKeyId(expandedKeyId === key.keyId ? null : key.keyId)}
+                                                                title="Show endpoints"
+                                                                className={`p-1.5 rounded-lg text-xs transition-colors ${expandedKeyId === key.keyId ? 'bg-purple-500/20 text-purple-400' : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700/50'}`}
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                        {key.isActive ? (
+                                                            <button
+                                                                onClick={() => handleRevokeKey(key.keyId)}
+                                                                className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                                                            >
+                                                                Revoke
+                                                            </button>
+                                                        ) : (
+                                                            <span className="px-2.5 py-1 bg-neutral-800 text-neutral-600 rounded-lg text-xs">Revoked</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {/* Expandable endpoints panel */}
+                                                {expandedKeyId === key.keyId && (
+                                                    <div className="px-3 pb-3 space-y-2 border-t border-neutral-700/40 pt-3">
+                                                        <p className="text-xs text-neutral-500 mb-2">
+                                                            Set header <code className="text-purple-400 bg-neutral-800 px-1.5 py-0.5 rounded font-mono">X-Api-Key: &lt;your-key&gt;</code>
+                                                        </p>
+                                                        {[['CSV', 'csv', 'text-cyan-400'], ['JSON', 'json', 'text-emerald-400'], ['XML', 'xml', 'text-orange-400']].map(([label, fmt, color]) => (
+                                                            <div key={fmt} className="flex items-center gap-2">
+                                                                <span className={`text-xs font-mono font-semibold w-9 shrink-0 ${color}`}>{label}</span>
+                                                                <code className="flex-1 text-xs text-neutral-400 bg-neutral-900/80 px-2.5 py-1.5 rounded-lg font-mono min-w-0 truncate border border-neutral-800">
+                                                                    {`${apiUrl}/custom-export/${activeExportId}/${fmt}`}
+                                                                </code>
+                                                                <button
+                                                                    onClick={() => { navigator.clipboard.writeText(`${apiUrl}/custom-export/${activeExportId}/${fmt}`); setCopiedField(`${key.keyId}-${fmt}`); setTimeout(() => setCopiedField(null), 2000); }}
+                                                                    className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${copiedField === `${key.keyId}-${fmt}` ? 'bg-green-500/15 text-green-400 ring-1 ring-green-500/20' : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-400'}`}
+                                                                >
+                                                                    {copiedField === `${key.keyId}-${fmt}` ? '✓' : 'Copy'}
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {/* Timestamps */}
+                                                <p className="text-xs text-neutral-700 px-3 pb-2.5">
+                                                    Created {formatDate(key.createdAt)}
+                                                    {key.lastUsedAt && <span className="ml-2.5">· Last used {formatDate(key.lastUsedAt)}</span>}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Access Control Modal */}
+            {showAccessModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-neutral-800 rounded-2xl w-full max-w-lg border border-neutral-700 max-h-[90vh] flex flex-col shadow-2xl">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-white text-sm">Access Control</h3>
+                                    {activeExportName && <p className="text-xs text-neutral-500 truncate max-w-[220px]">{activeExportName}</p>}
+                                </div>
+                            </div>
+                            <button onClick={closeAccessModal} className="text-neutral-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-neutral-700/50">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+                            {/* Grant access */}
+                            <div>
+                                <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2">Grant Access</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="email"
+                                        value={newGrantEmail}
+                                        onChange={(e) => setNewGrantEmail(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleGrantAccess()}
+                                        placeholder="user@example.com"
+                                        className="flex-1 px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-sm"
+                                    />
+                                    <button
+                                        onClick={handleGrantAccess}
+                                        disabled={isAccessLoading || !newGrantEmail.trim()}
+                                        className="px-4 py-2.5 bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed text-blue-400 rounded-xl text-sm font-medium transition-colors"
+                                    >
+                                        Grant
+                                    </button>
+                                </div>
+                                <p className="text-xs text-neutral-600 mt-1.5">User must also have the export role in Auth0.</p>
+                            </div>
+
+                            <div className="border-t border-neutral-700/50" />
+
+                            {/* Access list */}
+                            <div>
+                                <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2">
+                                    Users with Access
+                                    {exportAccess.length > 0 && (
+                                        <span className="ml-2 text-blue-400 normal-case font-normal tracking-normal">
+                                            {exportAccess.length} {exportAccess.length === 1 ? 'user' : 'users'}
+                                        </span>
+                                    )}
+                                </p>
+                                {isAccessLoading ? (
+                                    <div className="flex items-center justify-center py-8 text-neutral-500 text-sm gap-2">
+                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Loading...
+                                    </div>
+                                ) : exportAccess.length === 0 ? (
+                                    <div className="text-center py-8 text-neutral-600">
+                                        <svg className="w-8 h-8 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        <p className="text-sm">No access grants yet</p>
+                                        <p className="text-xs text-neutral-700 mt-1">Enter an email above to grant access</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {exportAccess.map(entry => {
+                                            const initials = entry.email.split('@')[0].slice(0, 2).toUpperCase();
+                                            return (
+                                                <div key={entry.email} className="flex items-center gap-3 p-3 bg-neutral-900/50 rounded-xl border border-neutral-700/50">
+                                                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
+                                                        <span className="text-xs font-semibold text-blue-400">{initials}</span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-white truncate">{entry.email}</p>
+                                                        <p className="text-xs text-neutral-500">
+                                                            Granted {formatDate(entry.grantedAt)}
+                                                            {' · '}
+                                                            <span className={entry.sub ? 'text-green-500' : 'text-neutral-600'}>
+                                                                {entry.sub ? 'Active' : 'Pending login'}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleRevokeAccess(entry.email)}
+                                                        className="shrink-0 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                                                    >
+                                                        Revoke
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

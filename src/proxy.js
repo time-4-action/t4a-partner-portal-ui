@@ -16,16 +16,43 @@
  */
 
 import { auth0 } from "./lib/auth0";
+import { NextResponse } from "next/server";
+
+const ROLES_CLAIM = "https://time-4-action.com/roles";
+const REQUIRED_ROLE = "export";
 
 /**
- * Middleware proxy function that delegates to Auth0's middleware handler.
- * This runs on every request that matches the config.matcher pattern.
+ * Middleware proxy function that delegates to Auth0's middleware handler
+ * and enforces the `export` role gate on all protected routes.
  *
  * @param {Request} request - The incoming HTTP request object
- * @returns {Promise<Response>} The response from Auth0 middleware or undefined to continue
+ * @returns {Promise<Response>} The response from Auth0 middleware or a redirect
  */
 export async function proxy(request) {
-  return await auth0.middleware(request);
+  const authResponse = await auth0.middleware(request);
+
+  // Let Auth0 routes and the unauthorized page pass through
+  if (
+    request.nextUrl.pathname.startsWith("/auth") ||
+    request.nextUrl.pathname === "/unauthorized"
+  ) {
+    return authResponse;
+  }
+
+  // Use auth0.getSession() so the encrypted session cookie is properly decrypted
+  const session = await auth0.getSession(request);
+  if (!session) {
+    // Not logged in — auth0.middleware already handles the login redirect
+    return authResponse;
+  }
+
+  const roles = session.user[ROLES_CLAIM] ?? [];
+
+  if (!roles.includes(REQUIRED_ROLE)) {
+    return NextResponse.redirect(new URL("/unauthorized", request.url));
+  }
+
+  return authResponse;
 }
 
 /**

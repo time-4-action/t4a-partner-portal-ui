@@ -20,15 +20,21 @@ import { useState, useEffect, useRef } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 
 /**
- * Navigation links configuration.
- * Defines all main navigation items displayed in both desktop and mobile menus.
+ * Returns navigation links. Export is hidden for users without the 'export' role.
+ * Roles are injected into the ID token via an Auth0 Post Login Action.
  */
-const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/product", label: "Products" },
-  { href: "/export", label: "Export" },
-  { href: "/contact", label: "Contact" },
-];
+function getNavLinks(user) {
+  const roles = user?.["https://time-4-action.com/roles"] ?? [];
+  const links = [
+    { href: "/", label: "Home" },
+    { href: "/product", label: "Products" },
+  ];
+  if (roles.includes("export")) {
+    links.push({ href: "/export", label: "Export" });
+  }
+  links.push({ href: "/contact", label: "Contact" });
+  return links;
+}
 
 /**
  * Navbar Component
@@ -52,6 +58,7 @@ const Navbar = () => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const { user, isLoading } = useUser(); // Auth0 hook for user state
   const profileMenuRef = useRef(null);
+  const navLinks = getNavLinks(user);
 
   /**
    * Effect to close profile dropdown when clicking outside.

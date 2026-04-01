@@ -1,11 +1,11 @@
 import ExportPage from "@/components/ExportPage";
+import { auth0 } from "@/lib/auth0";
 
 // Get API URL from environment
-const apiUrl = process.env.EXPORT_API_URL || "http://localhost:4000";
+const apiUrl = process.env.EXPORT_API_URL || "http://localhost:3000/api/export";
 
 // Fetch products from Export API
 async function getProducts() {
-
   try {
     const res = await fetch(`${apiUrl}/product`, {
       cache: "no-store",
@@ -26,8 +26,54 @@ async function getProducts() {
   }
 }
 
+// Fetch AI export configs, filtered to those the user's roles and user ID can access.
+// A document with no `roles` field (or empty array) is visible to everyone with the export role.
+// A document with no `users` field (or empty array) is visible to everyone with the export role.
+// If `users` is set, only the listed Auth0 user IDs may see the export.
+async function getAllowedExports(userRoles, userId) {
+  try {
+    const res = await fetch(`${apiUrl}/exports`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const all = data?.data ?? [];
+    return all.filter(exp => {
+      const roleOk = !exp.roles?.length || exp.roles.some(r => userRoles.includes(r));
+      const userOk = !exp.users?.length || exp.users.includes(userId);
+      return roleOk && userOk;
+    });
+  } catch {
+    return null; // null = fallback to deriving exports from product data
+  }
+}
+
 export default async function ExportPageRoute() {
-  const { data: products, error } = await getProducts();
+  // Check export role — roles must be in the ID token claim set by the Auth0 Post Login Action
+  const session = await auth0.getSession();
+  const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
+  const userId = session?.user?.sub ?? null;
+
+  if (!roles.includes("export")) {
+    return (
+      <div className="relative p-8">
+        <div className="max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
+          <div className="p-8 bg-neutral-800/50 border border-neutral-700/50 rounded-2xl text-center">
+            <svg className="w-12 h-12 text-neutral-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <h2 className="text-xl font-semibold text-white mb-2">Access Restricted</h2>
+            <p className="text-neutral-400">You do not have access to the Export feature. Contact your administrator to request access.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const [{ data: products, error }, allowedExports] = await Promise.all([
+    getProducts(),
+    getAllowedExports(roles, userId),
+  ]);
 
   return (
     <div className="relative p-8 bg-transparent">
@@ -45,7 +91,7 @@ export default async function ExportPageRoute() {
             </div>
           </div>
         )}
-        <ExportPage initialProducts={products} apiUrl={apiUrl} />
+        <ExportPage initialProducts={products} apiUrl={apiUrl} allowedExports={allowedExports} />
       </div>
     </div>
   );

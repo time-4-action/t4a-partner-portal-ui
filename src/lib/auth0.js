@@ -26,4 +26,23 @@ import { Auth0Client } from '@auth0/nextjs-auth0/server';
  *
  * @type {Auth0Client}
  */
-export const auth0 = new Auth0Client();
+const ROLES_CLAIM = "https://time-4-action.com/roles";
+
+export const auth0 = new Auth0Client({
+    authorizationParameters: {
+        scope: "openid profile email offline_access",
+        // audience must be set so getAccessToken() returns a JWT the backend can verify.
+        // Add AUTH0_AUDIENCE=https://api.time-4-action.com to .env
+        audience: process.env.AUTH0_AUDIENCE,
+    },
+    // Auth0 v4 strips non-standard claims by default. Preserve the roles claim.
+    async beforeSessionSaved(session) {
+        return {
+            ...session,
+            user: {
+                ...session.user,
+                [ROLES_CLAIM]: session.user[ROLES_CLAIM] ?? [],
+            },
+        };
+    },
+});
