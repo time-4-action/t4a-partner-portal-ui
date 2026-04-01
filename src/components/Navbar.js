@@ -31,6 +31,7 @@ function getNavLinks(user) {
   ];
   if (roles.includes("export")) {
     links.push({ href: "/export", label: "Export" });
+    links.push({ href: "/categories", label: "Categories" });
   }
   links.push({ href: "/contact", label: "Contact" });
   return links;
