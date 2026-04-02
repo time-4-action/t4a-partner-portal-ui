@@ -169,6 +169,12 @@ export default function ProductVariants({ product }) {
               </div>
             </div>
             <div className="text-sm text-neutral-400 space-y-1">
+              {selectedVariant.size && (
+                <p>
+                  <span className="font-semibold">Size:</span>{" "}
+                  {selectedVariant.size}
+                </p>
+              )}
               <p>
                 <span className="font-semibold">SKU:</span>{" "}
                 {selectedVariant.code}
