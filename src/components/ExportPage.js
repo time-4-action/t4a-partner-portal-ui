@@ -59,7 +59,7 @@ const EXPORT_PRESETS = {
             { key: "vendor", label: "Vendor", default: true },
             { key: "type", label: "Type", default: false },
             { key: "tags", label: "Tags (Categories)", default: true },
-            { key: "ai_tags", label: "Tags (Custom Categories)", default: false },
+            { key: "ai_tags", label: "Collection", description: "Leaf category name only (e.g. \"Phones\" from \"Electronics / Phones\")", default: false },
             { key: "published", label: "Published", default: true },
             { key: "variant_sku", label: "Variant SKU", default: true },
             { key: "variant_title", label: "Variant Title", default: true },
@@ -90,7 +90,7 @@ const EXPORT_PRESETS = {
             { key: "price_with_vat", label: "Price with VAT", default: false },
             { key: "stock", label: "Stock", default: true },
             { key: "categories", label: "Categories", default: true },
-            { key: "ai_category_names", label: "Custom Categories", default: false },
+            { key: "ai_category_names", label: "Collection", description: "Full category path (e.g. \"Electronics / Phones\")", default: false },
             { key: "image_url", label: "Image URL", default: true },
         ],
     },
@@ -117,9 +117,9 @@ const EXPORT_PRESETS = {
             { key: "stock", label: "Stock Amount", default: true },
             { key: "categories", label: "Categories", default: true },
             { key: "ai_export_ids", label: "AI Export IDs", default: false },
-            { key: "ai_category_names", label: "Custom Category Names", default: false },
-            { key: "ai_category_ids", label: "Custom Category IDs", default: false },
-            { key: "ai_category_full", label: "Custom Categories (Full)", default: false },
+            { key: "ai_category_names", label: "Collection", description: "Full category path (e.g. \"Electronics / Phones\")", default: false },
+            { key: "ai_category_ids", label: "Collection IDs", description: "MongoDB IDs of matched categories", default: false },
+            { key: "ai_category_full", label: "Collection (Full)", description: "exportId + categoryId + name as JSON", default: false },
             { key: "short_description", label: "Short Description", default: false },
             { key: "detailed_description", label: "Detailed Description", default: false },
             { key: "is_new", label: "New Product", default: true },
@@ -156,6 +156,9 @@ const EXPORT_PRESETS = {
         ],
     },
 };
+
+// Field keys that require an AI export to be selected — hidden otherwise
+const AI_FIELD_KEYS = new Set(["ai_tags", "ai_category_names", "ai_category_ids", "ai_category_full", "ai_export_ids"]);
 
 /**
  * Strips HTML tags from a string.
@@ -345,12 +348,18 @@ function applyFiltersLocal(products, filters) {
             if (!match) return false;
         }
         if (filters.stockStatus !== 'all') {
-            const hasStock = product.child_products?.some(v => v.stock_amount > 0);
+            const variants = product.child_products || [];
+            const hasStock = variants.length > 0
+                ? variants.some(v => v.stock_amount > 0)
+                : (product.stock_amount || 0) > 0;
             if (filters.stockStatus === 'in_stock' && !hasStock) return false;
             if (filters.stockStatus === 'out_of_stock' && hasStock) return false;
         }
         if (filters.minPrice || filters.maxPrice) {
-            const prices = product.child_products?.flatMap(v => v.pricelist?.map(p => p.price) || []).filter(p => p > 0) || [];
+            const variants = product.child_products || [];
+            const prices = variants.length > 0
+                ? variants.flatMap(v => v.pricelist?.map(p => p.price) || []).filter(p => p > 0)
+                : (product.pricelist?.map(p => p.price) || []).filter(p => p > 0);
             if (!prices.length) return false;
             if (filters.minPrice && Math.max(...prices) < parseFloat(filters.minPrice)) return false;
             if (filters.maxPrice && Math.min(...prices) > parseFloat(filters.maxPrice)) return false;
@@ -433,6 +442,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     const [previewConfig, setPreviewConfig] = useState(null); // null = live filteredProducts, or saved config object
     const [previewView, setPreviewView] = useState('grid'); // 'grid' | 'list'
     const [previewSearch, setPreviewSearch] = useState('');
+    const [fieldInfoModal, setFieldInfoModal] = useState(null); // field object | null
+    const [aiLeafMode, setAiLeafMode] = useState({ ai_tags: true, ai_category_names: false });
 
     /**
      * Extracts and memoizes all unique pricelists from products.
@@ -621,6 +632,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableAiExports]);
 
+    // Auto-deselect AI fields when no AI export is selected or none exist
+    useEffect(() => {
+        const aiAvailable = availableAiExports.length > 0 && filters.aiExportId !== "all";
+        if (!aiAvailable) {
+            setSelectedFields(prev => prev.filter(k => !AI_FIELD_KEYS.has(k)));
+        }
+    }, [availableAiExports, filters.aiExportId]);
+
     // Auto-remove categories that no longer have matching products given other active filters
     useEffect(() => {
         if (filters.category.length === 0) return;
@@ -668,16 +687,19 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             }
 
             if (filters.stockStatus !== "all") {
-                const hasStock = product.child_products?.some((v) => v.stock_amount > 0);
+                const variants = product.child_products || [];
+                const hasStock = variants.length > 0
+                    ? variants.some((v) => v.stock_amount > 0)
+                    : (product.stock_amount || 0) > 0;
                 if (filters.stockStatus === "in_stock" && !hasStock) return false;
                 if (filters.stockStatus === "out_of_stock" && hasStock) return false;
             }
 
             if (filters.minPrice || filters.maxPrice) {
-                const prices = product.child_products?.map((v) => {
-                    const priceInfo = getPriceFromPriority(v);
-                    return priceInfo.price;
-                }).filter((p) => p > 0) || [];
+                const variants = product.child_products || [];
+                const prices = variants.length > 0
+                    ? variants.map((v) => getPriceFromPriority(v).price).filter((p) => p > 0)
+                    : [getPriceFromPriority(product).price].filter((p) => p > 0);
 
                 if (prices.length === 0) return false;
                 const minProductPrice = Math.min(...prices);
@@ -844,57 +866,65 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 const filteredAiCats = filters.aiExportId !== "all"
                     ? product.ai_categories?.filter((c) => c.exportId === filters.aiExportId)
                     : product.ai_categories;
-                return (filteredAiCats?.map((c) => c.categoryName) || []).join(", ");
+                return (filteredAiCats?.map((c) => aiLeafMode.ai_tags ? c.categoryName.split(" / ").pop().trim() : c.categoryName) || []).join(", ");
             case "published":
                 return isShopify ? (isFirstRow ? (product.published ? "TRUE" : "FALSE") : "") : (product.published ? "TRUE" : "FALSE");
             case "variant_sku":
-                return variant?.code || "";
+                return variant?.code || product.code || "";
             case "variant_title":
-                return variant?.product_name || "";
+                return variant?.product_name || product.product_name || "";
             case "variant_price":
-                return variant ? priceInfo.price.toFixed(2) : "";
-            case "variant_compare_at_price":
-                if (!variant) return "";
+                return priceInfo.price > 0 ? priceInfo.price.toFixed(2) : "";
+            case "variant_compare_at_price": {
+                const pricelist = variant?.pricelist ?? (product.child_products?.length === 0 ? product.pricelist : null);
+                if (!pricelist) return "";
                 const enabledPricelists = pricelistPriority.filter((p) => p.enabled);
                 if (enabledPricelists.length > 1) {
                     const secondPricelist = enabledPricelists[1];
-                    const found = variant.pricelist?.find((p) => p.name === secondPricelist?.name);
+                    const found = pricelist.find((p) => p.name === secondPricelist?.name);
                     return found?.price?.toFixed(2) || "";
                 }
                 return "";
+            }
             case "variant_inventory_qty":
-                return variant ? (variant.stock_amount || 0) : "";
+                return variant != null ? (variant.stock_amount || 0) : (product.stock_amount || 0);
             case "variant_barcode":
-                return variant?.ean_code || "";
+                return variant?.ean_code || product.ean_code || "";
             case "image_src":
                 return isShopify ? (imageParam || "") : (product.images?.[0] || "");
             case "image_alt_text":
                 return product.product_name || "";
             case "variant_image":
-                return variant?.images?.[0] || "";
+                return variant?.images?.[0] || product.images?.[0] || "";
             case "product_name":
                 return product.product_name || "";
             case "variant_name":
-                return variant?.product_name || "";
+                return variant?.product_name || product.product_name || "";
             case "sku":
             case "variant_code":
-                return variant?.code || "";
+                return variant?.code || product.code || "";
             case "ean":
-                return variant?.ean_code || "";
+                return variant?.ean_code || product.ean_code || "";
             case "price":
-                return variant ? priceInfo.price.toFixed(2) : "";
+                return priceInfo.price > 0 ? priceInfo.price.toFixed(2) : "";
             case "pricelist_name":
                 return priceInfo.name || "";
             case "vat":
-                return variant ? priceInfo.vat : "";
+                return priceInfo.price > 0 ? priceInfo.vat : "";
             case "price_with_vat":
-                return variant ? priceWithVat.toFixed(2) : "";
-            case "stock":
-                return variant ? (variant.stock_amount || 0) : "";
-            case "stock_value":
-                return variant ? ((variant.stock_amount || 0) * priceInfo.price).toFixed(2) : "";
-            case "in_stock":
-                return variant ? ((variant.stock_amount || 0) > 0 ? "Yes" : "No") : "";
+                return priceInfo.price > 0 ? priceWithVat.toFixed(2) : "";
+            case "stock": {
+                const qty = variant != null ? (variant.stock_amount || 0) : (product.stock_amount || 0);
+                return qty;
+            }
+            case "stock_value": {
+                const qty = variant != null ? (variant.stock_amount || 0) : (product.stock_amount || 0);
+                return (qty * priceInfo.price).toFixed(2);
+            }
+            case "in_stock": {
+                const qty = variant != null ? (variant.stock_amount || 0) : (product.stock_amount || 0);
+                return qty > 0 ? "Yes" : "No";
+            }
             case "categories":
                 return (product.categories || []).join("; ");
             case "ai_export_ids":
@@ -904,7 +934,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 const filteredCatsNames = filters.aiExportId !== "all"
                     ? product.ai_categories?.filter((c) => c.exportId === filters.aiExportId)
                     : product.ai_categories;
-                return (filteredCatsNames?.map((c) => c.categoryName) || []).join("; ");
+                return (filteredCatsNames?.map((c) => aiLeafMode.ai_category_names ? c.categoryName.split(" / ").pop().trim() : c.categoryName) || []).join("; ");
             case "ai_category_ids":
                 const filteredCatsIds = filters.aiExportId !== "all"
                     ? product.ai_categories?.filter((c) => c.exportId === filters.aiExportId)
@@ -922,7 +952,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             case "product_code":
                 return product.code || "";
             case "variant_token":
-                return variant?.token || "";
+                return variant?.token || product.token || "";
             case "short_description":
                 return stripHtml(product.short_description || "");
             case "detailed_description":
@@ -972,17 +1002,19 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             const uniqueImages = [...new Set(allImages)];
 
             if (isShopify) {
-                const numVariants = Math.max(variants.length, 1);
+                const variantRowCount = Math.max(variants.length, 1);
                 const numImages = uniqueImages.length;
-                const maxRows = Math.max(numVariants, numImages);
+                const maxRows = Math.max(variantRowCount, numImages);
 
                 for (let rowIdx = 0; rowIdx < maxRows; rowIdx++) {
                     const row = [];
                     const hasVariant = rowIdx < variants.length;
                     const variant = hasVariant ? variants[rowIdx] : null;
-                    const isImageOnlyRow = !hasVariant && rowIdx < numImages;
+                    // Image-only rows start after all variant rows (row 0 is always a real product row)
+                    const isImageOnlyRow = rowIdx >= variantRowCount && rowIdx < numImages;
                     const currentImage = uniqueImages[rowIdx] || "";
-                    const priceInfo = variant ? getPriceFromPriority(variant) : { price: 0, vat: 0, name: "" };
+                    const priceSource = variant ?? (variants.length === 0 ? product : null);
+                    const priceInfo = priceSource ? getPriceFromPriority(priceSource) : { price: 0, vat: 0, name: "" };
 
                     preset.fields.forEach((field) => {
                         if (!selectedFields.includes(field.key)) return;
@@ -997,7 +1029,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                 variantsToExport.forEach((variant, variantIndex) => {
                     const row = [];
-                    const priceInfo = variant ? getPriceFromPriority(variant) : { price: 0, vat: 0, name: "" };
+                    const priceSource = variant ?? product;
+                    const priceInfo = getPriceFromPriority(priceSource);
 
                     preset.fields.forEach((field) => {
                         if (!selectedFields.includes(field.key)) return;
@@ -1011,7 +1044,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         });
 
         return rows.join("\n");
-    }, [selectedPreset, selectedFields, filteredProducts, getPriceFromPriority, filters.aiExportId, pricelistPriority]);
+    }, [selectedPreset, selectedFields, filteredProducts, getPriceFromPriority, filters.aiExportId, pricelistPriority, aiLeafMode]);
 
     // Shared row generator — same logic as generateCSVData but returns array of {fieldKey: value} objects
     const generateRows = useCallback(() => {
@@ -1027,12 +1060,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             ])];
 
             if (isShopify) {
-                const maxRows = Math.max(variants.length, allImages.length, 1);
+                const variantRowCount = Math.max(variants.length, 1);
+                const maxRows = Math.max(variantRowCount, allImages.length);
                 for (let rowIdx = 0; rowIdx < maxRows; rowIdx++) {
                     const variant = variants[rowIdx] || null;
-                    const isImageOnlyRow = !variant && rowIdx < allImages.length;
+                    const isImageOnlyRow = rowIdx >= variantRowCount && rowIdx < allImages.length;
                     const currentImage = allImages[rowIdx] || "";
-                    const priceInfo = variant ? getPriceFromPriority(variant) : { price: 0, vat: 0, name: "" };
+                    const priceSource = variant ?? (variants.length === 0 ? product : null);
+                    const priceInfo = priceSource ? getPriceFromPriority(priceSource) : { price: 0, vat: 0, name: "" };
                     const row = {};
                     preset.fields.forEach((field) => {
                         if (!selectedFields.includes(field.key)) return;
@@ -1043,7 +1078,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             } else {
                 const variantsToExport = variants.length > 0 ? variants : [null];
                 variantsToExport.forEach((variant, idx) => {
-                    const priceInfo = variant ? getPriceFromPriority(variant) : { price: 0, vat: 0, name: "" };
+                    const priceSource = variant ?? product;
+                    const priceInfo = getPriceFromPriority(priceSource);
                     const row = {};
                     preset.fields.forEach((field) => {
                         if (!selectedFields.includes(field.key)) return;
@@ -1054,25 +1090,31 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             }
         });
         return rows;
-    }, [selectedPreset, selectedFields, filteredProducts, getPriceFromPriority, filters.aiExportId, pricelistPriority]);
+    }, [selectedPreset, selectedFields, filteredProducts, getPriceFromPriority, filters.aiExportId, pricelistPriority, aiLeafMode]);
 
-    // Generate JSON: array of objects keyed by column label, respecting selectedFields
+    // Generate JSON: array of objects keyed by column header name (matches API/CSV headers)
     const generateJsonData = useCallback(() => {
         const preset = EXPORT_PRESETS[selectedPreset];
         const activeFields = preset.fields.filter(f => selectedFields.includes(f.key));
-        return generateRows().map(row => {
-            const obj = {};
-            activeFields.forEach(f => { obj[f.label] = row[f.key]; });
-            return obj;
-        });
+        const rows = generateRows();
+        return {
+            success: true,
+            generatedAt: new Date().toISOString(),
+            totalRows: rows.length,
+            data: rows.map(row => {
+                const obj = {};
+                activeFields.forEach(f => { obj[f.label] = row[f.key] ?? ''; });
+                return obj;
+            }),
+        };
     }, [generateRows, selectedPreset, selectedFields]);
 
-    // Generate XML: row-based, respecting selectedFields, CDATA for HTML fields
+    // Generate XML: flat row-based matching API format, CDATA for HTML fields
     const generateXmlData = useCallback(() => {
         const HTML_FIELDS = new Set(['body_html', 'short_description', 'detailed_description']);
         const escXml = (val) => String(val ?? '')
             .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
         const rowXmls = generateRows().map(row => {
             const lines = selectedFields.map(key => {
@@ -1080,9 +1122,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 const content = HTML_FIELDS.has(key) ? `<![CDATA[${val}]]>` : escXml(val);
                 return `    <${key}>${content}</${key}>`;
             }).join('\n');
-            return `  <product>\n${lines}\n  </product>`;
+            return `  <row>\n${lines}\n  </row>`;
         });
-        return `<?xml version="1.0" encoding="UTF-8"?>\n<products>\n${rowXmls.join('\n')}\n</products>`;
+        return `<?xml version="1.0" encoding="UTF-8"?>\n<export>\n${rowXmls.join('\n')}\n</export>`;
     }, [generateRows, selectedFields]);
 
     // Download in the chosen format
@@ -1096,6 +1138,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         let content, mimeType, ext;
         if (format === 'json') {
             content = JSON.stringify(generateJsonData(), null, 2);
+            // generateJsonData returns the full envelope object
             mimeType = 'application/json;charset=utf-8;';
             ext = 'json';
         } else if (format === 'xml') {
@@ -1138,6 +1181,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 selectedFields,
                 filters,
                 pricelistPriority,
+                aiLeafMode,
             };
 
             const response = await fetch(`/nextapi/export/custom-export`, {
@@ -1212,9 +1256,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             stockStatus: "all",
             minPrice: "",
             maxPrice: "",
-            category: "all",
+            category: [],
             aiExportId: "all",
-            aiCategory: "all",
+            aiCategory: [],
             imageFilter: "all",
             showNew: false,
             showRecommended: false,
@@ -1225,6 +1269,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         // Set pricelist priority if available
         if (config.pricelistPriority?.length > 0) {
             setPricelistPriority(config.pricelistPriority);
+        }
+
+        // Restore leaf mode if saved
+        if (config.aiLeafMode) {
+            setAiLeafMode({
+                ai_tags: config.aiLeafMode.ai_tags !== false,
+                ai_category_names: config.aiLeafMode.ai_category_names === true,
+            });
         }
 
         setActiveTab("configure");
@@ -2062,25 +2114,33 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
                             <div className="p-6">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-                                    {currentPreset.fields.map((field) => (
-                                        <button
-                                            key={field.key}
-                                            onClick={() => toggleField(field.key)}
-                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all ${selectedFields.includes(field.key)
-                                                    ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-white"
-                                                    : "bg-neutral-800/50 border border-neutral-700/30 text-neutral-400 hover:text-white hover:border-neutral-600"
-                                                }`}
-                                        >
-                                            <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${selectedFields.includes(field.key) ? "bg-cyan-500" : "bg-neutral-700"
-                                                }`}>
-                                                {selectedFields.includes(field.key) && (
-                                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            <span className="truncate">{field.label}</span>
-                                        </button>
+                                    {currentPreset.fields.filter(f => !AI_FIELD_KEYS.has(f.key) || (availableAiExports.length > 0 && filters.aiExportId !== "all")).map((field) => (
+                                        <div key={field.key} className="relative group/field">
+                                            <button
+                                                onClick={() => toggleField(field.key)}
+                                                className={`w-full flex items-center gap-2 px-3 py-2.5 pr-8 rounded-xl text-sm transition-all ${selectedFields.includes(field.key)
+                                                        ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-white"
+                                                        : "bg-neutral-800/50 border border-neutral-700/30 text-neutral-400 hover:text-white hover:border-neutral-600"
+                                                    }`}
+                                            >
+                                                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${selectedFields.includes(field.key) ? "bg-cyan-500" : "bg-neutral-700"}`}>
+                                                    {selectedFields.includes(field.key) && (
+                                                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                                <span className="truncate">{field.label}</span>
+                                            </button>
+                                            {/* Info button */}
+                                            <button
+                                                onClick={e => { e.stopPropagation(); setFieldInfoModal(field); }}
+                                                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-neutral-700 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all opacity-0 group-hover/field:opacity-100"
+                                                title="Field details"
+                                            >
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                            </button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -2819,6 +2879,93 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     })}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Field Info Modal */}
+            {fieldInfoModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setFieldInfoModal(null)}>
+                    <div className="bg-neutral-900 rounded-2xl w-full max-w-md border border-neutral-700/60 overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="h-0.5 w-full bg-gradient-to-r from-cyan-500 to-blue-500" />
+                        <div className="p-6 space-y-5">
+
+                            {/* Header */}
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1.5">
+                                    <h3 className="text-base font-semibold text-white">{fieldInfoModal.label}</h3>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] text-neutral-500 uppercase tracking-wider">Column</span>
+                                        <code className="text-[11px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md font-mono border border-cyan-500/15">{fieldInfoModal.label}</code>
+                                    </div>
+                                </div>
+                                <button onClick={() => setFieldInfoModal(null)} className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-white hover:bg-white/[0.06] transition-all shrink-0 mt-0.5">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            {/* AI source notice */}
+                            {AI_FIELD_KEYS.has(fieldInfoModal.key) && fieldInfoModal.key !== "ai_export_ids" && (
+                                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-purple-500/[0.07] border border-purple-500/20">
+                                    <svg className="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                    <p className="text-xs text-neutral-400">
+                                        Populated by <span className="text-purple-300 font-medium">Gemini AI</span> based on your export's custom category tree
+                                        {fieldInfoModal.key === "ai_tags" && <> · used as <span className="text-white font-medium">Collection</span> in Shopify</>}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Description — only for non-Collection fields (Collection gets the toggle instead) */}
+                            {fieldInfoModal.description && fieldInfoModal.key !== "ai_tags" && fieldInfoModal.key !== "ai_category_names" && (
+                                <p className="text-sm text-neutral-400 leading-relaxed">{fieldInfoModal.description}</p>
+                            )}
+
+                            {/* Output format toggle — Collection fields only */}
+                            {(fieldInfoModal.key === "ai_tags" || fieldInfoModal.key === "ai_category_names") && (
+                                <div className="space-y-2.5">
+                                    <p className="text-xs font-semibold text-neutral-500 uppercase tracking-widest">Output format</p>
+                                    <div className="space-y-2">
+                                        {[
+                                            {
+                                                leaf: true,
+                                                title: "Category name",
+                                                subtitle: "Last segment of the path",
+                                                example: "Phones",
+                                                isDefault: fieldInfoModal.key === "ai_tags",
+                                                defaultLabel: "Shopify default",
+                                            },
+                                            {
+                                                leaf: false,
+                                                title: "Full hierarchy",
+                                                subtitle: "Complete path including parents",
+                                                example: "Electronics / Phones",
+                                                isDefault: fieldInfoModal.key === "ai_category_names",
+                                                defaultLabel: "Default",
+                                            },
+                                        ].map(opt => {
+                                            const active = aiLeafMode[fieldInfoModal.key] === opt.leaf;
+                                            return (
+                                                <button key={String(opt.leaf)} onClick={() => setAiLeafMode(prev => ({ ...prev, [fieldInfoModal.key]: opt.leaf }))}
+                                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${active ? "bg-cyan-500/10 border-cyan-500/40" : "bg-neutral-800/40 border-neutral-700/40 hover:border-neutral-600/60"}`}>
+                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${active ? "border-cyan-500" : "border-neutral-600"}`}>
+                                                        {active && <div className="w-2 h-2 rounded-full bg-cyan-500" />}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-sm font-medium ${active ? "text-white" : "text-neutral-400"}`}>{opt.title}</span>
+                                                            {opt.isDefault && <span className="text-[10px] text-neutral-500 bg-neutral-700/60 px-1.5 py-0.5 rounded-md">{opt.defaultLabel}</span>}
+                                                        </div>
+                                                        <p className="text-xs text-neutral-600 mt-0.5">{opt.subtitle}</p>
+                                                    </div>
+                                                    <code className={`text-[11px] font-mono px-2 py-1 rounded-lg shrink-0 ${active ? "text-cyan-300 bg-cyan-500/10 border border-cyan-500/20" : "text-neutral-500 bg-neutral-800 border border-neutral-700/50"}`}>{opt.example}</code>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                         </div>
                     </div>
                 </div>

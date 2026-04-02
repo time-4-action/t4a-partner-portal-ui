@@ -568,7 +568,7 @@ function CategorySelect({ categories, currentCategoryId, onSelect, onClear }) {
 
     const openDrop = () => {
         const r = btnRef.current?.getBoundingClientRect();
-        if (r) setPos({ top: r.bottom + window.scrollY + 4, left: r.right - 260 + window.scrollX });
+        if (r) setPos({ top: r.bottom + 4, left: r.right - 260 });
         setOpen(true);
     };
 
