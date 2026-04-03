@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Next.js 16 partner portal for Patrik International built with the App Router architecture. The application provides product browsing, detailed product views, and export functionality for partners. Authentication is handled via Auth0.
+This is a Next.js 16 partner portal for Patrik International built with the App Router architecture. The application provides product browsing, detailed product views, export functionality, and AI-powered category management for partners. Authentication and authorization are handled via Auth0.
 
 ## Commands
 
@@ -18,36 +18,56 @@ npm run lint         # Run ESLint
 
 ## Architecture
 
-### Authentication Flow
-- Uses `@auth0/nextjs-auth0` package
-- Auth0 client initialized in `src/lib/auth0.js`
-- Protected routes use the `(protected)` route group convention
-- Protected layouts wrap children with `auth0.withPageAuthRequired()` (see `src/app/(protected)/product/layout.js`)
-- Auth0 middleware is NOT in a middleware.js file - it's configured in `src/proxy.js` but currently has an API inconsistency issue
+### Authentication & Authorization Flow
+- Uses `@auth0/nextjs-auth0` package; Auth0 client initialized in `src/lib/auth0.js`
+- **Middleware** lives in `src/proxy.js` (not `middleware.js`) — Next.js is configured to pick it up from there. It runs on all non-static routes, calls `auth0.middleware()`, then enforces the `export` role gate
+- Users without the `export` role are redirected to `/unauthorized`
+- Role claims are read from the custom Auth0 JWT claim `https://time-4-action.com/roles`, set by an Auth0 Post-Login Action
+- Protected layouts additionally wrap children with `auth0.withPageAuthRequired()` (see `src/app/(protected)/product/layout.js`)
+- Role checks are duplicated: middleware handles the global redirect, individual pages do fine-grained access checks (e.g. the export page re-checks the `export` role)
 
 ### Route Structure
 - **Public routes:**
   - `/` - Homepage
   - `/contact` - Contact form (sends email via nodemailer)
-- **Protected routes (require Auth0 login):**
-  - `/product` - Product grid/list view (fetches from backend API)
+  - `/unauthorized` - Shown when user is authenticated but lacks the `export` role
+- **Protected routes (require Auth0 login + `export` role):**
+  - `/product` - Product grid/list view
   - `/product/[token]` - Individual product detail page with variants
-  - `/export` - Advanced export functionality with multiple format presets (Shopify, Simple, Detailed, Inventory)
+  - `/export` - Export UI with preset configurations and custom export management
+  - `/categories` - AI-powered category management; links categories to export configs
 
-### API Integration
-- Backend API URL configured via `EXPORT_API_URL` environment variable
-- Default: `http://localhost:4000`
-- Main endpoints:
-  - `GET /product` - Fetch all products
-  - `GET /product/{token}` - Fetch single product with variants
-- All product fetches use `cache: "no-store"` for fresh data
-- Products have child_products array containing variants with pricelists, images, stock, and EAN codes
+### API Proxy Pattern
+All routes under `src/app/nextapi/` are thin authenticated proxies to the backend. The pattern is: obtain an Auth0 access token via `auth0.getAccessToken()`, then forward the request to `BACKEND` (from `EXPORT_API_URL`) with `Authorization: Bearer <token>`. No business logic lives in these proxies.
+
+Backend proxy endpoints:
+- `/nextapi/exports` — CRUD for export configurations (`/exports` on backend)
+- `/nextapi/export/custom-export` — CRUD for custom exports (`/custom-export` on backend)
+  - `/[id]` — GET, PUT, DELETE a single custom export
+  - `/[id]/keys` — manage API keys for a custom export
+  - `/[id]/keys/[keyId]` — delete a specific key
+  - `/[id]/access` — manage per-user access
+  - `/[id]/access/[email]` — remove a specific user's access
+  - `/[id]/csv`, `/[id]/json`, `/[id]/xml` — generate export files in each format
+- `/nextapi/categories` — CRUD for categories; supports `?exportId=` query param to fetch by export
+  - `/import` — bulk category import
+  - `/by-export/[exportId]` — fetch categories scoped to an export
+- `/nextapi/products/ai-categories` — fetch products with AI-assigned categories (`?exportId=` required); DELETE clears AI categories for an export
+- `/nextapi/products/[id]/ai-category` — set/update AI category for a single product
+- `/nextapi/ai-categorization` — trigger AI categorization job
+- `/nextapi/contact` — sends contact form email via nodemailer
 
 ### Key Components
 - `ProductGrid` (`src/components/ProductGrid.js`): Client component with grid/list toggle, product selection, and local storage persistence
 - `ProductVariants` (`src/components/ProductVariants.js`): Displays product details with variant selection
-- `ExportPage` (`src/components/ExportPage.js`): Complex export UI with preset configurations (Shopify, Simple, Detailed, Inventory formats)
+- `ExportPage` (`src/components/ExportPage.js`): Complex export UI; receives `initialProducts`, `apiUrl`, and `allowedExports` (filtered by user role/ID). Handles both preset export formats (Shopify, Simple, Detailed, Inventory) and custom export configs fetched from the backend
+- `CategoriesPage` (`src/components/CategoriesPage.js`): AI category management UI; receives `initialExports` filtered to those the user can access
 - `Navbar` (`src/components/Navbar.js`): Navigation with Auth0 login/logout buttons and user profile
+
+### Export & Category Access Filtering
+Exports and categories are filtered server-side before passing to client components:
+- An export is visible if: its `roles` array is empty/absent OR the user has one of the listed roles, AND its `users` array is empty/absent OR the user's Auth0 `sub` is listed
+- Filtering uses the session's `https://time-4-action.com/roles` claim and `user.sub`
 
 ### Styling
 - Tailwind CSS v4 (using `@tailwindcss/postcss` plugin)
@@ -55,17 +75,9 @@ npm run lint         # Run ESLint
 - Animated blob backgrounds defined in root layout
 - Dark theme with cyan/blue accent colors
 
-### Image Configuration
-Next.js Image component is configured to allow images from:
-- `imgs.pnvnet.si`
-- `www.patrikinternational.com/assets/**`
-- `via.placeholder.com`
-- `s.gravatar.com` (for Auth0 user avatars)
-- `lh3.googleusercontent.com` (for Google profile pictures)
-
 ### Environment Variables
 Required variables (see `.env`):
-- `EXPORT_API_URL` - Backend API base URL
+- `EXPORT_API_URL` - Backend API base URL (default: `http://localhost:4000`)
 - `GMAIL_EMAIL` - Gmail address for contact form
 - `GMAIL_APP_PASSWORD` - Gmail app password for nodemailer
 - `AUTH0_DOMAIN` - Auth0 tenant domain
@@ -78,21 +90,18 @@ Required variables (see `.env`):
 ## Important Notes
 
 ### Product Data Structure
-Products have a specific structure with:
 - Parent product: contains token, product_name, images array, categories
 - Child products (variants): array containing SKU, EAN, stock, pricelists with prices
 - Export presets transform this data into different formats (Shopify CSV, simple list, detailed data, inventory)
 
 ### Client vs Server Components
 - All pages under `/app` are Server Components by default (handle auth checks, API fetching)
-- Interactive components like ProductGrid, ExportPage use "use client" directive
-- Server Components fetch data directly; Client Components receive initialProducts props
+- Interactive components like ProductGrid, ExportPage, CategoriesPage use `"use client"` directive
+- Server Components fetch data and filter by user permissions; Client Components receive pre-filtered props
 
 ### Route Group Convention
 - `(protected)` folder is a route group - doesn't affect URL path but allows shared layouts
 - The layout.js inside `(protected)` enforces authentication for all nested routes
 
-### Contact Form
-- Sends emails via nodemailer configured with Gmail SMTP
-- Route handler at `src/app/nextapi/contact/route.js`
-- Uses GMAIL_EMAIL and GMAIL_APP_PASSWORD environment variables
+### Image Configuration
+Next.js Image component allows: `imgs.pnvnet.si`, `www.patrikinternational.com/assets/**`, `via.placeholder.com`, `s.gravatar.com`, `lh3.googleusercontent.com`, `encrypted-tbn0.gstatic.com`
