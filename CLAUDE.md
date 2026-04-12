@@ -60,7 +60,7 @@ Backend proxy endpoints:
 ### Key Components
 - `ProductGrid` (`src/components/ProductGrid.js`): Client component with grid/list toggle, product selection, and local storage persistence
 - `ProductVariants` (`src/components/ProductVariants.js`): Displays product details with variant selection
-- `ExportPage` (`src/components/ExportPage.js`): Complex export UI; receives `initialProducts`, `apiUrl`, and `allowedExports` (filtered by user role/ID). Handles both preset export formats (Shopify, Simple, Detailed, Inventory) and custom export configs fetched from the backend
+- `ExportPage` (`src/components/ExportPage.js`): Complex export UI; receives `initialProducts`, `apiUrl`, and `allowedExports` (filtered by user role/ID). Handles both preset export formats (Shopify, Simple, Detailed, Inventory) and custom export configs fetched from the backend. The **Inventory preset** has special behavior: it skips the field-selection step (fixed Shopify inventory columns), replaces the Pricelist Priority panel with a Shopify Location Name input, and only offers CSV download (no JSON/XML). The location name is stored as `inventoryLocationName` on the config and must exactly match the Shopify location name (case-sensitive)
 - `CategoriesPage` (`src/components/CategoriesPage.js`): AI category management UI; receives `initialExports` filtered to those the user can access
 - `Navbar` (`src/components/Navbar.js`): Navigation with Auth0 login/logout buttons and user profile
 
@@ -92,7 +92,7 @@ Required variables (see `.env`):
 ### Product Data Structure
 - Parent product: contains token, product_name, images array, categories
 - Child products (variants): array containing SKU, EAN, stock, pricelists with prices
-- Export presets transform this data into different formats (Shopify CSV, simple list, detailed data, inventory)
+- Export presets transform this data into different formats (Shopify CSV, simple list, detailed data, inventory/Shopify inventory import)
 
 ### Client vs Server Components
 - All pages under `/app` are Server Components by default (handle auth checks, API fetching)
