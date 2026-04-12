@@ -62,7 +62,7 @@ const EXPORT_PRESETS = {
             { key: "ai_tags", label: "Collection", description: "Leaf category name only (e.g. \"Phones\" from \"Electronics / Phones\")", default: true },
             { key: "published", label: "Published", default: true },
             { key: "variant_sku", label: "Variant SKU", default: true },
-            { key: "variant_title", label: "Variant Title", default: true },
+            { key: "option1", label: "Option1 (Variant)", group: [{ key: "option1_name", label: "Option1 Name" }, { key: "option1_value", label: "Option1 Value" }], default: true },
             { key: "variant_price", label: "Variant Price", default: true },
             { key: "variant_compare_at_price", label: "Compare At Price", default: false },
             { key: "variant_inventory", label: "Inventory", group: [{ key: "variant_inventory_tracker", label: "Variant Inventory Tracker" }, { key: "variant_inventory_qty", label: "Variant Inventory Qty" }, { key: "variant_inventory_policy", label: "Variant Inventory Policy" }, { key: "variant_fulfillment_service", label: "Variant Fulfillment Service" }], default: true },
@@ -898,8 +898,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 return isShopify ? (isFirstRow ? (product.published ? "TRUE" : "FALSE") : "") : (product.published ? "TRUE" : "FALSE");
             case "variant_sku":
                 return variant?.code || product.code || "";
-            case "variant_title":
-                return variant?.product_name || product.product_name || "";
+            case "option1_name":
+                return "Variant";
+            case "option1_value":
+                return variant?.size || variant?.product_name || product.product_name || "";
             case "variant_price":
                 return priceInfo.price > 0 ? priceInfo.price.toFixed(2) : "";
             case "variant_compare_at_price": {
