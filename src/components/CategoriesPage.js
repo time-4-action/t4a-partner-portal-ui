@@ -798,6 +798,442 @@ function ProductsTab({ exportId, toast }) {
     );
 }
 
+// ─── PlaygroundTab ───────────────────────────────────────────────────────────
+
+function PlaygroundTab({ exportId, toast }) {
+    const [input, setInput] = useState("");
+    const [results, setResults] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [elapsed, setElapsed] = useState(0);
+    const [apiDocsOpen, setApiDocsOpen] = useState(false);
+    const timerRef = useRef(null);
+
+    const placeholder = JSON.stringify([
+        { code: "SKU-001", name: "Wireless Bluetooth Headphones", description: "Over-ear noise cancelling" },
+        { code: "SKU-002", name: "USB-C Charging Cable 2m" },
+    ], null, 2);
+
+    const loadSample = () => setInput(placeholder);
+
+    const run = async () => {
+        setError(""); setResults(null);
+        let parsed;
+        try {
+            parsed = JSON.parse(input.trim());
+            if (!Array.isArray(parsed)) parsed = [parsed];
+        } catch {
+            setError("Invalid JSON. Paste an array of product objects.");
+            return;
+        }
+        for (const p of parsed) {
+            if (!p.code || !p.name) {
+                setError('Every product needs at least "code" and "name" fields.');
+                return;
+            }
+        }
+        if (parsed.length > 300) {
+            setError("Maximum 300 products per request.");
+            return;
+        }
+
+        setLoading(true); setElapsed(0);
+        const t0 = Date.now();
+        timerRef.current = setInterval(() => setElapsed(((Date.now() - t0) / 1000)), 100);
+
+        try {
+            const res = await fetch("/nextapi/categorize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ exportId, products: parsed }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || data.error || "Request failed");
+            setResults(data.results || []);
+            toast(`Categorized ${(data.results || []).length} products`, "success");
+        } catch (e) {
+            setError(e.message);
+            toast(e.message, "error");
+        } finally {
+            clearInterval(timerRef.current);
+            setElapsed(((Date.now() - t0) / 1000));
+            setLoading(false);
+        }
+    };
+
+    const copyResults = () => {
+        navigator.clipboard.writeText(JSON.stringify(results, null, 2));
+        toast("Copied to clipboard", "success");
+    };
+
+    const downloadResults = () => {
+        const blob = new Blob([JSON.stringify(results, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `categorized-${exportId}-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    };
+
+    return (
+        <div className="space-y-5">
+            {/* Info banner */}
+            <div className={`${S.card} p-5`}>
+                <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500/15 to-fuchsia-500/10 ring-1 ring-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white mb-1">AI Categorization Playground</p>
+                        <p className="text-xs text-neutral-500 leading-relaxed">
+                            Paste a JSON array of third-party products below and categorize them against this export's category set.
+                            Nothing is saved — results are returned directly. Max 300 products per request.
+                        </p>
+                        <div className="flex items-center gap-3 mt-3">
+                            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />Export ID
+                            </span>
+                            <code className="text-[11px] font-mono text-[#01a0be] bg-[#01a0be]/[0.06] px-2 py-0.5 rounded-md ring-1 ring-[#01a0be]/15 select-all cursor-text">{exportId}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Input area */}
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <label className={S.label}>Product JSON</label>
+                    <button onClick={loadSample} className="text-[11px] text-neutral-600 hover:text-[#01a0be] transition-colors">
+                        Load sample
+                    </button>
+                </div>
+                <div className="relative">
+                    <textarea
+                        rows={12}
+                        value={input}
+                        onChange={e => { setInput(e.target.value); setError(""); }}
+                        placeholder={placeholder}
+                        className={`${S.input} font-mono text-xs leading-relaxed resize-none ${error ? "ring-red-500/40 focus:ring-red-500/60" : ""}`}
+                    />
+                    {input && (
+                        <button onClick={() => { setInput(""); setResults(null); setError(""); }}
+                            className="absolute top-3 right-3 text-neutral-600 hover:text-neutral-400 transition-colors">
+                            <Ic.X />
+                        </button>
+                    )}
+                </div>
+                {error && (
+                    <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/[0.06] ring-1 ring-red-500/15 rounded-xl px-3.5 py-2.5">
+                        <Ic.Warning />
+                        <span>{error}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Run button */}
+            <button onClick={run} disabled={loading || !input.trim()} className={`${S.btnPrimary} w-full justify-center py-3 text-sm`}>
+                {loading ? (
+                    <>
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="opacity-20" />
+                            <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                        </svg>
+                        Categorizing... {elapsed.toFixed(1)}s
+                    </>
+                ) : (
+                    <><Ic.Spark />Categorize Products</>
+                )}
+            </button>
+
+            {/* Loading overlay */}
+            {loading && (
+                <div className={`${S.card} overflow-hidden`}>
+                    <div className="p-8 flex flex-col items-center gap-5">
+                        {/* Animated orbs */}
+                        <div className="relative w-20 h-20">
+                            <div className="absolute inset-0 rounded-full bg-[#01a0be]/20 animate-ping" style={{ animationDuration: "1.5s" }} />
+                            <div className="absolute inset-2 rounded-full bg-[#01a0be]/15 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.3s" }} />
+                            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#01a0be]/30 to-violet-500/20 flex items-center justify-center backdrop-blur-sm ring-1 ring-[#01a0be]/20">
+                                <Ic.Spark />
+                            </div>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-sm font-medium text-white mb-1">AI is analyzing your products...</p>
+                            <p className="text-xs text-neutral-500">Processing with Gemini 2.5 Flash in batches of 30</p>
+                        </div>
+                        {/* Progress shimmer */}
+                        <div className="w-full max-w-xs h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
+                            <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-[#01a0be] to-transparent animate-shimmer"
+                                style={{ animation: "shimmer 1.5s ease-in-out infinite" }} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Results */}
+            {results && !loading && (
+                <div className="space-y-3 animate-in">
+                    {/* Results header */}
+                    <div className={`${S.card} p-4`}>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/30" />
+                                    <span className="text-sm font-medium text-white">{results.length} categorized</span>
+                                </div>
+                                <span className="text-xs text-neutral-600">in {elapsed.toFixed(1)}s</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={copyResults} className={S.btnOutline}>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                    Copy
+                                </button>
+                                <button onClick={downloadResults} className={S.btnOutline}>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    Download
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Results table */}
+                    <div className={`${S.card} overflow-hidden`}>
+                        <div className="grid grid-cols-[auto_1fr_2fr] gap-x-4 px-4 py-2.5 border-b border-white/[0.05]">
+                            {["Code", "Category", "Category ID"].map(h => <span key={h} className={S.label}>{h}</span>)}
+                        </div>
+                        <div className="max-h-[420px] overflow-y-auto">
+                            {results.map((r, i) => (
+                                <div key={`${r.code}-${i}`}
+                                    className="grid grid-cols-[auto_1fr_2fr] gap-x-4 px-4 py-3 items-center border-b border-white/[0.03] last:border-0 hover:bg-white/[0.02] transition-all"
+                                    style={{ animation: `fadeSlideIn 0.3s ease-out ${i * 0.03}s both` }}>
+                                    <span className="text-xs text-neutral-400 font-mono">{r.code}</span>
+                                    <span className="text-sm text-white truncate">{r.categoryName}</span>
+                                    <span className="text-xs text-neutral-600 font-mono truncate">{r.categoryId}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Raw JSON toggle */}
+                    <details className={`${S.card} group`}>
+                        <summary className="px-4 py-3 text-xs text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors flex items-center gap-2 select-none">
+                            <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                            Raw JSON response
+                        </summary>
+                        <pre className="px-4 pb-4 text-xs text-neutral-400 font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                            {JSON.stringify(results, null, 2)}
+                        </pre>
+                    </details>
+                </div>
+            )}
+
+            {/* ── API Reference ─────────────────────────────────────────────── */}
+            <div className={`${S.card} overflow-hidden`}>
+                <button onClick={() => setApiDocsOpen(o => !o)}
+                    className="w-full flex items-center justify-between px-5 py-4 text-left group hover:bg-white/[0.02] transition-colors">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/10 ring-1 ring-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-white">API Reference</p>
+                            <p className="text-[11px] text-neutral-600">Use this endpoint from your own code or third-party services</p>
+                        </div>
+                    </div>
+                    <svg className={`w-4 h-4 text-neutral-600 group-hover:text-neutral-400 transition-all ${apiDocsOpen ? "rotate-180" : ""}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+
+                {apiDocsOpen && (
+                    <div className="px-5 pb-6 space-y-5 border-t border-white/[0.05]">
+
+                        {/* Endpoint */}
+                        <div className="pt-5">
+                            <p className={`${S.label} mb-2`}>Endpoint</p>
+                            <div className="flex items-center gap-2">
+                                <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-bold tracking-wider ring-1 ring-emerald-500/20">POST</span>
+                                <code className="text-sm font-mono text-neutral-300 select-all">/api/export/webhooks/categorize</code>
+                            </div>
+                        </div>
+
+                        {/* Auth */}
+                        <div>
+                            <p className={`${S.label} mb-2`}>Authentication</p>
+                            <div className="bg-white/[0.02] rounded-xl ring-1 ring-white/[0.06] p-3.5">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                                    <span className="text-xs text-neutral-300 font-medium">x-api-key header</span>
+                                </div>
+                                <p className="text-[11px] text-neutral-500 leading-relaxed">
+                                    Pass your <code className="text-neutral-400 bg-white/[0.04] px-1 rounded">WEBHOOK_API_KEY</code> in the <code className="text-neutral-400 bg-white/[0.04] px-1 rounded">x-api-key</code> request header.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Request body */}
+                        <div>
+                            <p className={`${S.label} mb-2`}>Request Body</p>
+                            <div className="bg-neutral-900/80 rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
+                                <div className="flex items-center justify-between px-3.5 py-2 border-b border-white/[0.04]">
+                                    <span className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">JSON</span>
+                                    <button onClick={() => {
+                                        navigator.clipboard.writeText(JSON.stringify({ exportId, products: [{ code: "SKU-001", name: "Product Name", description: "Optional description" }] }, null, 2));
+                                        toast("Copied", "success");
+                                    }} className="text-[10px] text-neutral-600 hover:text-[#01a0be] transition-colors flex items-center gap-1">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                        Copy
+                                    </button>
+                                </div>
+                                <pre className="p-3.5 text-xs font-mono text-neutral-400 leading-relaxed overflow-x-auto">{`{
+  "exportId": "${exportId}",
+  "products": [
+    {
+      "code": "SKU-001",
+      "name": "Product Name",
+      "description": "Optional description",
+      "brand": "Optional brand",
+      "tags": ["optional", "tags"]
+    }
+  ]
+}`}</pre>
+                            </div>
+                        </div>
+
+                        {/* Product fields table */}
+                        <div>
+                            <p className={`${S.label} mb-2`}>Product Fields</p>
+                            <div className="bg-white/[0.02] rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
+                                <div className="grid grid-cols-[100px_60px_1fr] gap-x-3 px-3.5 py-2 border-b border-white/[0.06]">
+                                    {["Field", "Required", "Description"].map(h => <span key={h} className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">{h}</span>)}
+                                </div>
+                                {[
+                                    ["code", true, "Unique product identifier (used to match results)"],
+                                    ["name", true, "Product name — primary text the AI uses"],
+                                    ["description", false, "Product description — improves accuracy"],
+                                    ["brand", false, "Brand name"],
+                                    ["tags", false, "Array of keywords/tags"],
+                                    ["price", false, "Price (helps disambiguate categories)"],
+                                    ["child_products", false, "Variants — AI reads for context but only categorizes parent"],
+                                ].map(([field, req, desc]) => (
+                                    <div key={field} className="grid grid-cols-[100px_60px_1fr] gap-x-3 px-3.5 py-2.5 border-b border-white/[0.03] last:border-0 items-center">
+                                        <code className="text-xs font-mono text-[#01a0be]">{field}</code>
+                                        <span>{req
+                                            ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-400 ring-1 ring-red-500/15">YES</span>
+                                            : <span className="text-[10px] text-neutral-700">no</span>
+                                        }</span>
+                                        <span className="text-[11px] text-neutral-500">{desc}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-[11px] text-neutral-600 mt-2 leading-relaxed">
+                                You can include any additional fields on each product — the AI receives the full object, so more context means better categorization.
+                            </p>
+                        </div>
+
+                        {/* Response */}
+                        <div>
+                            <p className={`${S.label} mb-2`}>Response</p>
+                            <div className="bg-neutral-900/80 rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
+                                <div className="px-3.5 py-2 border-b border-white/[0.04]">
+                                    <span className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">200 OK</span>
+                                </div>
+                                <pre className="p-3.5 text-xs font-mono text-neutral-400 leading-relaxed overflow-x-auto">{`{
+  "results": [
+    {
+      "code": "SKU-001",
+      "categoryId": "683a1f2e...",
+      "categoryName": "Electronics / Audio"
+    }
+  ]
+}`}</pre>
+                            </div>
+                        </div>
+
+                        {/* curl example */}
+                        <div>
+                            <p className={`${S.label} mb-2`}>curl Example</p>
+                            <div className="bg-neutral-900/80 rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
+                                <div className="flex items-center justify-between px-3.5 py-2 border-b border-white/[0.04]">
+                                    <span className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">Shell</span>
+                                    <button onClick={() => {
+                                        navigator.clipboard.writeText(`curl -X POST https://your-server.com/api/export/webhooks/categorize \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: YOUR_API_KEY" \\\n  -d '{"exportId":"${exportId}","products":[{"code":"P1","name":"Example Product"}]}'`);
+                                        toast("Copied", "success");
+                                    }} className="text-[10px] text-neutral-600 hover:text-[#01a0be] transition-colors flex items-center gap-1">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                        Copy
+                                    </button>
+                                </div>
+                                <pre className="p-3.5 text-xs font-mono text-neutral-400 leading-relaxed overflow-x-auto whitespace-pre-wrap">{`curl -X POST https://your-server.com/api/export/webhooks/categorize \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{
+    "exportId": "${exportId}",
+    "products": [
+      {"code": "P1", "name": "Example Product", "description": "..."}
+    ]
+  }'`}</pre>
+                            </div>
+                        </div>
+
+                        {/* Limits / notes */}
+                        <div>
+                            <p className={`${S.label} mb-2`}>Limits &amp; Notes</p>
+                            <div className="space-y-2">
+                                {[
+                                    ["300", "Max products per request"],
+                                    ["30", "Internal batch size (products per AI call)"],
+                                    ["Sync", "Response is synchronous — wait for the full result"],
+                                    ["Stateless", "Nothing is saved to the database"],
+                                ].map(([val, desc]) => (
+                                    <div key={val} className="flex items-center gap-3 text-xs">
+                                        <span className="px-2 py-0.5 rounded-md bg-white/[0.04] ring-1 ring-white/[0.06] text-neutral-300 font-mono font-medium shrink-0 min-w-[60px] text-center">{val}</span>
+                                        <span className="text-neutral-500">{desc}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Error codes */}
+                        <div>
+                            <p className={`${S.label} mb-2`}>Error Responses</p>
+                            <div className="bg-white/[0.02] rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
+                                {[
+                                    ["400", "Missing fields, empty products, or exceeds 300 limit"],
+                                    ["401", "Missing or invalid x-api-key"],
+                                    ["500", "No categories for this exportId, or AI processing error"],
+                                ].map(([code, desc]) => (
+                                    <div key={code} className="flex items-center gap-3 px-3.5 py-2.5 border-b border-white/[0.03] last:border-0">
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ring-1 ${
+                                            code === "400" ? "bg-amber-500/10 text-amber-400 ring-amber-500/15"
+                                            : code === "401" ? "bg-red-500/10 text-red-400 ring-red-500/15"
+                                            : "bg-red-500/10 text-red-400 ring-red-500/15"
+                                        }`}>{code}</span>
+                                        <span className="text-[11px] text-neutral-500">{desc}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <style jsx>{`
+                @keyframes shimmer {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(400%); }
+                }
+                @keyframes fadeSlideIn {
+                    from { opacity: 0; transform: translateY(8px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-in {
+                    animation: fadeSlideIn 0.4s ease-out;
+                }
+            `}</style>
+        </div>
+    );
+}
+
 // ─── ExportSelector ───────────────────────────────────────────────────────────
 
 function ExportSelector({ exports, selected, onSelect, onCreateEdit, onDelete }) {
@@ -932,6 +1368,7 @@ export default function CategoriesPage({ initialExports }) {
     const tabs = [
         { key: "categories", label: "Categories", icon: <Ic.Tag /> },
         { key: "products", label: "Products", icon: <Ic.Cube /> },
+        { key: "playground", label: "Playground", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
     ];
 
     return (
@@ -992,9 +1429,9 @@ export default function CategoriesPage({ initialExports }) {
                         </div>
 
                         {/* Tab content */}
-                        {tab === "categories"
-                            ? <CategoriesTab key={selected._id} exportId={selected._id} toast={toast} />
-                            : <ProductsTab key={selected._id} exportId={selected._id} toast={toast} />}
+                        {tab === "categories" && <CategoriesTab key={selected._id} exportId={selected._id} toast={toast} />}
+                        {tab === "products" && <ProductsTab key={selected._id} exportId={selected._id} toast={toast} />}
+                        {tab === "playground" && <PlaygroundTab key={selected._id} exportId={selected._id} toast={toast} />}
                     </div>
                 )}
             </div>
