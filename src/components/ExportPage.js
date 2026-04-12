@@ -1208,7 +1208,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 if (!res.ok) throw new Error(`Failed to update config: ${res.status}`);
             } else {
                 // Auto-save with current name or a generated one
-                const name = exportName.trim() || `Export ${new Date().toISOString().split("T")[0]}`;
+                const name = exportName.trim() || `Export ${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}`;
                 const res = await fetch(`/nextapi/export/custom-export`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
