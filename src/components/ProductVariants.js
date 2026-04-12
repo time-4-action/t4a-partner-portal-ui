@@ -141,7 +141,7 @@ export default function ProductVariants({ product }) {
                       : "bg-neutral-800 border-transparent hover:border-neutral-600"
                   }`}
                 >
-                  {child.product_name}
+                  {child.size || child.product_name}
                 </button>
               ))}
             </div>
