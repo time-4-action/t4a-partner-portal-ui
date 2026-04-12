@@ -62,7 +62,7 @@ const EXPORT_PRESETS = {
             { key: "ai_tags", label: "Collection", description: "Leaf category name only (e.g. \"Phones\" from \"Electronics / Phones\")", default: true },
             { key: "published", label: "Published", default: true },
             { key: "variant_sku", label: "Variant SKU", default: true },
-            { key: "option1", label: "Option1 (Variant)", group: [{ key: "option1_name", label: "Option1 Name" }, { key: "option1_value", label: "Option1 Value" }], default: true },
+            { key: "option1", label: "Variant Option", description: "Shopify variant option — exports Option1 Name (\"Variant\") and Option1 Value (size or model)", group: [{ key: "option1_name", label: "Option1 Name" }, { key: "option1_value", label: "Option1 Value" }], default: true },
             { key: "variant_price", label: "Variant Price", default: true },
             { key: "variant_compare_at_price", label: "Compare At Price", default: false },
             { key: "variant_inventory", label: "Inventory", group: [{ key: "variant_inventory_tracker", label: "Variant Inventory Tracker" }, { key: "variant_inventory_qty", label: "Variant Inventory Qty" }, { key: "variant_inventory_policy", label: "Variant Inventory Policy" }, { key: "variant_fulfillment_service", label: "Variant Fulfillment Service" }], default: true },
@@ -448,6 +448,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     const [fieldInfoModal, setFieldInfoModal] = useState(null); // field object | null
     const [aiLeafMode, setAiLeafMode] = useState({ ai_tags: false, ai_category_names: false });
     const [inventoryLocationName, setInventoryLocationName] = useState('');
+    const [option1Name, setOption1Name] = useState('');
 
     /**
      * Extracts and memoizes all unique pricelists from products.
@@ -899,7 +900,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             case "variant_sku":
                 return variant?.code || product.code || "";
             case "option1_name":
-                return "Variant";
+                return option1Name || "Variant";
             case "option1_value":
                 return variant?.size || variant?.product_name || product.product_name || "";
             case "variant_price":
@@ -1189,6 +1190,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             pricelistPriority,
             aiLeafMode,
             ...(selectedPreset === 'inventory' && { inventoryLocationName }),
+            ...(option1Name && { option1Name }),
         };
 
         const downloadKey = `current-${format}`;
@@ -1250,6 +1252,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 pricelistPriority,
                 aiLeafMode,
                 ...(selectedPreset === 'inventory' && { inventoryLocationName }),
+                ...(option1Name && { option1Name }),
             };
 
             const response = await fetch(`/nextapi/export/custom-export`, {
@@ -1349,8 +1352,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             });
         }
 
-        // Restore inventory location name
+        // Restore inventory location name and option1 name
         setInventoryLocationName(config.inventoryLocationName || '');
+        setOption1Name(config.option1Name || '');
 
         setCurrentConfigId(config._id);
         setActiveTab("configure");
@@ -2196,7 +2200,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     )}
 
                     {/* ── Step 3: Fields ───────────────────────────────────────────── */}
-                    {exportStep === 'fields' && (
+                    {exportStep === 'fields' && (<>
                         <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
                             <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-700/50">
                                 <div>
@@ -2259,7 +2263,32 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 </div>
                             </div>
                         </div>
-                    )}
+
+                        {/* Option1 Name customization — shown when option1 fields are selected */}
+                        {selectedFields.includes('option1_name') && (
+                            <div className="mt-4 bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
+                                <div className="px-6 py-4 border-b border-neutral-700/50">
+                                    <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                        </svg>
+                                        <h2 className="text-sm font-semibold text-white">Variant Option Name</h2>
+                                    </div>
+                                    <p className="text-xs text-neutral-500 mt-1.5">Customize the Option1 Name column value in your export</p>
+                                </div>
+                                <div className="p-5">
+                                    <input
+                                        type="text"
+                                        value={option1Name}
+                                        onChange={(e) => setOption1Name(e.target.value)}
+                                        placeholder="Variant"
+                                        className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-700/50 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
+                                    />
+                                    <p className="text-xs text-neutral-500 mt-2">Leave empty to use default: <span className="text-neutral-400 font-medium">Variant</span></p>
+                                </div>
+                            </div>
+                        )}
+                    </>)}
 
                     {/* ── Step 4: Export ───────────────────────────────────────────── */}
                     {exportStep === 'export' && (
