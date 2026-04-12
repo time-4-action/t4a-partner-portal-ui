@@ -4,6 +4,11 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
+        hostname: "docs.gravatar.com", // Added this
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "imgs.pnvnet.si",
         pathname: "/**",
       },

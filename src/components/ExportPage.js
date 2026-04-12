@@ -58,18 +58,18 @@ const EXPORT_PRESETS = {
             { key: "body_html", label: "Body (HTML)", default: true },
             { key: "vendor", label: "Vendor", default: true },
             { key: "type", label: "Type", default: false },
-            { key: "tags", label: "Tags (Categories)", default: true },
-            { key: "ai_tags", label: "Collection", description: "Leaf category name only (e.g. \"Phones\" from \"Electronics / Phones\")", default: false },
+            { key: "tags", label: "Tags", default: true },
+            { key: "ai_tags", label: "Collection", description: "Leaf category name only (e.g. \"Phones\" from \"Electronics / Phones\")", default: true },
             { key: "published", label: "Published", default: true },
             { key: "variant_sku", label: "Variant SKU", default: true },
             { key: "variant_title", label: "Variant Title", default: true },
             { key: "variant_price", label: "Variant Price", default: true },
             { key: "variant_compare_at_price", label: "Compare At Price", default: false },
-            { key: "variant_inventory_qty", label: "Inventory Qty", default: true },
+            { key: "variant_inventory", label: "Inventory", group: [{ key: "variant_inventory_tracker", label: "Variant Inventory Tracker" }, { key: "variant_inventory_qty", label: "Variant Inventory Qty" }, { key: "variant_inventory_policy", label: "Variant Inventory Policy" }, { key: "variant_fulfillment_service", label: "Variant Fulfillment Service" }], default: true },
             { key: "variant_barcode", label: "Barcode", default: true },
             { key: "image_src", label: "Image Src", default: true },
             { key: "image_alt_text", label: "Image Alt Text", default: false },
-            { key: "variant_image", label: "Variant Image", default: false },
+            { key: "variant_image", label: "Variant Image", default: true },
         ],
     },
     simple: {
@@ -89,7 +89,7 @@ const EXPORT_PRESETS = {
             { key: "vat", label: "VAT %", default: true },
             { key: "price_with_vat", label: "Price with VAT", default: false },
             { key: "stock", label: "Stock", default: true },
-            { key: "categories", label: "Categories", default: true },
+            { key: "categories", label: "Tags", default: true },
             { key: "ai_category_names", label: "Collection", description: "Full category path (e.g. \"Electronics / Phones\")", default: false },
             { key: "image_url", label: "Image URL", default: true },
         ],
@@ -115,7 +115,7 @@ const EXPORT_PRESETS = {
             { key: "vat", label: "VAT %", default: true },
             { key: "price_with_vat", label: "Price with VAT", default: false },
             { key: "stock", label: "Stock Amount", default: true },
-            { key: "categories", label: "Categories", default: true },
+            { key: "categories", label: "Tags", default: true },
             { key: "ai_export_ids", label: "AI Export IDs", default: false },
             { key: "ai_category_names", label: "Collection", description: "Full category path (e.g. \"Electronics / Phones\")", default: false },
             { key: "ai_category_ids", label: "Collection IDs", description: "MongoDB IDs of matched categories", default: false },
@@ -385,6 +385,7 @@ function applyFiltersLocal(products, filters) {
         if (filters.showNew && !product.new) return false;
         if (filters.showRecommended && !product.recomended) return false;
         if (filters.publishedOnly && !product.published) return false;
+        if (filters.excludeCloseOut && product.product_name?.toUpperCase().includes('CLOSE OUT')) return false;
         return true;
     });
 }
@@ -394,7 +395,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     const [selectedPreset, setSelectedPreset] = useState("shopify");
     const [selectedFields, setSelectedFields] = useState(() => {
         const preset = EXPORT_PRESETS.shopify;
-        return preset.fields.filter((f) => f.default).map((f) => f.key);
+        return preset.fields.filter((f) => f.default).flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]);
     });
     const [filters, setFilters] = useState({
         search: "",
@@ -408,6 +409,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         showNew: false,
         showRecommended: false,
         publishedOnly: false,
+        excludeCloseOut: false,
     });
     const [pricelistPriority, setPricelistPriority] = useState([]);
     const [exportStatus, setExportStatus] = useState("");
@@ -416,6 +418,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [exportName, setExportName] = useState("");
     const [exportDescription, setExportDescription] = useState("");
+    const [currentConfigId, setCurrentConfigId] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isLoadingExports, setIsLoadingExports] = useState(false);
     const [previewLimit, setPreviewLimit] = useState(5);
@@ -443,7 +446,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     const [previewView, setPreviewView] = useState('grid'); // 'grid' | 'list'
     const [previewSearch, setPreviewSearch] = useState('');
     const [fieldInfoModal, setFieldInfoModal] = useState(null); // field object | null
-    const [aiLeafMode, setAiLeafMode] = useState({ ai_tags: true, ai_category_names: false });
+    const [aiLeafMode, setAiLeafMode] = useState({ ai_tags: false, ai_category_names: false });
+    const [inventoryLocationName, setInventoryLocationName] = useState('');
 
     /**
      * Extracts and memoizes all unique pricelists from products.
@@ -536,12 +540,13 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             if (filters.showNew && !product.new) return;
             if (filters.showRecommended && !product.recomended) return;
             if (filters.publishedOnly && !product.published) return;
+            if (filters.excludeCloseOut && product.product_name?.toUpperCase().includes('CLOSE OUT')) return;
             product.categories?.forEach(cat => catCounts.set(cat, (catCounts.get(cat) || 0) + 1));
         });
         return { dynamicCategories: Array.from(catCounts.keys()).sort(), categoryProductCounts: catCounts };
     }, [initialProducts, filters.search, filters.stockStatus, filters.minPrice, filters.maxPrice,
         filters.aiExportId, filters.aiCategory, filters.imageFilter,
-        filters.showNew, filters.showRecommended, filters.publishedOnly]);
+        filters.showNew, filters.showRecommended, filters.publishedOnly, filters.excludeCloseOut]);
 
     // Extract AI exports: role-filtered when allowedExports is provided, otherwise derived from product data
     const availableAiExports = useMemo(() => {
@@ -739,6 +744,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             if (filters.showNew && !product.new) return false;
             if (filters.showRecommended && !product.recomended) return false;
             if (filters.publishedOnly && !product.published) return false;
+            if (filters.excludeCloseOut && product.product_name?.toUpperCase().includes('CLOSE OUT')) return false;
 
             return true;
         });
@@ -763,17 +769,26 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     // Handle preset change
     const handlePresetChange = (presetKey) => {
         setSelectedPreset(presetKey);
+        setCurrentConfigId(null);
         const preset = EXPORT_PRESETS[presetKey];
-        setSelectedFields(preset.fields.filter((f) => f.default).map((f) => f.key));
+        setSelectedFields(preset.fields.filter((f) => f.default).flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]));
     };
 
     // Toggle field selection
-    const toggleField = (fieldKey) => {
-        setSelectedFields((prev) =>
-            prev.includes(fieldKey)
-                ? prev.filter((k) => k !== fieldKey)
-                : [...prev, fieldKey]
-        );
+    const toggleField = (field) => {
+        if (field.group) {
+            const groupKeys = field.group.map((g) => g.key);
+            setSelectedFields((prev) => {
+                const allSelected = groupKeys.every((k) => prev.includes(k));
+                return allSelected
+                    ? prev.filter((k) => !groupKeys.includes(k))
+                    : [...new Set([...prev, ...groupKeys])];
+            });
+        } else {
+            setSelectedFields((prev) =>
+                prev.includes(field.key) ? prev.filter((k) => k !== field.key) : [...prev, field.key]
+            );
+        }
     };
 
     // Move pricelist up/down
@@ -853,14 +868,26 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 return isShopify ? (isFirstRow ? "Patrik International" : "") : "Patrik International";
             case "type":
                 return isShopify ? (isFirstRow ? (product.categories?.[0] || "") : "") : (product.categories?.[0] || "");
-            case "tags":
+            case "tags": {
                 if (isShopify && !isFirstRow) return "";
-                const tags = [
-                    ...(product.categories || []),
+                let baseTags;
+                if (filters.aiExportId && filters.aiExportId !== "all") {
+                    const filtered = product.ai_categories?.filter((c) => c.exportId === filters.aiExportId) || [];
+                    baseTags = filtered.length > 0
+                        ? [...new Set(filtered.flatMap((c) => {
+                            const parts = c.categoryName.split(" / ");
+                            return parts.map((_, i) => parts.slice(0, i + 1).join(" / "));
+                        }))]
+                        : (product.categories || []);
+                } else {
+                    baseTags = product.categories || [];
+                }
+                const extraTags = [
                     product.new ? "new" : "",
                     product.recomended ? "recommended" : "",
                 ].filter(Boolean);
-                return tags.join(", ");
+                return [...baseTags, ...extraTags].join(", ");
+            }
             case "ai_tags":
                 if (isShopify && !isFirstRow) return "";
                 const filteredAiCats = filters.aiExportId !== "all"
@@ -886,8 +913,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 }
                 return "";
             }
+            case "variant_inventory_tracker":
+                return "shopify";
             case "variant_inventory_qty":
                 return variant != null ? (variant.stock_amount || 0) : (product.stock_amount || 0);
+            case "variant_inventory_policy":
+                return (variant?.allow_backorder || product.allow_backorder) ? "continue" : "deny";
+            case "variant_fulfillment_service":
+                return "manual";
             case "variant_barcode":
                 return variant?.ean_code || product.ean_code || "";
             case "image_src":
@@ -925,8 +958,18 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 const qty = variant != null ? (variant.stock_amount || 0) : (product.stock_amount || 0);
                 return qty > 0 ? "Yes" : "No";
             }
-            case "categories":
-                return (product.categories || []).join("; ");
+            case "categories": {
+                if (filters.aiExportId && filters.aiExportId !== "all") {
+                    const filtered = product.ai_categories?.filter((c) => c.exportId === filters.aiExportId) || [];
+                    if (filtered.length > 0) {
+                        return [...new Set(filtered.flatMap((c) => {
+                            const parts = c.categoryName.split(" / ");
+                            return parts.map((_, i) => parts.slice(0, i + 1).join(" / "));
+                        }))].join(", ");
+                    }
+                }
+                return (product.categories || []).join(", ");
+            }
             case "ai_export_ids":
                 const exportIds = [...new Set(product.ai_categories?.map((c) => c.exportId) || [])];
                 return exportIds.join("; ");
@@ -986,7 +1029,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         const rows = [];
         const isShopify = selectedPreset === "shopify";
 
-        const headers = preset.fields
+        const expandedFields = preset.fields.flatMap((f) => f.group || [f]);
+        const headers = expandedFields
             .filter((f) => selectedFields.includes(f.key))
             .map((f) => f.label);
         rows.push(headers.map(escapeCSV).join(","));
@@ -1016,7 +1060,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     const priceSource = variant ?? (variants.length === 0 ? product : null);
                     const priceInfo = priceSource ? getPriceFromPriority(priceSource) : { price: 0, vat: 0, name: "" };
 
-                    preset.fields.forEach((field) => {
+                    expandedFields.forEach((field) => {
                         if (!selectedFields.includes(field.key)) return;
                         const value = getFieldValue(field.key, product, variant, rowIdx, currentImage, priceInfo, isImageOnlyRow, true);
                         row.push(escapeCSV(value));
@@ -1032,7 +1076,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     const priceSource = variant ?? product;
                     const priceInfo = getPriceFromPriority(priceSource);
 
-                    preset.fields.forEach((field) => {
+                    expandedFields.forEach((field) => {
                         if (!selectedFields.includes(field.key)) return;
                         const value = getFieldValue(field.key, product, variant, variantIndex, "", priceInfo, false, false);
                         row.push(escapeCSV(value));
@@ -1051,6 +1095,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         const preset = EXPORT_PRESETS[selectedPreset];
         const isShopify = selectedPreset === "shopify";
         const rows = [];
+        const expandedFields = preset.fields.flatMap((f) => f.group || [f]);
 
         filteredProducts.forEach((product) => {
             const variants = product.child_products || [];
@@ -1069,7 +1114,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     const priceSource = variant ?? (variants.length === 0 ? product : null);
                     const priceInfo = priceSource ? getPriceFromPriority(priceSource) : { price: 0, vat: 0, name: "" };
                     const row = {};
-                    preset.fields.forEach((field) => {
+                    expandedFields.forEach((field) => {
                         if (!selectedFields.includes(field.key)) return;
                         row[field.key] = getFieldValue(field.key, product, variant, rowIdx, currentImage, priceInfo, isImageOnlyRow, true);
                     });
@@ -1081,7 +1126,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     const priceSource = variant ?? product;
                     const priceInfo = getPriceFromPriority(priceSource);
                     const row = {};
-                    preset.fields.forEach((field) => {
+                    expandedFields.forEach((field) => {
                         if (!selectedFields.includes(field.key)) return;
                         row[field.key] = getFieldValue(field.key, product, variant, idx, "", priceInfo, false, false);
                     });
@@ -1127,42 +1172,62 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         return `<?xml version="1.0" encoding="UTF-8"?>\n<export>\n${rowXmls.join('\n')}\n</export>`;
     }, [generateRows, selectedFields]);
 
-    // Download in the chosen format
-    const handleDownload = (format = 'csv') => {
+    // Download via API — saves/updates the config first to get a stable ID, then proxies through the backend
+    const handleDownload = async (format = 'csv') => {
         if (filteredProducts.length === 0) {
             setExportStatus("No products to export");
             setTimeout(() => setExportStatus(""), 3000);
             return;
         }
 
-        let content, mimeType, ext;
-        if (format === 'json') {
-            content = JSON.stringify(generateJsonData(), null, 2);
-            // generateJsonData returns the full envelope object
-            mimeType = 'application/json;charset=utf-8;';
-            ext = 'json';
-        } else if (format === 'xml') {
-            content = generateXmlData();
-            mimeType = 'application/xml;charset=utf-8;';
-            ext = 'xml';
-        } else {
-            content = "\ufeff" + generateCSVData();
-            mimeType = 'text/csv;charset=utf-8;';
-            ext = 'csv';
+        const exportConfig = {
+            preset: selectedPreset,
+            selectedFields: selectedPreset === 'inventory' ? ['sku'] : selectedFields,
+            filters,
+            pricelistPriority,
+            aiLeafMode,
+            ...(selectedPreset === 'inventory' && { inventoryLocationName }),
+        };
+
+        const downloadKey = `current-${format}`;
+        setDownloadingId(downloadKey);
+        try {
+            let configId = currentConfigId;
+
+            if (configId) {
+                // Update existing config so the API generates from current settings
+                const res = await fetch(`/nextapi/export/custom-export/${configId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(exportConfig),
+                });
+                if (!res.ok) throw new Error(`Failed to update config: ${res.status}`);
+            } else {
+                // Auto-save with current name or a generated one
+                const name = exportName.trim() || `Export ${new Date().toISOString().split("T")[0]}`;
+                const res = await fetch(`/nextapi/export/custom-export`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ...exportConfig, name }),
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || `Failed to save config: ${res.status}`);
+                }
+                const result = await res.json();
+                configId = result.data._id;
+                setCurrentConfigId(configId);
+                setSavedExports((prev) => [result.data, ...prev]);
+            }
+
+            await downloadFromAPI(configId, format);
+        } catch (error) {
+            console.error("Download error:", error);
+            setExportStatus("Download failed");
+            setTimeout(() => setExportStatus(""), 3000);
+        } finally {
+            setDownloadingId(null);
         }
-
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `patrik-export-${selectedPreset}-${new Date().toISOString().split("T")[0]}.${ext}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        setExportStatus("Downloaded!");
-        setTimeout(() => setExportStatus(""), 3000);
     };
 
     // Save export configuration - POST {EXPORT_API_URL}/custom-export
@@ -1178,10 +1243,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 name: exportName.trim(),
                 description: exportDescription.trim() || null,
                 preset: selectedPreset,
-                selectedFields,
+                selectedFields: selectedPreset === 'inventory' ? ['sku'] : selectedFields,
                 filters,
                 pricelistPriority,
                 aiLeafMode,
+                ...(selectedPreset === 'inventory' && { inventoryLocationName }),
             };
 
             const response = await fetch(`/nextapi/export/custom-export`, {
@@ -1206,6 +1272,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             }
 
             setSavedExports((prev) => [result.data, ...prev]);
+            setCurrentConfigId(result.data._id);
             setShowSaveModal(false);
             setExportName("");
             setExportDescription("");
@@ -1263,6 +1330,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             showNew: false,
             showRecommended: false,
             publishedOnly: false,
+            excludeCloseOut: false,
             ...config.filters,
         });
 
@@ -1274,11 +1342,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         // Restore leaf mode if saved
         if (config.aiLeafMode) {
             setAiLeafMode({
-                ai_tags: config.aiLeafMode.ai_tags !== false,
+                ai_tags: config.aiLeafMode.ai_tags === true,
                 ai_category_names: config.aiLeafMode.ai_category_names === true,
             });
         }
 
+        // Restore inventory location name
+        setInventoryLocationName(config.inventoryLocationName || '');
+
+        setCurrentConfigId(config._id);
         setActiveTab("configure");
         setExportStep("format");
         setExportStatus("Configuration loaded!");
@@ -1492,6 +1564,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             showNew: false,
             showRecommended: false,
             publishedOnly: false,
+            excludeCloseOut: false,
         });
         setPreviewLimit(5);
     };
@@ -1574,7 +1647,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 <div className="space-y-6">
                     {/* Step Indicator */}
                     {(() => {
-                        const stepsOrder = ['format', 'filters', 'fields', 'export'];
+                        const isInventory = selectedPreset === 'inventory';
+                        const stepsOrder = isInventory ? ['format', 'filters', 'export'] : ['format', 'filters', 'fields', 'export'];
                         const currentIdx = stepsOrder.indexOf(exportStep);
                         const activeFilterCount = [
                             filters.search, filters.stockStatus !== 'all' && filters.stockStatus,
@@ -1583,9 +1657,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             filters.aiExportId !== 'all' && filters.aiExportId,
                             filters.aiCategory.length > 0 && 'aiCat',
                             filters.imageFilter !== 'all' && filters.imageFilter,
-                            filters.showNew, filters.showRecommended, filters.publishedOnly,
+                            filters.showNew, filters.showRecommended, filters.publishedOnly, filters.excludeCloseOut,
                         ].filter(Boolean).length;
-                        const STEP_META = [
+                        const ALL_STEPS = [
                             {
                                 id: 'format', label: 'Format',
                                 sub: currentPreset.name,
@@ -1607,6 +1681,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
                             },
                         ];
+                        const STEP_META = ALL_STEPS.filter(s => stepsOrder.includes(s.id));
                         return (
                             <div className="bg-neutral-900/60 border border-neutral-700/50 rounded-2xl overflow-hidden">
                                 <div className="flex divide-x divide-neutral-800">
@@ -1680,8 +1755,39 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 </div>
                             </div>
 
-                            {/* Pricelist Priority */}
-                            {pricelistPriority.length > 0 ? (
+                            {/* Right column: Shopify Location (inventory) or Pricelist Priority (others) */}
+                            {selectedPreset === 'inventory' ? (
+                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden flex flex-col">
+                                    <div className="px-6 py-5 border-b border-neutral-700/50">
+                                        <div className="flex items-center gap-2">
+                                            <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                            <h2 className="text-sm font-semibold text-white">Shopify Location</h2>
+                                        </div>
+                                        <p className="text-xs text-neutral-500 mt-1.5">Inventory column header in export</p>
+                                    </div>
+                                    <div className="p-5 flex flex-col gap-4 flex-1">
+                                        <input
+                                            type="text"
+                                            value={inventoryLocationName}
+                                            onChange={(e) => setInventoryLocationName(e.target.value)}
+                                            placeholder="e.g. pATRIK"
+                                            className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-700/50 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
+                                        />
+                                        <div className="flex items-start gap-2.5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                                            <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                            </svg>
+                                            <p className="text-xs text-amber-300/80 leading-relaxed">
+                                                Must be an <strong className="text-amber-200">exact case-sensitive match</strong> of your Shopify location name.
+                                                Find it in <strong className="text-amber-200">Settings &rarr; Locations</strong> in Shopify Admin.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : pricelistPriority.length > 0 ? (
                                 <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden flex flex-col">
                                     <div className="px-6 py-5 border-b border-neutral-700/50">
                                         <div className="flex items-center gap-2">
@@ -1816,7 +1922,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 filters.aiExportId !== 'all' && filters.aiExportId,
                                                 filters.aiCategory !== 'all' && filters.aiCategory,
                                                 filters.imageFilter !== 'all' && filters.imageFilter,
-                                                filters.showNew, filters.showRecommended, filters.publishedOnly,
+                                                filters.showNew, filters.showRecommended, filters.publishedOnly, filters.excludeCloseOut,
                                             ].filter(Boolean).length;
                                             return n > 0 ? (
                                                 <span className="text-xs bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium">{n} active</span>
@@ -1894,6 +2000,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     { key: "showNew", label: "New", icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" },
                                                     { key: "showRecommended", label: "Recommended", icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" },
                                                     { key: "publishedOnly", label: "Published", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
+                                                    { key: "excludeCloseOut", label: "Excl. Close Out", icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" },
                                                 ].map(({ key, label, icon }) => (
                                                     <button key={key} onClick={() => setFilters(prev => ({ ...prev, [key]: !prev[key] }))}
                                                         className={`flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all flex-1 justify-center ${filters[key] ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
@@ -2095,10 +2202,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     <p className="text-xs text-neutral-500 mt-0.5">Choose which columns to include in your export</p>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    <span className="text-xs text-neutral-500">{selectedFields.length} / {currentPreset.fields.length} selected</span>
+                                    <span className="text-xs text-neutral-500">{selectedFields.length} / {currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]).length} selected</span>
                                     <div className="flex gap-3">
                                         <button
-                                            onClick={() => setSelectedFields(currentPreset.fields.map((f) => f.key))}
+                                            onClick={() => setSelectedFields(currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]))}
                                             className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
                                         >
                                             Select all
@@ -2114,17 +2221,21 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
                             <div className="p-6">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-                                    {currentPreset.fields.filter(f => !AI_FIELD_KEYS.has(f.key) || (availableAiExports.length > 0 && filters.aiExportId !== "all")).map((field) => (
+                                    {currentPreset.fields.filter(f => !AI_FIELD_KEYS.has(f.key) || (availableAiExports.length > 0 && filters.aiExportId !== "all")).map((field) => {
+                                        const isSelected = field.group
+                                            ? field.group.map((g) => g.key).every((k) => selectedFields.includes(k))
+                                            : selectedFields.includes(field.key);
+                                        return (
                                         <div key={field.key} className="relative group/field">
                                             <button
-                                                onClick={() => toggleField(field.key)}
-                                                className={`w-full flex items-center gap-2 px-3 py-2.5 pr-8 rounded-xl text-sm transition-all ${selectedFields.includes(field.key)
+                                                onClick={() => toggleField(field)}
+                                                className={`w-full flex items-center gap-2 px-3 py-2.5 pr-8 rounded-xl text-sm transition-all ${isSelected
                                                         ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-white"
                                                         : "bg-neutral-800/50 border border-neutral-700/30 text-neutral-400 hover:text-white hover:border-neutral-600"
                                                     }`}
                                             >
-                                                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${selectedFields.includes(field.key) ? "bg-cyan-500" : "bg-neutral-700"}`}>
-                                                    {selectedFields.includes(field.key) && (
+                                                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${isSelected ? "bg-cyan-500" : "bg-neutral-700"}`}>
+                                                    {isSelected && (
                                                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                                         </svg>
@@ -2141,7 +2252,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                             </button>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -2161,12 +2273,21 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     <div className="text-xs text-neutral-500 mt-1">Export Rows</div>
                                 </div>
                                 <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
-                                    <div className="text-3xl font-bold text-purple-400">{selectedFields.length}</div>
-                                    <div className="text-xs text-neutral-500 mt-1">Fields</div>
+                                    <div className="text-3xl font-bold text-purple-400">{selectedPreset === 'inventory' ? 12 : selectedFields.length}</div>
+                                    <div className="text-xs text-neutral-500 mt-1">{selectedPreset === 'inventory' ? 'Fixed Columns' : 'Fields'}</div>
                                 </div>
                                 <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
-                                    <div className="text-2xl font-bold text-pink-400">{currentPreset.name}</div>
-                                    <div className="text-xs text-neutral-500 mt-1">Format</div>
+                                    {selectedPreset === 'inventory' ? (
+                                        <>
+                                            <div className="text-lg font-bold text-pink-400 truncate" title={inventoryLocationName || 'Not set'}>{inventoryLocationName || 'No location'}</div>
+                                            <div className="text-xs text-neutral-500 mt-1">Location</div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="text-2xl font-bold text-pink-400">{currentPreset.name}</div>
+                                            <div className="text-xs text-neutral-500 mt-1">Format</div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
@@ -2175,7 +2296,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50">
                                     <div>
                                         <h2 className="text-sm font-semibold text-white">Download</h2>
-                                        <p className="text-xs text-neutral-500 mt-0.5">{filteredProducts.length} products · {totalRows} rows · {selectedFields.length} fields</p>
+                                        <p className="text-xs text-neutral-500 mt-0.5">{filteredProducts.length} products · {totalRows} rows{selectedPreset === 'inventory' ? ` · ${inventoryLocationName || 'No location'}` : ` · ${selectedFields.length} fields`}</p>
                                     </div>
                                     {exportStatus && (
                                         <span className={`text-sm font-medium px-3 py-1.5 rounded-lg ${exportStatus.includes("!") ? "bg-green-500/15 text-green-400" : "bg-amber-500/15 text-amber-400"}`}>
@@ -2183,10 +2304,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         </span>
                                     )}
                                 </div>
-                                <div className="p-4 grid grid-cols-3 gap-3">
-                                    {['csv', 'json', 'xml'].map((fmt) => {
+                                <div className={`p-4 grid gap-3 ${selectedPreset === 'inventory' ? 'grid-cols-1 max-w-xs' : 'grid-cols-3'}`}>
+                                    {(selectedPreset === 'inventory' ? ['csv'] : ['csv', 'json', 'xml']).map((fmt) => {
                                         const meta = FORMAT_META[fmt];
-                                        const disabled = selectedFields.length === 0 || filteredProducts.length === 0;
+                                        const isLoading = downloadingId === `current-${fmt}`;
+                                        const disabled = (selectedPreset !== 'inventory' && selectedFields.length === 0) || filteredProducts.length === 0 || !!downloadingId;
                                         return (
                                             <button
                                                 key={fmt}
@@ -2198,7 +2320,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         : `${meta.bg} ${meta.text} hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] cursor-pointer`
                                                 }`}
                                             >
-                                                <div className="w-7 h-7 flex items-center justify-center">{meta.icon}</div>
+                                                <div className="w-7 h-7 flex items-center justify-center">
+                                                    {isLoading ? (
+                                                        <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                                        </svg>
+                                                    ) : meta.icon}
+                                                </div>
                                                 <div className="text-center">
                                                     <div className="font-semibold">{meta.label}</div>
                                                     <div className="text-xs opacity-60 mt-0.5">{fmt === 'csv' ? 'Spreadsheet' : fmt === 'json' ? 'Structured data' : 'Markup'}</div>
@@ -2432,7 +2561,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     <div className="flex items-center justify-between pt-4 border-t border-neutral-800/60">
                         <button
                             onClick={() => {
-                                const steps = ['format', 'filters', 'fields', 'export'];
+                                const steps = selectedPreset === 'inventory' ? ['format', 'filters', 'export'] : ['format', 'filters', 'fields', 'export'];
                                 const idx = steps.indexOf(exportStep);
                                 if (idx > 0) setExportStep(steps[idx - 1]);
                             }}
@@ -2448,14 +2577,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         {exportStep !== 'export' ? (
                             <button
                                 onClick={() => {
-                                    const steps = ['format', 'filters', 'fields', 'export'];
+                                    const steps = selectedPreset === 'inventory' ? ['format', 'filters', 'export'] : ['format', 'filters', 'fields', 'export'];
                                     const idx = steps.indexOf(exportStep);
                                     if (idx < steps.length - 1) setExportStep(steps[idx + 1]);
                                 }}
                                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-md shadow-cyan-500/20"
                             >
                                 {exportStep === 'format' && 'Set Filters'}
-                                {exportStep === 'filters' && 'Choose Fields'}
+                                {exportStep === 'filters' && selectedPreset === 'inventory' ? 'Review & Export' : ''}
+                                {exportStep === 'filters' && selectedPreset !== 'inventory' ? 'Choose Fields' : ''}
                                 {exportStep === 'fields' && 'Review & Export'}
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -2464,7 +2594,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         ) : (
                             <button
                                 onClick={() => setShowSaveModal(true)}
-                                disabled={selectedFields.length === 0}
+                                disabled={selectedPreset !== 'inventory' && selectedFields.length === 0}
                                 className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-800/50 disabled:cursor-not-allowed border border-neutral-700 hover:border-neutral-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-sm"
                             >
                                 <SaveIcon /> Save Config
@@ -2557,7 +2687,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     f.aiExportId !== 'all' && f.aiExportId,
                                     fAiCats.length > 0 && 'aiCat',
                                     f.imageFilter !== 'all' && f.imageFilter,
-                                    f.showNew, f.showRecommended, f.publishedOnly,
+                                    f.showNew, f.showRecommended, f.publishedOnly, f.excludeCloseOut,
                                 ].filter(Boolean).length;
 
                                 return (
@@ -2625,8 +2755,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         {/* Download section */}
                                         <div className="mb-3">
                                             <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-widest mb-2">Download</p>
-                                            <div className="grid grid-cols-3 gap-1.5">
-                                                {['csv', 'json', 'xml'].map((fmt) => {
+                                            <div className={`grid gap-1.5 ${config.preset === 'inventory' ? 'grid-cols-1 max-w-[120px]' : 'grid-cols-3'}`}>
+                                                {(config.preset === 'inventory' ? ['csv'] : ['csv', 'json', 'xml']).map((fmt) => {
                                                     const meta = FORMAT_META[fmt];
                                                     const dlKey = `${config._id}-${fmt}`;
                                                     const isLoading = downloadingId === dlKey;
