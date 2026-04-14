@@ -1,178 +1,78 @@
-# Documentation Index
+# Documentation
 
-Welcome to the Patrik Products UI documentation. This folder contains comprehensive technical documentation for developers, architects, and contributors.
-
-## 📑 Documentation Files
-
-### [ARCHITECTURE.md](./ARCHITECTURE.md)
-**Detailed Technical Architecture**
-
-Deep dive into the application's technical architecture:
-- Application layers and technology stack
-- Authentication flow with Auth0
-- Routing strategy using Next.js App Router
-- Data flow patterns (Server vs Client components)
-- State management approaches
-- Styling architecture with Tailwind CSS v4
-- Performance optimization strategies
-- Security considerations
-- Build and deployment configuration
-
-**Best for:** Architects, senior developers, anyone making architectural decisions
+> Technical documentation for the Patrik Products UI partner portal.
 
 ---
 
-### [API.md](./API.md)
-**API Integration & Data Structures**
+## Documents
 
-Complete reference for all API integrations:
-- Backend API endpoints (products, exports)
-- Internal Next.js API routes
-- Auth0 authentication routes
-- Request/response formats with examples
-- TypeScript interface definitions
-- Error handling patterns
-- Rate limiting and caching strategies
-
-**Best for:** Backend developers, API consumers, integration work
+| Document | Description |
+|----------|-------------|
+| **[Architecture](./ARCHITECTURE.md)** | Application layers, auth flow, routing, data flow, state management, styling, performance, security |
+| **[API Reference](./API.md)** | Backend endpoints, internal routes, Auth0 routes, data structures, error handling |
+| **[Components](./COMPONENTS.md)** | Full component library — props, state, features, usage examples, relationships |
+| **[Development Guide](./DEVELOPMENT.md)** | Setup, Git workflow, common tasks, testing, debugging, deployment |
+| **[Roles & Auth](./ROLES_AUTH.md)** | Auth0 integration, JWT claims, role definitions, middleware gate, token flow |
+| **[Design System](./DESIGN_SYSTEM.md)** | Colors, typography, component patterns, animations, page layouts |
 
 ---
 
-### [COMPONENTS.md](./COMPONENTS.md)
-**Component Library Documentation**
+## Where to Start
 
-Comprehensive guide to all React components:
-- Navigation components (Navbar, Profile)
-- Product components (ProductGrid, ProductVariants, ProductImageGallery)
-- Export components (ExportPage with all presets)
-- Authentication components
-- Page components
-- Props, state, and features for each component
-- Usage examples and code snippets
-- Component relationship diagrams
-- Best practices
+### New to the project?
 
-**Best for:** Frontend developers, UI/UX work, component development
+1. Read the [main README](../README.md) for an overview
+2. Follow the [Development Guide](./DEVELOPMENT.md) to get set up
+3. Browse [Components](./COMPONENTS.md) to understand the UI
+4. Reference [Architecture](./ARCHITECTURE.md) and [API](./API.md) as needed
 
----
+### Building a new feature?
 
-### [DEVELOPMENT.md](./DEVELOPMENT.md)
-**Development Workflow & Best Practices**
+1. [Architecture](./ARCHITECTURE.md) — understand the patterns
+2. [Components](./COMPONENTS.md) — see what already exists
+3. [Design System](./DESIGN_SYSTEM.md) — match the visual language
+4. [Development Guide](./DEVELOPMENT.md) — follow the workflow
 
-Practical guide for day-to-day development:
-- Getting started and initial setup
-- Development workflow and Git strategy
-- Common tasks (adding pages, components, API routes)
-- Creating new export presets
-- Styling patterns and color palette
-- Testing checklist
-- Debugging techniques
-- Code quality tools (ESLint, Prettier)
-- Deployment instructions
-- Troubleshooting common issues
-- Useful commands reference
+### Working on auth or access control?
 
-**Best for:** New developers, daily development work, troubleshooting
+1. [Roles & Auth](./ROLES_AUTH.md) — the full auth flow
+2. [Architecture](./ARCHITECTURE.md#authentication-flow) — how it fits into the app
+3. [API Reference](./API.md#auth0-api-routes) — auth-related endpoints
+
+### Integrating with the API?
+
+1. [API Reference](./API.md) — all endpoints and data structures
+2. [Architecture](./ARCHITECTURE.md#data-flow-patterns) — how data moves through the app
 
 ---
 
-## 🚀 Quick Navigation
+## Quick Reference
 
-**I want to...**
+### Key Paths
 
-| Task | Documentation |
-|------|---------------|
-| Understand the overall architecture | [ARCHITECTURE.md](./ARCHITECTURE.md) |
-| Learn how authentication works | [ARCHITECTURE.md](./ARCHITECTURE.md#authentication-flow) |
-| See all API endpoints | [API.md](./API.md) |
-| Understand product data structure | [API.md](./API.md#product-object) |
-| Learn about a specific component | [COMPONENTS.md](./COMPONENTS.md) |
-| Add a new page | [DEVELOPMENT.md](./DEVELOPMENT.md#adding-a-new-page) |
-| Add a new component | [DEVELOPMENT.md](./DEVELOPMENT.md#adding-a-new-component) |
-| Create a new export preset | [DEVELOPMENT.md](./DEVELOPMENT.md#adding-a-new-export-preset) |
-| Set up my development environment | [DEVELOPMENT.md](./DEVELOPMENT.md#getting-started) |
-| Deploy to production | [DEVELOPMENT.md](./DEVELOPMENT.md#deployment) |
-| Troubleshoot an issue | [DEVELOPMENT.md](./DEVELOPMENT.md#troubleshooting) |
-| Understand state management | [ARCHITECTURE.md](./ARCHITECTURE.md#state-management) |
-| See styling patterns | [DEVELOPMENT.md](./DEVELOPMENT.md#styling-components) |
+| What | Where |
+|------|-------|
+| Pages | `src/app/` |
+| Protected pages | `src/app/(protected)/` |
+| Components | `src/components/` |
+| API proxy routes | `src/app/nextapi/` |
+| Auth0 config | `src/lib/auth0.js` |
+| Middleware | `src/proxy.js` |
 
----
+### Commands
 
-## 📖 Reading Order
-
-### For New Developers
-1. Start with [README.md](../README.md) in the root folder
-2. Read [DEVELOPMENT.md](./DEVELOPMENT.md) - Getting Started section
-3. Skim [COMPONENTS.md](./COMPONENTS.md) to familiarize with components
-4. Reference [ARCHITECTURE.md](./ARCHITECTURE.md) and [API.md](./API.md) as needed
-
-### For Experienced Developers
-1. Read [ARCHITECTURE.md](./ARCHITECTURE.md) for design decisions
-2. Review [API.md](./API.md) for data structures
-3. Reference [COMPONENTS.md](./COMPONENTS.md) and [DEVELOPMENT.md](./DEVELOPMENT.md) as needed
-
-### For Architects/Tech Leads
-1. [ARCHITECTURE.md](./ARCHITECTURE.md) - Complete read
-2. [API.md](./API.md) - Data structures and integration patterns
-3. [DEVELOPMENT.md](./DEVELOPMENT.md) - Deployment and code quality sections
+```bash
+npm run dev      # Development server (port 3000)
+npm run build    # Production build
+npm start        # Production server
+npm run lint     # ESLint
+```
 
 ---
 
-## 🎯 Documentation Coverage
+## External Resources
 
-This documentation covers:
-
-✅ **Architecture**
-- Next.js 16 App Router architecture
-- Server vs Client components
-- Route protection with Auth0
-- State management with React hooks
-
-✅ **Features**
-- Product catalog with grid/list views
-- Product variants and pricing
-- 4 export presets (Shopify, Simple, Detailed, Inventory)
-- Advanced filtering and field selection
-- Contact form with email integration
-
-✅ **Technical Details**
-- All API endpoints with examples
-- Complete component library
-- Performance optimizations (useMemo, useCallback)
-- Security best practices
-- Docker deployment
-
-✅ **Development**
-- Setup instructions
-- Git workflow
-- Common development tasks
-- Debugging techniques
-- Troubleshooting guide
-
----
-
-## 💡 Tips
-
-- **Use search (Ctrl+F)**: All files are searchable
-- **Follow links**: Documents are interconnected with hyperlinks
-- **Code examples**: Most documentation includes code snippets
-- **Keep updated**: When making changes, update relevant documentation
-
----
-
-## 🔗 Additional Resources
-
-- **[Main README](../README.md)** - Project overview and quick start
-- **[CLAUDE.md](../CLAUDE.md)** - Guidelines for Claude Code
-- **[Next.js Docs](https://nextjs.org/docs)** - Official Next.js documentation
-- **[React Docs](https://react.dev)** - Official React documentation
-- **[Tailwind CSS](https://tailwindcss.com/docs)** - Tailwind documentation
-- **[Auth0 Docs](https://auth0.com/docs)** - Auth0 documentation
-
----
-
-**Last Updated:** 2026-02-06
-
-**Documentation Version:** 1.0
-
-**Application Version:** See [package.json](../package.json)
+- [Next.js Docs](https://nextjs.org/docs)
+- [React Docs](https://react.dev)
+- [Tailwind CSS Docs](https://tailwindcss.com/docs)
+- [Auth0 Next.js SDK](https://auth0.com/docs/quickstart/webapp/nextjs)
