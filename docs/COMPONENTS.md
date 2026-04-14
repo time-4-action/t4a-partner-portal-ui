@@ -1,14 +1,18 @@
-# Component Documentation
+# Components
 
-This document provides detailed documentation for all React components in the Patrik Products UI application.
+> Complete reference for all React components in the application.
+>
+> **See also:** [Architecture](./ARCHITECTURE.md) | [Design System](./DESIGN_SYSTEM.md)
 
 ## Table of Contents
+
 1. [Navigation Components](#navigation-components)
 2. [Product Display Components](#product-display-components)
 3. [Export Components](#export-components)
 4. [Authentication Components](#authentication-components)
 5. [Page Components](#page-components)
 6. [Utility Hooks](#utility-hooks)
+7. [Component Relationships](#component-relationships)
 
 ---
 
@@ -997,4 +1001,10 @@ App
 
 ---
 
-This component library provides a comprehensive UI for the Patrik Products partner portal. Each component is designed to be maintainable, performant, and user-friendly.
+---
+
+<div align="center">
+
+[Back to Documentation Index](./README.md)
+
+</div>

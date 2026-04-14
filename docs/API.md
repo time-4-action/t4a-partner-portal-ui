@@ -1,13 +1,17 @@
-# API Documentation
+# API Reference
 
-This document details all API integrations, endpoints, request/response formats, and data structures used in the Patrik Products UI application.
+> Complete reference for all API integrations, endpoints, request/response formats, and data structures.
+>
+> **See also:** [Architecture](./ARCHITECTURE.md) | [Roles & Auth](./ROLES_AUTH.md)
 
 ## Table of Contents
+
 1. [Backend API Integration](#backend-api-integration)
 2. [Internal API Routes](#internal-api-routes)
 3. [Auth0 API Routes](#auth0-api-routes)
 4. [Data Structures](#data-structures)
 5. [Error Handling](#error-handling)
+6. [Rate Limiting & Caching](#rate-limiting--caching)
 
 ---
 
@@ -737,4 +741,10 @@ const { data, error } = useSWR("/product", fetcher);
 
 ---
 
-This API documentation covers all current integrations. Update as new endpoints are added.
+---
+
+<div align="center">
+
+[Back to Documentation Index](./README.md)
+
+</div>

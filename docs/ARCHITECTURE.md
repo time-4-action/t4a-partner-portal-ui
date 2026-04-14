@@ -1,8 +1,11 @@
-# Architecture Documentation
+# Architecture
 
-This document provides detailed technical architecture information for the Patrik Products UI application.
+> Deep dive into the technical architecture of the Patrik Products UI application.
+>
+> **See also:** [API Reference](./API.md) | [Components](./COMPONENTS.md) | [Design System](./DESIGN_SYSTEM.md)
 
 ## Table of Contents
+
 1. [Application Architecture](#application-architecture)
 2. [Authentication Flow](#authentication-flow)
 3. [Routing Strategy](#routing-strategy)
@@ -11,6 +14,7 @@ This document provides detailed technical architecture information for the Patri
 6. [Styling Architecture](#styling-architecture)
 7. [Performance Optimization](#performance-optimization)
 8. [Security Considerations](#security-considerations)
+9. [Build & Deployment](#build--deployment)
 
 ---
 
@@ -776,4 +780,10 @@ if (process.env.NODE_ENV === "development") {
 
 ---
 
-This architecture supports scalability, maintainability, and performance while maintaining security best practices.
+---
+
+<div align="center">
+
+[Back to Documentation Index](./README.md)
+
+</div>

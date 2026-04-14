@@ -1,8 +1,11 @@
 # Development Guide
 
-This guide provides practical information for developers working on the Patrik Products UI application.
+> Practical guide for day-to-day development — setup, workflow, common tasks, and troubleshooting.
+>
+> **See also:** [Architecture](./ARCHITECTURE.md) | [Components](./COMPONENTS.md) | [API Reference](./API.md)
 
 ## Table of Contents
+
 1. [Getting Started](#getting-started)
 2. [Development Workflow](#development-workflow)
 3. [Common Tasks](#common-tasks)
@@ -791,4 +794,10 @@ docker stop <container>  # Stop container
 
 ---
 
-Happy coding! 🚀
+---
+
+<div align="center">
+
+[Back to Documentation Index](./README.md)
+
+</div>
