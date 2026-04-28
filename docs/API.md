@@ -649,7 +649,9 @@ interface ExportFilters {
   aiCategory: string;
   showNew: boolean;
   showRecommended: boolean;
-  publishedOnly: boolean;
+  publishedOnly: boolean; // Cascades: excludes unpublished parents and strips
+                          // unpublished variants from child_products before
+                          // all downstream filters and row generation.
 }
 
 interface PricelistPriority {
