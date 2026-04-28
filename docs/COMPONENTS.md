@@ -411,11 +411,16 @@ const filteredProducts = useMemo(() => {
     // Flags
     if (filters.showNew && !product.new) return false;
     if (filters.showRecommended && !product.recomended) return false;
-    if (filters.publishedOnly && !product.published) return false;
+    // publishedOnly is applied as a pre-pass (see note below), so no check here.
 
     return true;
   });
 }, [initialProducts, filters, getPriceFromPriority]);
+
+// publishedOnly cascades into variants: before the filter runs, unpublished
+// parents are dropped and each surviving parent's child_products is narrowed
+// to only published variants. Downstream row generation then naturally emits
+// no rows for unpublished variants.
 ```
 
 **CSV Generation**:

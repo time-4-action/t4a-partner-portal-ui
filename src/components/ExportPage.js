@@ -339,7 +339,14 @@ const FORMAT_META = {
 // Client-side filter application for preview — mirrors backend applyFilters, backwards-compatible
 function applyFiltersLocal(products, filters) {
     if (!filters) return products;
-    return products.filter(product => {
+    // publishedOnly cascades: drop unpublished parents, narrow child_products to
+    // only published variants so all downstream checks see only exportable items.
+    const input = filters.publishedOnly
+        ? products
+            .filter(p => p.published)
+            .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }))
+        : products;
+    return input.filter(product => {
         if (filters.search?.trim()) {
             const s = filters.search.toLowerCase();
             const match = product.product_name?.toLowerCase().includes(s) ||
@@ -384,7 +391,6 @@ function applyFiltersLocal(products, filters) {
         }
         if (filters.showNew && !product.new) return false;
         if (filters.showRecommended && !product.recomended) return false;
-        if (filters.publishedOnly && !product.published) return false;
         if (filters.excludeCloseOut && product.product_name?.toUpperCase().includes('CLOSE OUT')) return false;
         return true;
     });
@@ -500,7 +506,13 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     // Categories available given current filters (excluding the category filter itself) with per-category product counts
     const { dynamicCategories, categoryProductCounts } = useMemo(() => {
         const catCounts = new Map();
-        initialProducts.forEach(product => {
+        // publishedOnly cascades: drop unpublished parents and narrow variants to published.
+        const sourceProducts = filters.publishedOnly
+            ? initialProducts
+                .filter(p => p.published)
+                .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }))
+            : initialProducts;
+        sourceProducts.forEach(product => {
             if (filters.search) {
                 const sl = filters.search.toLowerCase();
                 const match = product.product_name?.toLowerCase().includes(sl) ||
@@ -540,7 +552,6 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             }
             if (filters.showNew && !product.new) return;
             if (filters.showRecommended && !product.recomended) return;
-            if (filters.publishedOnly && !product.published) return;
             if (filters.excludeCloseOut && product.product_name?.toUpperCase().includes('CLOSE OUT')) return;
             product.categories?.forEach(cat => catCounts.set(cat, (catCounts.get(cat) || 0) + 1));
         });
@@ -679,7 +690,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
     // Filter products based on criteria
     const filteredProducts = useMemo(() => {
-        return initialProducts.filter((product) => {
+        // publishedOnly cascades into variants. Narrow the input first so row
+        // generation, totals, and the preview all see only exportable items.
+        const input = filters.publishedOnly
+            ? initialProducts
+                .filter(p => p.published)
+                .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }))
+            : initialProducts;
+        return input.filter((product) => {
             if (filters.search) {
                 const searchLower = filters.search.toLowerCase();
                 const nameMatch = product.product_name?.toLowerCase().includes(searchLower);
@@ -744,7 +762,6 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
             if (filters.showNew && !product.new) return false;
             if (filters.showRecommended && !product.recomended) return false;
-            if (filters.publishedOnly && !product.published) return false;
             if (filters.excludeCloseOut && product.product_name?.toUpperCase().includes('CLOSE OUT')) return false;
 
             return true;
