@@ -2352,8 +2352,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         </span>
                                     )}
                                 </div>
-                                <div className={`p-4 grid gap-3 ${selectedPreset === 'inventory' ? 'grid-cols-1 max-w-xs' : 'grid-cols-3'}`}>
-                                    {(selectedPreset === 'inventory' ? ['csv'] : ['csv', 'json', 'xml']).map((fmt) => {
+                                <div className="p-4 grid gap-3 grid-cols-3">
+                                    {['csv', 'json', 'xml'].map((fmt) => {
                                         const meta = FORMAT_META[fmt];
                                         const isLoading = downloadingId === `current-${fmt}`;
                                         const disabled = (selectedPreset !== 'inventory' && selectedFields.length === 0) || filteredProducts.length === 0 || !!downloadingId;
@@ -2803,8 +2803,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         {/* Download section */}
                                         <div className="mb-3">
                                             <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-widest mb-2">Download</p>
-                                            <div className={`grid gap-1.5 ${config.preset === 'inventory' ? 'grid-cols-1 max-w-[120px]' : 'grid-cols-3'}`}>
-                                                {(config.preset === 'inventory' ? ['csv'] : ['csv', 'json', 'xml']).map((fmt) => {
+                                            <div className="grid gap-1.5 grid-cols-3">
+                                                {['csv', 'json', 'xml'].map((fmt) => {
                                                     const meta = FORMAT_META[fmt];
                                                     const dlKey = `${config._id}-${fmt}`;
                                                     const isLoading = downloadingId === dlKey;
