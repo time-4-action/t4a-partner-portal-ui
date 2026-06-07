@@ -90,9 +90,15 @@ Required variables (see `.env`):
 ## Important Notes
 
 ### Product Data Structure
-- Parent product: contains token, product_name, images array, categories
-- Child products (variants): array containing SKU, EAN, stock, pricelists with prices
-- Export presets transform this data into different formats (Shopify CSV, simple list, detailed data, inventory/Shopify inventory import)
+A product document in the `products` collection is a **parent** that may hold a `child_products` array of **variants**. Variants — not the parent — are usually the sellable SKUs.
+
+- **Parent** fields: `code`, `token` (URL handle, e.g. `chase-dw-x-downwind`), `product_name`, `short_description`/`detailed_description` (HTML), `images[]` (gallery), `categories[]` (PNV path), `ai_categories[]`, `published`, `active`, `archived`, `stock_amount` (often `0` when variants carry the stock), `pricelist[]` (often empty when variants carry pricing), `ean_code`, `size`.
+- **Variant** (`child_products[]`) fields: `code` (the **SKU**), `ean_code` (the **barcode**), `token`, `product_name`, `size` (Shopify Option1 value, e.g. `"77"`), `stock_amount`, `images[]`, `published`/`archived`/`cart`/`new`/`recomended` (per-variant flags), and `pricelist[]`.
+- **`pricelist[]`** is an array of named price lists, each `{ name, valid_from, price, vat }` — e.g. `RRP 2025` (`vat: 22`, tax-inclusive) and a future-dated `RRP 2026` (`vat: 0`). There is no single price field; a price is **resolved** from this array using the export config's `pricelistPriority` (see `getPriceFromPriority` in the API). VAT and `valid_from` differ per list, so the chosen list matters.
+- **`ai_categories[]`** holds `{ exportId, categoryId, categoryName }` per AI export — the same product can be categorized differently for each export, keyed by `exportId`.
+- **Publishing:** both parents and individual variants have a `published` flag. A parent can be published while some variants are not (those are excluded everywhere — exports are always published-only).
+- **No-variant products:** if `child_products` is empty, the parent itself is the sellable item and its own `code`/`pricelist`/`stock_amount` are used.
+- Export presets transform this data into different formats (Shopify CSV, simple list, detailed data, inventory/Shopify inventory import).
 
 ### Client vs Server Components
 - All pages under `/app` are Server Components by default (handle auth checks, API fetching)
