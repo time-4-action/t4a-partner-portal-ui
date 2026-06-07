@@ -339,13 +339,12 @@ const FORMAT_META = {
 // Client-side filter application for preview — mirrors backend applyFilters, backwards-compatible
 function applyFiltersLocal(products, filters) {
     if (!filters) return products;
-    // publishedOnly cascades: drop unpublished parents, narrow child_products to
-    // only published variants so all downstream checks see only exportable items.
-    const input = filters.publishedOnly
-        ? products
-            .filter(p => p.published)
-            .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }))
-        : products;
+    // Published-only is always enforced: drop unpublished parents, narrow
+    // child_products to only published variants so all downstream checks see
+    // only exportable items. Exports must never leak unannounced products.
+    const input = products
+        .filter(p => p.published)
+        .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }));
     return input.filter(product => {
         if (filters.search?.trim()) {
             const s = filters.search.toLowerCase();
@@ -414,7 +413,6 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         imageFilter: "all",
         showNew: false,
         showRecommended: false,
-        publishedOnly: false,
         excludeCloseOut: false,
     });
     const [pricelistPriority, setPricelistPriority] = useState([]);
@@ -506,12 +504,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     // Categories available given current filters (excluding the category filter itself) with per-category product counts
     const { dynamicCategories, categoryProductCounts } = useMemo(() => {
         const catCounts = new Map();
-        // publishedOnly cascades: drop unpublished parents and narrow variants to published.
-        const sourceProducts = filters.publishedOnly
-            ? initialProducts
-                .filter(p => p.published)
-                .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }))
-            : initialProducts;
+        // Published-only is always enforced: drop unpublished parents and narrow variants to published.
+        const sourceProducts = initialProducts
+            .filter(p => p.published)
+            .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }));
         sourceProducts.forEach(product => {
             if (filters.search) {
                 const sl = filters.search.toLowerCase();
@@ -558,7 +554,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         return { dynamicCategories: Array.from(catCounts.keys()).sort(), categoryProductCounts: catCounts };
     }, [initialProducts, filters.search, filters.stockStatus, filters.minPrice, filters.maxPrice,
         filters.aiExportId, filters.aiCategory, filters.imageFilter,
-        filters.showNew, filters.showRecommended, filters.publishedOnly, filters.excludeCloseOut]);
+        filters.showNew, filters.showRecommended, filters.excludeCloseOut]);
 
     // Extract AI exports: role-filtered when allowedExports is provided, otherwise derived from product data
     const availableAiExports = useMemo(() => {
@@ -690,13 +686,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
     // Filter products based on criteria
     const filteredProducts = useMemo(() => {
-        // publishedOnly cascades into variants. Narrow the input first so row
+        // Published-only is always enforced. Narrow the input first so row
         // generation, totals, and the preview all see only exportable items.
-        const input = filters.publishedOnly
-            ? initialProducts
-                .filter(p => p.published)
-                .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }))
-            : initialProducts;
+        const input = initialProducts
+            .filter(p => p.published)
+            .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }));
         return input.filter((product) => {
             if (filters.search) {
                 const searchLower = filters.search.toLowerCase();
@@ -1351,7 +1345,6 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             imageFilter: "all",
             showNew: false,
             showRecommended: false,
-            publishedOnly: false,
             excludeCloseOut: false,
             ...config.filters,
         });
@@ -1586,7 +1579,6 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             imageFilter: "all",
             showNew: false,
             showRecommended: false,
-            publishedOnly: false,
             excludeCloseOut: false,
         });
         setPreviewLimit(5);
@@ -1680,7 +1672,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             filters.aiExportId !== 'all' && filters.aiExportId,
                             filters.aiCategory.length > 0 && 'aiCat',
                             filters.imageFilter !== 'all' && filters.imageFilter,
-                            filters.showNew, filters.showRecommended, filters.publishedOnly, filters.excludeCloseOut,
+                            filters.showNew, filters.showRecommended, filters.excludeCloseOut,
                         ].filter(Boolean).length;
                         const ALL_STEPS = [
                             {
@@ -1945,7 +1937,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 filters.aiExportId !== 'all' && filters.aiExportId,
                                                 filters.aiCategory !== 'all' && filters.aiCategory,
                                                 filters.imageFilter !== 'all' && filters.imageFilter,
-                                                filters.showNew, filters.showRecommended, filters.publishedOnly, filters.excludeCloseOut,
+                                                filters.showNew, filters.showRecommended, filters.excludeCloseOut,
                                             ].filter(Boolean).length;
                                             return n > 0 ? (
                                                 <span className="text-xs bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium">{n} active</span>
@@ -2022,7 +2014,6 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 {[
                                                     { key: "showNew", label: "New", icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" },
                                                     { key: "showRecommended", label: "Recommended", icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" },
-                                                    { key: "publishedOnly", label: "Published", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
                                                     { key: "excludeCloseOut", label: "Excl. Close Out", icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" },
                                                 ].map(({ key, label, icon }) => (
                                                     <button key={key} onClick={() => setFilters(prev => ({ ...prev, [key]: !prev[key] }))}
@@ -2352,8 +2343,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         </span>
                                     )}
                                 </div>
-                                <div className={`p-4 grid gap-3 ${selectedPreset === 'inventory' ? 'grid-cols-1 max-w-xs' : 'grid-cols-3'}`}>
-                                    {(selectedPreset === 'inventory' ? ['csv'] : ['csv', 'json', 'xml']).map((fmt) => {
+                                <div className="p-4 grid gap-3 grid-cols-3">
+                                    {['csv', 'json', 'xml'].map((fmt) => {
                                         const meta = FORMAT_META[fmt];
                                         const isLoading = downloadingId === `current-${fmt}`;
                                         const disabled = (selectedPreset !== 'inventory' && selectedFields.length === 0) || filteredProducts.length === 0 || !!downloadingId;
@@ -2735,7 +2726,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     f.aiExportId !== 'all' && f.aiExportId,
                                     fAiCats.length > 0 && 'aiCat',
                                     f.imageFilter !== 'all' && f.imageFilter,
-                                    f.showNew, f.showRecommended, f.publishedOnly, f.excludeCloseOut,
+                                    f.showNew, f.showRecommended, f.excludeCloseOut,
                                 ].filter(Boolean).length;
 
                                 return (
@@ -2803,8 +2794,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         {/* Download section */}
                                         <div className="mb-3">
                                             <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-widest mb-2">Download</p>
-                                            <div className={`grid gap-1.5 ${config.preset === 'inventory' ? 'grid-cols-1 max-w-[120px]' : 'grid-cols-3'}`}>
-                                                {(config.preset === 'inventory' ? ['csv'] : ['csv', 'json', 'xml']).map((fmt) => {
+                                            <div className="grid gap-1.5 grid-cols-3">
+                                                {['csv', 'json', 'xml'].map((fmt) => {
                                                     const meta = FORMAT_META[fmt];
                                                     const dlKey = `${config._id}-${fmt}`;
                                                     const isLoading = downloadingId === dlKey;
