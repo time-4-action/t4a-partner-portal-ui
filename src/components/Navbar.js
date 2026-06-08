@@ -74,6 +74,20 @@ function NavIcon({ name, className = "h-5 w-5" }) {
 }
 
 /**
+ * Small pill used to flag a nav item's status (e.g. "Alpha" for the
+ * not-yet-wired Shopify integration). Amber to read as "experimental".
+ */
+function NavBadge({ label, className = "" }) {
+  return (
+    <span
+      className={`rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-400/30 ${className}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+/**
  * Returns navigation items. The export-role tools (Export, Categories, Shopify)
  * are grouped under a single "Exports" dropdown to keep the top bar compact.
  * Roles are injected into the ID token via an Auth0 Post Login Action.
@@ -110,6 +124,7 @@ function getNavLinks(user) {
           label: "Shopify",
           description: "Sync products to your store",
           icon: "shopify",
+          badge: "Alpha",
         },
       ],
     });
@@ -212,7 +227,10 @@ function NavDropdown({ group, pathname }) {
                   <NavIcon name={child.icon} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium">{child.label}</span>
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    {child.label}
+                    {child.badge && <NavBadge label={child.badge} />}
+                  </span>
                   <span className="block text-xs text-neutral-500">{child.description}</span>
                 </span>
               </Link>
@@ -421,6 +439,7 @@ const Navbar = () => {
                         >
                           <NavIcon name={child.icon} className="h-5 w-5 shrink-0" />
                           {child.label}
+                          {child.badge && <NavBadge label={child.badge} className="ml-auto" />}
                         </Link>
                       );
                     })}
