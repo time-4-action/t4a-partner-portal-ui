@@ -36,6 +36,7 @@ npm run lint         # Run ESLint
   - `/product/[token]` - Individual product detail page with variants
   - `/export` - Export UI with preset configurations and custom export management
   - `/categories` - AI-powered category management; links categories to export configs
+  - `/integrations/shopify` - Shopify integration UI: connect a store and configure the one-way product push (stock, products, prices, descriptions, images). **UI-only / mock data so far — no backend wired** (see "Shopify Integration" below)
 
 ### API Proxy Pattern
 All routes under `src/app/nextapi/` are thin authenticated proxies to the backend. The pattern is: obtain an Auth0 access token via `auth0.getAccessToken()`, then forward the request to `BACKEND` (from `EXPORT_API_URL`) with `Authorization: Bearer <token>`. No business logic lives in these proxies.
@@ -62,7 +63,8 @@ Backend proxy endpoints:
 - `ProductVariants` (`src/components/ProductVariants.js`): Displays product details with variant selection
 - `ExportPage` (`src/components/ExportPage.js`): Complex export UI; receives `initialProducts`, `apiUrl`, and `allowedExports` (filtered by user role/ID). Handles both preset export formats (Shopify, Simple, Detailed, Inventory) and custom export configs fetched from the backend. The **Inventory preset** has special behavior: it skips the field-selection step (fixed Shopify inventory columns), replaces the Pricelist Priority panel with a Shopify Location Name input, and only offers CSV download (no JSON/XML). The location name is stored as `inventoryLocationName` on the config and must exactly match the Shopify location name (case-sensitive)
 - `CategoriesPage` (`src/components/CategoriesPage.js`): AI category management UI; receives `initialExports` filtered to those the user can access
-- `Navbar` (`src/components/Navbar.js`): Navigation with Auth0 login/logout buttons and user profile
+- `ShopifyIntegrationPage` (`src/components/ShopifyIntegrationPage.js`): Partner-facing Shopify connect/configure UI. **UI-only** — a single `"use client"` component whose state is seeded from module-level `MOCK_*` constants; no backend calls (see "Shopify Integration" below). Receives `initialExports` (reuses the same role/user export filter) and `ownerEmail`
+- `Navbar` (`src/components/Navbar.js`): Navigation with Auth0 login/logout buttons and user profile; the user dropdown menu uses the `animate-dropdown` keyframe defined in `globals.css`
 
 ### Export & Category Access Filtering
 Exports and categories are filtered server-side before passing to client components:
@@ -99,6 +101,14 @@ A product document in the `products` collection is a **parent** that may hold a 
 - **Publishing:** both parents and individual variants have a `published` flag. A parent can be published while some variants are not (those are excluded everywhere — exports are always published-only).
 - **No-variant products:** if `child_products` is empty, the parent itself is the sellable item and its own `code`/`pricelist`/`stock_amount` are used.
 - Export presets transform this data into different formats (Shopify CSV, simple list, detailed data, inventory/Shopify inventory import).
+
+### Shopify Integration (UI-only — backend not yet built)
+The `/integrations/shopify` page lets a partner connect their Shopify store and configure a one-way push of catalog data. **As of now this is a front-end-only build** — there are no backend endpoints and no `nextapi` proxies for it yet. The full design lives in `shopify_integration.md` at the repo root.
+
+- **Route:** `src/app/(protected)/integrations/shopify/page.js` (Server Component, `export`-role gated, reuses the same export-config filter as the Export/Categories pages to populate the "Products to sync" selector) + `loading.js` skeleton.
+- **Component:** `src/components/ShopifyIntegrationPage.js` — one `"use client"` component. All state is local React state seeded from module-level `MOCK_*` constants (`MOCK_CONNECTION`, `MOCK_LOCATIONS`, `MOCK_EXPORTS`, `MOCK_SYNC_JOBS`, `MOCK_UNMATCHED`, `MOCK_COUNTS`). It renders two states driven by `isConnected`: **NOT CONNECTED** (enter a `myshopify` domain → "Connect", with a security/trust rail) and **CONNECTED** (status summary, needs-attention report, what-to-sync toggles, ownership-mode radios, products/location selectors, pricing = drag-to-reorder pricelist priority + VAT mode + future-dated guard, sync-activity table, disconnect, and a sticky save bar when config is dirty). `isConnected` defaults to `true` so the rich UI shows first.
+- **Backend seams (what to wire when the API lands):** the `connect` / `disconnect` / `syncNow` / `saveConfig` handlers and the `MOCK_*` constants are the only things to replace. Per `shopify_integration.md` §10 the API surface is `/api/export/shopify/*`, reached through new thin proxies under `src/app/nextapi/...` following the existing proxy pattern.
+- Nav link "Shopify" → `/integrations/shopify` is added in `src/components/Navbar.js` under the `export` role gate.
 
 ### Client vs Server Components
 - All pages under `/app` are Server Components by default (handle auth checks, API fetching)
