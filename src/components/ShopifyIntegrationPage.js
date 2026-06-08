@@ -247,6 +247,26 @@ const SpinnerIcon = (p) => (
   </svg>
 );
 
+// Official full-colour Shopify "bag" logo, inlined so it stays razor-sharp at any size and
+// needs no next.config remote-image allow-listing (the wordmark PNG would). The two greens
+// + white "S" are the Shopify brand mark; the surrounding UI keeps the portal's cyan accent.
+const ShopifyLogo = ({ title = "Shopify", ...p }) => (
+  <svg viewBox="0 0 122.5 139.5" role="img" aria-label={title} {...p}>
+    <path
+      fill="#95BF47"
+      d="M118.8,28.5c-0.1-0.8-0.8-1.2-1.4-1.2c-0.6-0.1-12.6-0.2-12.6-0.2s-10-9.7-11-10.7c-1-1-2.9-0.7-3.6-0.5c-0.1,0-1.9,0.6-5,1.5c-3-8.7-8.3-16.7-17.7-16.7c-0.3,0-0.5,0-0.8,0c-2.7-3.5-6-5.1-8.9-5.1C45.1-4.5,34.7,22.7,31.4,36.5c-8.5,2.6-14.6,4.5-15.3,4.8c-4.8,1.5-4.9,1.6-5.5,6.1C10.1,50.8,0,128.7,0,128.7l78.6,14.7l42.6-9.2C121.2,134.2,118.9,29.3,118.8,28.5z M81.1,19.3c-2.4,0.7-5.1,1.6-8,2.5c0-0.6,0-1.2,0-1.8c0-5.4-0.7-9.7-1.9-13.2C75.9,7.4,79.1,12.7,81.1,19.3z M64.7,7.9c1.4,3.4,2.2,8.3,2.2,14.9c0,0.3,0,0.6,0,0.9c-5.3,1.6-11,3.4-16.8,5.2C53.4,16.2,59.6,9.9,64.7,7.9z M58.1,1.6c0.9,0,1.9,0.3,2.8,0.9c-6.7,3.2-13.9,11.1-17,26.9c-4.6,1.4-9,2.8-13.1,4C34.6,21.1,43.4,1.6,58.1,1.6z"
+    />
+    <path
+      fill="#5E8E3E"
+      d="M117.4,27.3c-0.6-0.1-12.6-0.2-12.6-0.2s-10-9.7-11-10.7c-0.4-0.4-0.9-0.6-1.4-0.6l-5.9,127.8l42.6-9.2c0,0-18.3-123.6-18.4-124.5C120.2,28.5,118.5,27.4,117.4,27.3z"
+    />
+    <path
+      fill="#FFFFFF"
+      d="M71.5,46.4l-5.3,15.7c0,0-4.6-2.5-10.3-2.5c-8.3,0-8.7,5.2-8.7,6.5c0,7.1,18.6,9.9,18.6,26.6c0,13.2-8.3,21.6-19.6,21.6c-13.5,0-20.4-8.4-20.4-8.4l3.6-11.9c0,0,7.1,6.1,13.1,6.1c3.9,0,5.5-3.1,5.5-5.3c0-9.3-15.2-9.7-15.2-25c0-12.9,9.3-25.4,28-25.4c7.2,0,10.7,2,10.7,2C71.1,44.5,71.5,46.4,71.5,46.4z"
+    />
+  </svg>
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Reusable primitives                                                       */
 /* -------------------------------------------------------------------------- */
@@ -503,17 +523,27 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
     <div className="pb-40 sm:pb-32">
       {/* ----------------------------- Header ----------------------------- */}
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-[#01a0be]">
-            <BagIcon className="h-3.5 w-3.5" />
-            Integration
+        <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+          {/* Brand mark — official Shopify logo on a glassy tile lit by a soft green halo */}
+          <div className="relative shrink-0">
+            <div aria-hidden="true" className="absolute -inset-3 rounded-[1.75rem] bg-[#95BF47]/20 blur-2xl" />
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20 sm:h-[4.5rem] sm:w-[4.5rem]">
+              <ShopifyLogo className="h-9 w-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)] sm:h-10 sm:w-10" />
+            </div>
           </div>
-          <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            <span className="bg-gradient-to-r from-[#01a0be] to-cyan-300 bg-clip-text text-transparent">Shopify</span>
-          </h1>
-          <p className="mt-3 max-w-2xl text-neutral-400">
-            One-way push of stock, products, prices and images from the portal straight to your Shopify store.
-          </p>
+
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-[#01a0be]">
+              <BagIcon className="h-3.5 w-3.5" />
+              Integration
+            </div>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              <span className="bg-gradient-to-r from-[#95BF47] via-[#5fae46] to-[#01a0be] bg-clip-text text-transparent">Shopify</span>
+            </h1>
+            <p className="mt-3 max-w-2xl text-neutral-400">
+              One-way push of stock, products, prices and images from the portal straight to your Shopify store.
+            </p>
+          </div>
         </div>
 
         <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:shrink-0">
@@ -1047,8 +1077,11 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
           {/* left: connect + how it works */}
           <div className="space-y-6">
             <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/10">
-                <BagIcon className="h-6 w-6 text-[#01a0be]" />
+              <div className="relative mb-6 w-fit">
+                <div aria-hidden="true" className="absolute -inset-2 rounded-2xl bg-[#95BF47]/20 blur-xl" />
+                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
+                  <ShopifyLogo className="h-8 w-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]" />
+                </div>
               </div>
               <h2 className="text-xl font-semibold text-white">Connect your Shopify store</h2>
               <p className="mt-2 max-w-lg text-sm leading-relaxed text-neutral-400">
