@@ -78,13 +78,6 @@ const MOCK_LOCATIONS = [
   { id: "gid://shopify/Location/79283713", name: "Dropship Hub" },
 ];
 
-// Fallback export-config options when the server passes none (keeps the demo populated).
-const MOCK_EXPORTS = [
-  { _id: "exp_ss26", name: "SS26 Full Catalog" },
-  { _id: "exp_wing", name: "Wing & Foil Only" },
-  { _id: "exp_outlet", name: "Outlet / Clearance" },
-];
-
 // Recent sync jobs — deliberately spans all five job states so the demo looks alive.
 const MOCK_SYNC_JOBS = [
   { id: "j1", type: "inventory", parentCode: "CHASE_DW_X_DOWNWIND", variantCode: "P02250013077", status: "done", attempts: 1, time: "2026-06-07T06:42:10Z", error: null },
@@ -242,6 +235,11 @@ const ArrowRightIcon = (p) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
   </Svg>
 );
+const PlusIcon = (p) => (
+  <Svg {...p}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </Svg>
+);
 const SpinnerIcon = (p) => (
   <svg className={`animate-spin ${p.className || ""}`} viewBox="0 0 24 24" fill="none">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -331,7 +329,9 @@ function SectionHeading({ title, desc, icon, right }) {
 /* -------------------------------------------------------------------------- */
 
 export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail }) {
-  const exportOptions = initialExports.length ? initialExports : MOCK_EXPORTS;
+  // Real Shopify-preset export configs (from /custom-export?preset=shopify). May be empty —
+  // when it is, the "Products to sync" block shows a create prompt instead of a selector.
+  const exportOptions = initialExports;
 
   const seedConfig = () => ({
     ...MOCK_CONNECTION.config,
@@ -800,18 +800,45 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
             <SectionHeading title="Products & location" desc="Which products are in scope, and where their inventory lands." />
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-medium text-neutral-300">Products to sync</label>
-                <Select
-                  ariaLabel="Products to sync"
-                  value={config.exportConfigId}
-                  onChange={(e) => setCfg({ exportConfigId: e.target.value })}
-                >
-                  <option value="" disabled>Select an export configuration…</option>
-                  {exportOptions.map((x) => (
-                    <option key={x._id} value={x._id}>{x.name}</option>
-                  ))}
-                </Select>
-                <p className="mt-2 text-xs text-neutral-500">Sync follows this export config&apos;s product filters and field rules.</p>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <label className="block text-sm font-medium text-neutral-300">Products to sync</label>
+                  <a
+                    href="/export"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    New export
+                  </a>
+                </div>
+                {exportOptions.length > 0 ? (
+                  <>
+                    <Select
+                      ariaLabel="Products to sync"
+                      value={config.exportConfigId}
+                      onChange={(e) => setCfg({ exportConfigId: e.target.value })}
+                    >
+                      <option value="" disabled>Select an export configuration…</option>
+                      {exportOptions.map((x) => (
+                        <option key={x._id} value={x._id}>{x.name}</option>
+                      ))}
+                    </Select>
+                    <p className="mt-2 text-xs text-neutral-500">Sync follows this export config&apos;s product filters and field rules.</p>
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-5 text-center">
+                    <p className="text-sm text-neutral-300">No Shopify export configurations yet.</p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      Create one with the <span className="font-medium text-neutral-300">Shopify</span> preset to choose which products sync.
+                    </p>
+                    <a
+                      href="/export"
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#01a0be] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f]"
+                    >
+                      <PlusIcon className="h-4 w-4" />
+                      Create export configuration
+                    </a>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-neutral-300">Shopify location</label>

@@ -3,19 +3,19 @@ import { auth0 } from "@/lib/auth0";
 
 const apiUrl = process.env.EXPORT_API_URL || "http://localhost:4000";
 
-// Fetch export configs the current user may access, reusing the same role/user filter
-// as the Export and Categories pages. These populate the "Products to sync" selector.
-async function getAllowedExports(userRoles, userId) {
+// Fetch the saved export configurations that use the Shopify preset. These are the real
+// `custom-export` configs (auth-scoped to the current user by the backend) that drive the
+// "Products to sync" selector — the sync follows the chosen config's filters and field rules.
+async function getShopifyExportConfigs() {
   try {
-    const res = await fetch(`${apiUrl}/exports`, { cache: "no-store" });
+    const { token } = await auth0.getAccessToken();
+    const res = await fetch(`${apiUrl}/custom-export?preset=shopify`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
     if (!res.ok) return [];
     const data = await res.json();
-    const all = data?.data ?? [];
-    return all.filter((exp) => {
-      const roleOk = !exp.roles?.length || exp.roles.some((r) => userRoles.includes(r));
-      const userOk = !exp.users?.length || exp.users.includes(userId);
-      return roleOk && userOk;
-    });
+    return data?.data ?? [];
   } catch {
     return [];
   }
@@ -24,7 +24,6 @@ async function getAllowedExports(userRoles, userId) {
 export default async function ShopifyIntegrationRoute() {
   const session = await auth0.getSession();
   const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
-  const userId = session?.user?.sub ?? null;
 
   if (!roles.includes("export")) {
     return (
@@ -42,12 +41,12 @@ export default async function ShopifyIntegrationRoute() {
     );
   }
 
-  const allowedExports = await getAllowedExports(roles, userId);
+  const shopifyExports = await getShopifyExportConfigs();
 
   return (
     <div className="relative p-8 bg-transparent">
       <div className="relative max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
-        <ShopifyIntegrationPage initialExports={allowedExports ?? []} ownerEmail={session?.user?.email} />
+        <ShopifyIntegrationPage initialExports={shopifyExports ?? []} ownerEmail={session?.user?.email} />
       </div>
     </div>
   );
