@@ -1330,8 +1330,13 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         // Set preset first (determines available fields)
         setSelectedPreset(config.preset);
 
-        // Set selected fields
-        setSelectedFields(config.selectedFields || []);
+        // Set selected fields. Shopify hides the field picker and always exports the preset
+        // defaults (locked CSV schema), so ignore any saved subset and re-apply the defaults.
+        setSelectedFields(
+            config.preset === 'shopify'
+                ? EXPORT_PRESETS.shopify.fields.filter((f) => f.default).flatMap((f) => f.group ? f.group.map((g) => g.key) : [f.key])
+                : (config.selectedFields || [])
+        );
 
         // Set filters with defaults
         setFilters({
@@ -2209,6 +2214,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                     {/* ── Step 3: Fields ───────────────────────────────────────────── */}
                     {exportStep === 'fields' && (<>
+                        {/* Shopify hides the field picker on purpose — its column set is locked to the
+                            preset defaults so the generated CSV always matches Shopify's import schema.
+                            Only the Variant Option Name (below) stays editable. */}
+                        {selectedPreset !== 'shopify' && (
                         <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
                             <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-700/50">
                                 <div>
@@ -2271,6 +2280,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 </div>
                             </div>
                         </div>
+                        )}
 
                         {/* Option1 Name customization — shown when option1 fields are selected */}
                         {selectedFields.includes('option1_name') && (
@@ -2282,7 +2292,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         </svg>
                                         <h2 className="text-sm font-semibold text-white">Variant Option Name</h2>
                                     </div>
-                                    <p className="text-xs text-neutral-500 mt-1.5">Customize the Option1 Name column value in your export</p>
+                                    <p className="text-xs text-neutral-500 mt-1.5">
+                                        This is Shopify&apos;s <span className="text-neutral-400 font-medium">Option1 Name</span> — the label for the attribute that tells your variants apart (e.g. <span className="text-neutral-400">Size</span>, <span className="text-neutral-400">Length</span>, <span className="text-neutral-400">Color</span>). Shopify pairs it with each variant&apos;s own value (its size or model), so one product reads like <span className="text-neutral-400">Size: 77</span>. It applies to every product in this export.
+                                    </p>
                                 </div>
                                 <div className="p-5">
                                     <input
@@ -2292,7 +2304,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         placeholder="Variant"
                                         className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-700/50 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
                                     />
-                                    <p className="text-xs text-neutral-500 mt-2">Leave empty to use default: <span className="text-neutral-400 font-medium">Variant</span></p>
+                                    <p className="text-xs text-neutral-500 mt-2">Leave empty to use the generic default: <span className="text-neutral-400 font-medium">Variant</span>.</p>
                                 </div>
                             </div>
                         )}
