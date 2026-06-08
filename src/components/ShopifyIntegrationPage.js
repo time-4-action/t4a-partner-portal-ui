@@ -600,91 +600,6 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
             </div>
           </section>
 
-          {/* --------------------- Needs attention ------------------------- */}
-          {attentionCount > 0 && (
-            <section id="needs-attention" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-              <SectionHeading
-                icon={<WarningIcon className="h-5 w-5 text-amber-400" />}
-                title="Needs attention"
-                desc="Variants we couldn't push on the last run. Resolve the cause, or let the next sync retry."
-                right={<StatusBadge tone="red">{attentionCount}</StatusBadge>}
-              />
-
-              {/* desktop table */}
-              <div className="hidden overflow-x-auto rounded-xl border border-neutral-700/50 md:block">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
-                      <th className="px-4 py-3 font-medium">SKU</th>
-                      <th className="px-4 py-3 font-medium">Parent code</th>
-                      <th className="px-4 py-3 font-medium">Reason</th>
-                      <th className="px-4 py-3 text-right font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-800">
-                    {MOCK_UNMATCHED.map((r) => (
-                      <tr key={r.sku} className="hover:bg-neutral-800/30">
-                        <td className="px-4 py-3 font-mono text-neutral-200">{r.sku}</td>
-                        <td className="px-4 py-3 text-neutral-500">{r.parentCode}</td>
-                        <td className="px-4 py-3"><StatusBadge tone={r.tone}>{r.reason}</StatusBadge></td>
-                        <td className="px-4 py-3 text-right">
-                          <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
-                            Resolve
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* mobile cards */}
-              <div className="space-y-3 md:hidden">
-                {MOCK_UNMATCHED.map((r) => (
-                  <div key={r.sku} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-mono text-sm text-neutral-200">{r.sku}</span>
-                      <StatusBadge tone={r.tone}>{r.reason}</StatusBadge>
-                    </div>
-                    <p className="mt-1 text-xs text-neutral-500">{r.parentCode}</p>
-                    <button className="mt-3 w-full rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
-                      Resolve
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ------------------------ What to sync ------------------------- */}
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <SectionHeading title="What to sync" desc="Pick the data the portal is allowed to push to your store." />
-            {stockOnly && (
-              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-                <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-                <span><span className="font-medium text-neutral-200">Stock only</span> ownership mode syncs inventory and nothing else — these options don&apos;t apply. Switch ownership mode to enable them.</span>
-              </div>
-            )}
-            <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {SYNC_FLAGS.map((f) => (
-                <li key={f.key}>
-                  <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">{f.label}</span>
-                        {f.expensive && <StatusBadge tone="amber">expensive</StatusBadge>}
-                      </span>
-                      <span className="mt-1 block text-xs text-neutral-500">{f.desc}</span>
-                    </span>
-                    <ToggleSwitch checked={!!config[f.key]} onChange={() => toggleFlag(f.key)} ariaLabel={`Sync ${f.label}`} />
-                  </label>
-                </li>
-              ))}
-            </ul>
-            </fieldset>
-          </section>
-
           {/* ------------------------ Ownership mode ----------------------- */}
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
             <SectionHeading
@@ -733,40 +648,33 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
             </fieldset>
           </section>
 
-          {/* --------------------- Products & location --------------------- */}
+          {/* ------------------------ What to sync ------------------------- */}
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <SectionHeading title="Products & location" desc="Which products are in scope, and where their inventory lands." />
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-neutral-300">Products to sync</label>
-                <Select
-                  ariaLabel="Products to sync"
-                  value={config.exportConfigId}
-                  onChange={(e) => setCfg({ exportConfigId: e.target.value })}
-                >
-                  <option value="" disabled>Select an export configuration…</option>
-                  {exportOptions.map((x) => (
-                    <option key={x._id} value={x._id}>{x.name}</option>
-                  ))}
-                </Select>
-                <p className="mt-2 text-xs text-neutral-500">Sync follows this export config&apos;s product filters and field rules.</p>
+            <SectionHeading title="What to sync" desc="Pick the data the portal is allowed to push to your store." />
+            {stockOnly && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
+                <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+                <span><span className="font-medium text-neutral-200">Stock only</span> ownership mode syncs inventory and nothing else — these options don&apos;t apply. Switch ownership mode to enable them.</span>
               </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-neutral-300">Shopify location</label>
-                <Select
-                  ariaLabel="Shopify location"
-                  value={config.shopifyLocationId}
-                  onChange={(e) => setCfg({ shopifyLocationId: e.target.value })}
-                >
-                  {MOCK_LOCATIONS.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </Select>
-                <p className="mt-2 text-xs text-neutral-500">
-                  Inventory is pushed to this one location. Multi-location stores aren&apos;t supported yet.
-                </p>
-              </div>
-            </div>
+            )}
+            <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {SYNC_FLAGS.map((f) => (
+                <li key={f.key}>
+                  <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">{f.label}</span>
+                        {f.expensive && <StatusBadge tone="amber">expensive</StatusBadge>}
+                      </span>
+                      <span className="mt-1 block text-xs text-neutral-500">{f.desc}</span>
+                    </span>
+                    <ToggleSwitch checked={!!config[f.key]} onChange={() => toggleFlag(f.key)} ariaLabel={`Sync ${f.label}`} />
+                  </label>
+                </li>
+              ))}
+            </ul>
+            </fieldset>
           </section>
 
           {/* ----------------------------- Pricing ------------------------- */}
@@ -887,6 +795,42 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
             </fieldset>
           </section>
 
+          {/* --------------------- Products & location --------------------- */}
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+            <SectionHeading title="Products & location" desc="Which products are in scope, and where their inventory lands." />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-neutral-300">Products to sync</label>
+                <Select
+                  ariaLabel="Products to sync"
+                  value={config.exportConfigId}
+                  onChange={(e) => setCfg({ exportConfigId: e.target.value })}
+                >
+                  <option value="" disabled>Select an export configuration…</option>
+                  {exportOptions.map((x) => (
+                    <option key={x._id} value={x._id}>{x.name}</option>
+                  ))}
+                </Select>
+                <p className="mt-2 text-xs text-neutral-500">Sync follows this export config&apos;s product filters and field rules.</p>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-neutral-300">Shopify location</label>
+                <Select
+                  ariaLabel="Shopify location"
+                  value={config.shopifyLocationId}
+                  onChange={(e) => setCfg({ shopifyLocationId: e.target.value })}
+                >
+                  {MOCK_LOCATIONS.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </Select>
+                <p className="mt-2 text-xs text-neutral-500">
+                  Inventory is pushed to this one location. Multi-location stores aren&apos;t supported yet.
+                </p>
+              </div>
+            </div>
+          </section>
+
           {/* --------------------------- Sync activity --------------------- */}
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
             <SectionHeading
@@ -976,6 +920,62 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
               ))}
             </div>
           </section>
+
+          {/* --------------------- Needs attention ------------------------- */}
+          {attentionCount > 0 && (
+            <section id="needs-attention" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+              <SectionHeading
+                icon={<WarningIcon className="h-5 w-5 text-amber-400" />}
+                title="Needs attention"
+                desc="Variants we couldn't push on the last run. Resolve the cause, or let the next sync retry."
+                right={<StatusBadge tone="red">{attentionCount}</StatusBadge>}
+              />
+
+              {/* desktop table */}
+              <div className="hidden overflow-x-auto rounded-xl border border-neutral-700/50 md:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
+                      <th className="px-4 py-3 font-medium">SKU</th>
+                      <th className="px-4 py-3 font-medium">Parent code</th>
+                      <th className="px-4 py-3 font-medium">Reason</th>
+                      <th className="px-4 py-3 text-right font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-800">
+                    {MOCK_UNMATCHED.map((r) => (
+                      <tr key={r.sku} className="hover:bg-neutral-800/30">
+                        <td className="px-4 py-3 font-mono text-neutral-200">{r.sku}</td>
+                        <td className="px-4 py-3 text-neutral-500">{r.parentCode}</td>
+                        <td className="px-4 py-3"><StatusBadge tone={r.tone}>{r.reason}</StatusBadge></td>
+                        <td className="px-4 py-3 text-right">
+                          <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
+                            Resolve
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* mobile cards */}
+              <div className="space-y-3 md:hidden">
+                {MOCK_UNMATCHED.map((r) => (
+                  <div key={r.sku} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-mono text-sm text-neutral-200">{r.sku}</span>
+                      <StatusBadge tone={r.tone}>{r.reason}</StatusBadge>
+                    </div>
+                    <p className="mt-1 text-xs text-neutral-500">{r.parentCode}</p>
+                    <button className="mt-3 w-full rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
+                      Resolve
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* ------------------------ Danger zone -------------------------- */}
           <section className="rounded-2xl border border-red-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
