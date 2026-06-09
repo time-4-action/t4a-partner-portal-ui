@@ -369,6 +369,9 @@ export default function ShopifyIntegrationPage({
   initialLocations = [],
   // True when the stored token can't be refreshed (legacy/expired) — the UI prompts re-install.
   initialNeedsReconnect = false,
+  // Distinct catalogue pricelists [{ name, vat, valid_from }] (GET /shopify/pricelists). Drives
+  // the pricing-panel priority list with REAL names — replaces the old mock template.
+  initialPricelists = [],
 }) {
   // Real Shopify-preset export configs (from /custom-export?preset=shopify). May be empty —
   // when it is, the "Products to sync" block shows a create prompt instead of a selector.
@@ -386,6 +389,34 @@ export default function ShopifyIntegrationPage({
   // is used only in demo mode (no real connection id).
   const locations = hasRealConnection ? initialLocations : (initialLocations.length ? initialLocations : MOCK_LOCATIONS);
 
+  // Merge the catalogue's real pricelists with the connection's stored priority/enabled state:
+  // stored names (still in the catalogue) keep their order + enabled flag; newly-seen pricelists
+  // are appended newest-first; names no longer in the catalogue are dropped. Each row carries
+  // vat + valid_from from the catalogue for display. Falls back to the demo template only when
+  // the catalogue returned no pricelists (e.g. the fetch failed) so the panel isn't blank.
+  const buildPricelistPriority = (available, stored) => {
+    if (!available?.length) return MOCK_CONNECTION.config.pricelistPriority;
+    const byName = new Map(available.map((p) => [p.name, p]));
+    const storedByName = new Map((stored || []).map((p) => [p.name, p]));
+    const orderedNames = (stored || [])
+      .filter((s) => byName.has(s.name))
+      .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+      .map((s) => s.name);
+    const newNames = available.filter((p) => !storedByName.has(p.name)).map((p) => p.name);
+    return [...orderedNames, ...newNames].map((name, idx) => {
+      const a = byName.get(name);
+      const s = storedByName.get(name);
+      return {
+        _id: name,
+        name,
+        vat: a?.vat ?? 0,
+        valid_from: a?.valid_from ?? null,
+        enabled: s ? s.enabled !== false : true,
+        priority: idx,
+      };
+    });
+  };
+
   const seedConfig = () => {
     const cfg = baseConnection.config || MOCK_CONNECTION.config;
     // Only honour a stored location if it still exists in the live list; otherwise fall back to
@@ -397,9 +428,7 @@ export default function ShopifyIntegrationPage({
     return {
       ...MOCK_CONNECTION.config,
       ...cfg,
-      // Until the data plane resolves real pricelist names, keep the demo template when the
-      // stored priority list is empty so the pricing panel isn't blank.
-      pricelistPriority: (cfg.pricelistPriority?.length ? cfg.pricelistPriority : MOCK_CONNECTION.config.pricelistPriority),
+      pricelistPriority: buildPricelistPriority(initialPricelists, cfg.pricelistPriority),
       exportConfigId: cfg.exportConfigId ?? exportOptions[0]?._id ?? null,
       shopifyLocationId: locationId,
     };
@@ -709,13 +738,20 @@ export default function ShopifyIntegrationPage({
     try {
       const { pricelistPriority, priceVatMode, futureDatedGuard, syncStock, syncNewProducts,
         syncPrices, syncDescriptions, syncImages, ownership, exportConfigId, shopifyLocationId } = config;
+      // Persist only the resolution-relevant fields of each pricelist (name/enabled/priority);
+      // vat + valid_from are display-only and re-derived from the live catalogue on load.
+      const minimalPricelistPriority = pricelistPriority.map((p, i) => ({
+        name: p.name,
+        enabled: p.enabled !== false,
+        priority: p.priority ?? i,
+      }));
       const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/config`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shopifyLocationId,
-          config: { pricelistPriority, priceVatMode, futureDatedGuard, syncStock, syncNewProducts,
-            syncPrices, syncDescriptions, syncImages, ownership, exportConfigId },
+          config: { pricelistPriority: minimalPricelistPriority, priceVatMode, futureDatedGuard,
+            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncImages, ownership, exportConfigId },
         }),
       });
       if (res.ok) {

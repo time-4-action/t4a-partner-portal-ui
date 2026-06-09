@@ -37,6 +37,23 @@ async function getShopifyStatus() {
   }
 }
 
+// Fetch the distinct pricelists in the catalogue so the pricing panel seeds from real names
+// (not mock). Empty on failure → the panel falls back to its demo template.
+async function getShopifyPricelists() {
+  try {
+    const { token } = await auth0.getAccessToken();
+    const res = await fetch(`${apiUrl}/shopify/pricelists`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data?.pricelists ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function ShopifyIntegrationRoute() {
   const session = await auth0.getSession();
   const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
@@ -57,9 +74,10 @@ export default async function ShopifyIntegrationRoute() {
     );
   }
 
-  const [shopifyExports, status] = await Promise.all([
+  const [shopifyExports, status, pricelists] = await Promise.all([
     getShopifyExportConfigs(),
     getShopifyStatus(),
+    getShopifyPricelists(),
   ]);
 
   return (
@@ -72,6 +90,7 @@ export default async function ShopifyIntegrationRoute() {
           initialConnected={status ? Boolean(status.connected) : null}
           initialLocations={status?.locations ?? []}
           initialNeedsReconnect={Boolean(status?.needsReconnect)}
+          initialPricelists={pricelists ?? []}
         />
       </div>
     </div>
