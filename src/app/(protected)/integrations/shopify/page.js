@@ -91,6 +91,8 @@ export default async function ShopifyIntegrationRoute() {
           initialLocations={status?.locations ?? []}
           initialNeedsReconnect={Boolean(status?.needsReconnect)}
           initialPricelists={pricelists ?? []}
+          initialPublications={status?.publications ?? []}
+          initialPublishingEnabled={Boolean(status?.publishingEnabled)}
         />
       </div>
     </div>

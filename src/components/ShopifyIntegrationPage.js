@@ -372,6 +372,9 @@ export default function ShopifyIntegrationPage({
   // Distinct catalogue pricelists [{ name, vat, valid_from }] (GET /shopify/pricelists). Drives
   // the pricing-panel priority list with REAL names — replaces the old mock template.
   initialPricelists = [],
+  // The shop's sales channels [{ id, name }] and whether the token can publish to them.
+  initialPublications = [],
+  initialPublishingEnabled = false,
 }) {
   // Real Shopify-preset export configs (from /custom-export?preset=shopify). May be empty —
   // when it is, the "Products to sync" block shows a create prompt instead of a selector.
@@ -431,6 +434,8 @@ export default function ShopifyIntegrationPage({
       pricelistPriority: buildPricelistPriority(initialPricelists, cfg.pricelistPriority),
       exportConfigId: cfg.exportConfigId ?? exportOptions[0]?._id ?? null,
       shopifyLocationId: locationId,
+      // Keep only still-existing channels (a publication could be removed in Shopify).
+      publicationIds: (cfg.publicationIds || []).filter((id) => initialPublications.some((p) => p.id === id)),
     };
   };
 
@@ -514,6 +519,11 @@ export default function ShopifyIntegrationPage({
   const toggleFlag = (key) => setConfig((c) => ({ ...c, [key]: !c[key] }));
   const setOwnership = (v) => setConfig((c) => ({ ...c, ownership: v }));
   const setVatMode = (v) => setConfig((c) => ({ ...c, priceVatMode: v }));
+  const togglePublication = (id) =>
+    setConfig((c) => {
+      const ids = c.publicationIds || [];
+      return { ...c, publicationIds: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] };
+    });
 
   const togglePricelist = (index) =>
     setConfig((c) => ({
@@ -737,7 +747,7 @@ export default function ShopifyIntegrationPage({
     setSaving(true);
     try {
       const { pricelistPriority, priceVatMode, futureDatedGuard, syncStock, syncNewProducts,
-        syncPrices, syncDescriptions, syncImages, ownership, exportConfigId, shopifyLocationId } = config;
+        syncPrices, syncDescriptions, syncImages, ownership, exportConfigId, shopifyLocationId, publicationIds } = config;
       // Persist only the resolution-relevant fields of each pricelist (name/enabled/priority);
       // vat + valid_from are display-only and re-derived from the live catalogue on load.
       const minimalPricelistPriority = pricelistPriority.map((p, i) => ({
@@ -751,7 +761,7 @@ export default function ShopifyIntegrationPage({
         body: JSON.stringify({
           shopifyLocationId,
           config: { pricelistPriority: minimalPricelistPriority, priceVatMode, futureDatedGuard,
-            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncImages, ownership, exportConfigId },
+            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncImages, ownership, exportConfigId, publicationIds },
         }),
       });
       if (res.ok) {
@@ -1190,6 +1200,54 @@ export default function ShopifyIntegrationPage({
                 </p>
               </div>
             </div>
+          </section>
+
+          {/* --------------------------- Sales channels -------------------- */}
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+            <SectionHeading
+              title="Sales channels"
+              desc="Where newly-created products are published — e.g. Online Store, Point of Sale."
+            />
+            {!initialPublishingEnabled ? (
+              <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-2.5">
+                  <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+                  <span className="text-amber-200/90">
+                    Reconnect your store to grant publishing permission, then choose which channels new products go live on.
+                  </span>
+                </div>
+                <button
+                  onClick={reconnect}
+                  disabled={connecting}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-neutral-950 transition-all hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {connecting ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
+                  {connecting ? "Redirecting…" : "Reconnect"}
+                </button>
+              </div>
+            ) : initialPublications.length === 0 ? (
+              <p className="text-sm text-neutral-500">No sales channels found in your store.</p>
+            ) : (
+              <>
+                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {initialPublications.map((p) => (
+                    <li key={p.id}>
+                      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+                        <span className="text-sm font-medium text-white">{p.name}</span>
+                        <ToggleSwitch
+                          checked={(config.publicationIds || []).includes(p.id)}
+                          onChange={() => togglePublication(p.id)}
+                          ariaLabel={`Publish to ${p.name}`}
+                        />
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-neutral-500">
+                  Applies when the portal creates a product. Existing products aren&apos;t re-published.
+                </p>
+              </>
+            )}
           </section>
 
           {/* --------------------------- Sync activity --------------------- */}
