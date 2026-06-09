@@ -21,6 +21,16 @@ import { NextResponse } from "next/server";
 const ROLES_CLAIM = "https://time-4-action.com/roles";
 const REQUIRED_ROLE = "export";
 
+// Routes under the (protected) route group. An unauthenticated hit here is redirected to login
+// with an explicit returnTo so the FULL original URL — including the query string — survives the
+// round-trip. (withPageAuthRequired in the layout can't see the query in the App Router, which
+// dropped params like ?connect=1&shop=… and broke the Shopify auto-connect after login.)
+const PROTECTED_PREFIXES = ["/product", "/export", "/categories", "/integrations"];
+
+function isProtectedPath(pathname) {
+  return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
 /**
  * Middleware proxy function that delegates to Auth0's middleware handler
  * and enforces the `export` role gate on all protected routes.
@@ -42,7 +52,15 @@ export async function proxy(request) {
   // Use auth0.getSession() so the encrypted session cookie is properly decrypted
   const session = await auth0.getSession(request);
   if (!session) {
-    // Not logged in — auth0.middleware already handles the login redirect
+    // Not logged in. For a protected route, send them to login ourselves with returnTo set to
+    // the full path + query, so e.g. /integrations/shopify?connect=1&shop=… is restored after
+    // login and the Shopify auto-connect resumes. Public routes (home, /contact) pass through.
+    const { pathname, search } = request.nextUrl;
+    if (isProtectedPath(pathname)) {
+      const loginUrl = new URL("/auth/login", request.url);
+      loginUrl.searchParams.set("returnTo", pathname + search);
+      return NextResponse.redirect(loginUrl);
+    }
     return authResponse;
   }
 
