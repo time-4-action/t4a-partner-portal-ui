@@ -1,22 +1,25 @@
 /**
  * ShopifyIntegrationPage Component
  *
- * Partner-facing UI for connecting a Shopify store to the T4A Partner Portal and
- * configuring the one-way product push (stock, products, prices, descriptions, images).
+ * Partner-facing UI for connecting one or more Shopify stores to the T4A Partner Portal and
+ * configuring each store's one-way product push (stock, products, prices, descriptions, images).
  *
- * The control plane (OAuth connect/disconnect/config) AND Phase A of the data plane
- * (stock-only sync: "Sync now", live sync-activity runs, counts, and the needs-attention
- * report) are wired to the real API at /api/export/shopify/*. The remaining MOCK_* constants
- * are used ONLY as a demo fallback when there is no real connection id (e.g. the status
- * fetch failed), so the page still renders something rich.
+ * A single portal user can connect any number of Shopify stores. Each store is an independent
+ * connection with its own token, sync config, location, sales channels and product map. The page
+ * is split into three parts:
  *
- * Two top-level states, driven by `isConnected`:
- *   1. NOT CONNECTED — enter a myshopify domain and "connect" (starts real OAuth).
- *   2. CONNECTED     — full management UI: status, sync scope, ownership, pricing,
- *                      sync activity, needs-attention report, and disconnect.
+ *   • {@link ShopifyIntegrationPage} — the orchestrator: brand header, the store switcher, the
+ *     shared result banner, and either the connect screen or the selected store's panel.
+ *   • {@link ConnectionPanel}        — everything for ONE store: status, ownership, what-to-sync,
+ *     pricing, products/location, sales channels, sync activity, needs-attention, disconnect.
+ *     Keyed by connection id so switching stores remounts it with a clean slate. It lazy-loads
+ *     its own live locations/channels (GET …/detail) and sync activity (GET …/activity).
+ *   • {@link ConnectStore}           — the "connect a (another) store" screen: enter a myshopify
+ *     domain → start real OAuth, with the security/trust rail.
  *
- * Still mock until later phases land: the price/description/image push (Phases B–D) — those
- * toggles are configurable but Phase A only acts on inventory quantities.
+ * Real API surface: /api/export/shopify/* (connect, connections, connection/:id/detail,
+ * …/config, …/sync, …/activity, disconnect). The MOCK_* constants are used ONLY as a demo
+ * fallback when the connections fetch failed (no real ids), so the page still renders something.
  *
  * @module ShopifyIntegrationPage
  */
@@ -34,7 +37,7 @@ const getNowSnapshot = () => cachedNow || (cachedNow = Date.now());
 const getServerNowSnapshot = () => 0;
 
 /* -------------------------------------------------------------------------- */
-/*  Mock data (replace with real API data when the backend is built)          */
+/*  Mock data (demo fallback only — used when the connections fetch failed)    */
 /* -------------------------------------------------------------------------- */
 
 // OAuth scopes — rendered in BOTH states (requested when disconnected, granted when
@@ -102,6 +105,18 @@ const MOCK_UNMATCHED = [
 // Aggregate of shopify_product_map state (separate from the visible job rows above).
 const MOCK_COUNTS = { synced: 1284, pending: 17, error: 6 };
 
+// A second demo store so the switcher itself is demonstrable when the fetch fails.
+const MOCK_CONNECTION_2 = {
+  shopDomain: "patrik-outlet.myshopify.com",
+  status: "active",
+  scopes: SCOPES,
+  shopifyLocationId: "gid://shopify/Location/79283712",
+  installedAt: "2026-05-02T11:05:00Z",
+  lastSyncAt: "2026-06-06T18:10:00Z",
+  lastSyncStatus: "done",
+  config: { ...MOCK_CONNECTION.config, ownership: "create_then_handoff" },
+};
+
 const SYNC_FLAGS = [
   { key: "syncStock", label: "Stock", desc: "Push live inventory quantities to your store." },
   { key: "syncNewProducts", label: "New products", desc: "Create products that don't exist in your store yet." },
@@ -153,6 +168,22 @@ const jobSub = (j) => (j.label ? j.trigger : j.variantCode ? j.parentCode : null
 const jobDetail = (j) => j.detail ?? j.error ?? null;
 
 /* -------------------------------------------------------------------------- */
+/*  Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+// A stable per-connection key: the Mongo id for a real store, the domain for the demo store.
+const connKey = (c) => c._id || c.shopDomain;
+// The store name without the ".myshopify.com" suffix, for the compact switcher pills.
+const shopLabel = (domain) => (domain || "").replace(/\.myshopify\.com$/, "") || domain || "—";
+
+const STATUS_META = {
+  active: { tone: "cyan", label: "Active" },
+  error: { tone: "red", label: "Error" },
+  uninstalled: { tone: "amber", label: "Uninstalled" },
+};
+const statusMetaFor = (status) => STATUS_META[status] || { tone: "neutral", label: status };
+
+/* -------------------------------------------------------------------------- */
 /*  Formatting helpers (deterministic UTC — avoids SSR/client hydration drift) */
 /* -------------------------------------------------------------------------- */
 
@@ -176,6 +207,34 @@ function fmtDate(iso) {
 
 function fmtNum(n) {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// Merge the catalogue's real pricelists with the connection's stored priority/enabled state:
+// stored names (still in the catalogue) keep their order + enabled flag; newly-seen pricelists
+// are appended newest-first; names no longer in the catalogue are dropped. Each row carries
+// vat + valid_from from the catalogue for display. Falls back to the demo template only when the
+// catalogue returned no pricelists (e.g. the fetch failed) so the panel isn't blank.
+function buildPricelistPriority(available, stored) {
+  if (!available?.length) return MOCK_CONNECTION.config.pricelistPriority;
+  const byName = new Map(available.map((p) => [p.name, p]));
+  const storedByName = new Map((stored || []).map((p) => [p.name, p]));
+  const orderedNames = (stored || [])
+    .filter((s) => byName.has(s.name))
+    .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+    .map((s) => s.name);
+  const newNames = available.filter((p) => !storedByName.has(p.name)).map((p) => p.name);
+  return [...orderedNames, ...newNames].map((name, idx) => {
+    const a = byName.get(name);
+    const s = storedByName.get(name);
+    return {
+      _id: name,
+      name,
+      vat: a?.vat ?? 0,
+      valid_from: a?.valid_from ?? null,
+      enabled: s ? s.enabled !== false : true,
+      priority: idx,
+    };
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -241,11 +300,6 @@ const ShieldIcon = (p) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 5.25-3.75 8.25-8.625 9.6a1.5 1.5 0 0 1-.75 0C6.75 20.25 3 17.25 3 12V6.75a1.5 1.5 0 0 1 .96-1.4l7.5-2.81a1.5 1.5 0 0 1 1.08 0l7.5 2.81a1.5 1.5 0 0 1 .96 1.4V12Z" />
   </Svg>
 );
-const ArrowRightIcon = (p) => (
-  <Svg {...p}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-  </Svg>
-);
 const PlusIcon = (p) => (
   <Svg {...p}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -299,7 +353,7 @@ function StatusBadge({ tone = "neutral", children }) {
 }
 
 function PingDot({ tone = "cyan" }) {
-  const color = tone === "red" ? "#f87171" : tone === "amber" ? "#fbbf24" : "#01a0be";
+  const color = tone === "red" ? "#f87171" : tone === "amber" ? "#fbbf24" : tone === "neutral" ? "#737373" : "#01a0be";
   const ping = tone === "cyan";
   return (
     <span className="relative flex h-2.5 w-2.5 shrink-0">
@@ -324,14 +378,15 @@ function ToggleSwitch({ checked, onChange, ariaLabel }) {
   );
 }
 
-function Select({ value, onChange, ariaLabel, children }) {
+function Select({ value, onChange, ariaLabel, disabled, children }) {
   return (
     <div className="relative">
       <select
         value={value ?? ""}
         onChange={onChange}
         aria-label={ariaLabel}
-        className="w-full appearance-none rounded-xl border border-neutral-700 bg-neutral-900/60 backdrop-blur-sm px-4 py-3.5 pr-10 text-sm text-white focus:border-[#01a0be]/50 focus:outline-none transition-colors"
+        disabled={disabled}
+        className="w-full appearance-none rounded-xl border border-neutral-700 bg-neutral-900/60 backdrop-blur-sm px-4 py-3.5 pr-10 text-sm text-white focus:border-[#01a0be]/50 focus:outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       >
         {children}
       </select>
@@ -356,107 +411,407 @@ function SectionHeading({ title, desc, icon, right }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Main component                                                            */
+/*  Orchestrator — header, store switcher, banner, connect-or-panel           */
 /* -------------------------------------------------------------------------- */
 
 export default function ShopifyIntegrationPage({
   initialExports = [],
   ownerEmail,
-  // Real connection state from GET /shopify/status (null when the status fetch failed —
-  // in that case we fall back to the MOCK_* demo so the page still renders something).
-  initialConnection = null,
-  initialConnected = null,
-  initialLocations = [],
-  // True when the stored token can't be refreshed (legacy/expired) — the UI prompts re-install.
-  initialNeedsReconnect = false,
+  // Every store the user has connected (GET /shopify/connections). `null` means the fetch
+  // failed → fall back to a two-store demo so the page still renders something rich. An empty
+  // array means the user simply has no stores yet → show the connect screen.
+  initialConnections = null,
   // Distinct catalogue pricelists [{ name, vat, valid_from }] (GET /shopify/pricelists). Drives
-  // the pricing-panel priority list with REAL names — replaces the old mock template.
+  // each store's pricing-panel priority list with REAL names — replaces the old mock template.
   initialPricelists = [],
-  // The shop's sales channels [{ id, name }] and whether the token can publish to them.
-  initialPublications = [],
-  initialPublishingEnabled = false,
 }) {
-  // Real Shopify-preset export configs (from /custom-export?preset=shopify). May be empty —
-  // when it is, the "Products to sync" block shows a create prompt instead of a selector.
-  const exportOptions = initialExports;
+  const isDemo = initialConnections === null;
+  const seedConnections = isDemo ? [MOCK_CONNECTION, MOCK_CONNECTION_2] : initialConnections;
 
-  // The base connection: real one when present, else the demo. When it's real, the sync
-  // activity (jobs/counts/unmatched) is fetched live from /activity; the demo set is only a
-  // fallback for when there is no real connection id.
-  const baseConnection = initialConnection || MOCK_CONNECTION;
-  const hasRealConnection = Boolean(baseConnection._id);
+  const [connections, setConnections] = useState(seedConnections);
+  const [selectedKey, setSelectedKey] = useState(() => {
+    const active = seedConnections.find((c) => c.status === "active") || seedConnections[0];
+    return active ? connKey(active) : null;
+  });
+  // When true, the connect screen is shown even though stores exist ("connect another store").
+  const [adding, setAdding] = useState(seedConnections.length === 0);
+  const [notice, setNotice] = useState(null); // { tone: "success" | "error", text }
 
-  // Real Shopify inventory locations come straight from the store (GET /shopify/status →
-  // GraphQL `locations`). For a real connection we show ONLY those — never the demo set — so a
-  // partner can't accidentally save a location that doesn't exist in their store. The MOCK set
-  // is used only in demo mode (no real connection id).
-  const locations = hasRealConnection ? initialLocations : (initialLocations.length ? initialLocations : MOCK_LOCATIONS);
+  const showConnect = adding || connections.length === 0;
+  const selected =
+    connections.find((c) => connKey(c) === selectedKey) || connections[0] || null;
 
-  // Merge the catalogue's real pricelists with the connection's stored priority/enabled state:
-  // stored names (still in the catalogue) keep their order + enabled flag; newly-seen pricelists
-  // are appended newest-first; names no longer in the catalogue are dropped. Each row carries
-  // vat + valid_from from the catalogue for display. Falls back to the demo template only when
-  // the catalogue returned no pricelists (e.g. the fetch failed) so the panel isn't blank.
-  const buildPricelistPriority = (available, stored) => {
-    if (!available?.length) return MOCK_CONNECTION.config.pricelistPriority;
-    const byName = new Map(available.map((p) => [p.name, p]));
-    const storedByName = new Map((stored || []).map((p) => [p.name, p]));
-    const orderedNames = (stored || [])
-      .filter((s) => byName.has(s.name))
-      .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
-      .map((s) => s.name);
-    const newNames = available.filter((p) => !storedByName.has(p.name)).map((p) => p.name);
-    return [...orderedNames, ...newNames].map((name, idx) => {
-      const a = byName.get(name);
-      const s = storedByName.get(name);
-      return {
-        _id: name,
-        name,
-        vat: a?.vat ?? 0,
-        valid_from: a?.valid_from ?? null,
-        enabled: s ? s.enabled !== false : true,
-        priority: idx,
+  // Surface the OAuth callback outcome (the API redirects back here with `?shopify=connected`
+  // or `?shopify=error&reason=...`), then strip the params so a refresh doesn't re-show it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get("shopify");
+    if (!outcome) return;
+
+    let msg = null;
+    if (outcome === "connected") {
+      msg = {
+        tone: "success",
+        text: params.get("webhooks") === "partial"
+          ? "Store connected. Some webhooks could not be registered — they'll be retried."
+          : "Store connected successfully.",
       };
-    });
+    } else if (outcome === "error") {
+      msg = { tone: "error", text: `Connection failed (${params.get("reason") || "unknown error"}).` };
+    }
+
+    const url = new URL(window.location.href);
+    ["shopify", "shop", "webhooks", "reason"].forEach((k) => url.searchParams.delete(k));
+    window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+
+    if (msg) queueMicrotask(() => setNotice(msg));
+  }, []);
+
+  // Reflect a finished sync / status change up onto the matching switcher pill.
+  const patchConnection = (key, patch) =>
+    setConnections((list) => list.map((c) => (connKey(c) === key ? { ...c, ...patch } : c)));
+
+  // Drop a disconnected store and re-point the selection (or fall back to the connect screen).
+  const handleDisconnected = (key) => {
+    const next = connections.filter((c) => connKey(c) !== key);
+    setConnections(next);
+    if (next.length === 0) setAdding(true);
+    else if (key === selectedKey) setSelectedKey(connKey(next[0]));
+    setNotice({ tone: "success", text: "Store disconnected." });
   };
 
-  const seedConfig = () => {
-    const cfg = baseConnection.config || MOCK_CONNECTION.config;
-    // Only honour a stored location if it still exists in the live list; otherwise fall back to
-    // the first real location (the stale/phantom id won't silently get re-saved).
-    const storedLoc = baseConnection.shopifyLocationId ?? cfg.shopifyLocationId ?? null;
-    const locationId = locations.some((l) => l.id === storedLoc)
-      ? storedLoc
-      : (locations[0]?.id ?? (hasRealConnection ? null : storedLoc));
+  const selectStore = (key) => {
+    setAdding(false);
+    setNotice(null);
+    setSelectedKey(key);
+  };
+
+  return (
+    <div className="pb-40 sm:pb-32">
+      {/* ----------------------------- Header ----------------------------- */}
+      <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+          {/* Brand mark — official Shopify logo on a glassy tile lit by a soft green halo */}
+          <div className="relative shrink-0">
+            <div aria-hidden="true" className="absolute -inset-3 rounded-[1.75rem] bg-[#95BF47]/20 blur-2xl" />
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20 sm:h-[4.5rem] sm:w-[4.5rem]">
+              <ShopifyLogo className="h-9 w-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)] sm:h-10 sm:w-10" />
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-[#01a0be]">
+              <BagIcon className="h-3.5 w-3.5" />
+              Integration
+            </div>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              <span className="bg-gradient-to-r from-[#95BF47] via-[#5fae46] to-[#01a0be] bg-clip-text text-transparent">Shopify</span>
+            </h1>
+            <p className="mt-3 max-w-2xl text-neutral-400">
+              One-way push of stock, products, prices and images from the portal straight to your Shopify stores.
+            </p>
+          </div>
+        </div>
+
+        {connections.length > 0 && (
+          <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:shrink-0">
+            <StatusBadge tone="neutral">
+              {connections.length} {connections.length === 1 ? "store" : "stores"} connected
+            </StatusBadge>
+          </div>
+        )}
+      </header>
+
+      {/* --------------------------- Store switcher ---------------------------- */}
+      {connections.length > 0 && (
+        <nav aria-label="Connected stores" className="mb-6 -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-2">
+          {connections.map((c) => {
+            const key = connKey(c);
+            const active = key === selectedKey && !adding;
+            const tone = statusMetaFor(c.status).tone;
+            return (
+              <button
+                key={key}
+                onClick={() => selectStore(key)}
+                aria-current={active ? "true" : undefined}
+                className={`group inline-flex shrink-0 items-center gap-2.5 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                  active
+                    ? "border-[#01a0be]/60 bg-[#01a0be]/10 text-white shadow-[0_0_30px_rgba(1,160,190,0.08)]"
+                    : "border-neutral-800 bg-neutral-900/50 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
+                }`}
+              >
+                <PingDot tone={tone} />
+                <span className="max-w-[12rem] truncate">{shopLabel(c.shopDomain)}</span>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => { setAdding(true); setNotice(null); }}
+            className={`inline-flex shrink-0 items-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm font-medium transition-all ${
+              adding
+                ? "border-[#01a0be]/60 bg-[#01a0be]/10 text-white"
+                : "border-neutral-700 text-neutral-400 hover:border-[#01a0be]/50 hover:text-white"
+            }`}
+          >
+            <PlusIcon className="h-4 w-4" />
+            Connect store
+          </button>
+        </nav>
+      )}
+
+      {notice && (
+        <div
+          className={`mb-6 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+            notice.tone === "success"
+              ? "border-[#95BF47]/30 bg-[#95BF47]/10 text-[#b6df84]"
+              : "border-red-500/30 bg-red-500/10 text-red-300"
+          }`}
+        >
+          <span>{notice.text}</span>
+          <button
+            onClick={() => setNotice(null)}
+            aria-label="Dismiss"
+            className="shrink-0 text-current/70 transition-opacity hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {showConnect ? (
+        <ConnectStore
+          canCancel={connections.length > 0}
+          onCancel={() => setAdding(false)}
+          onNotice={setNotice}
+        />
+      ) : (
+        <ConnectionPanel
+          key={selectedKey}
+          connection={selected}
+          exportOptions={initialExports}
+          pricelists={initialPricelists}
+          onNotice={setNotice}
+          onDisconnected={handleDisconnected}
+          onPatch={patchConnection}
+        />
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  ConnectStore — enter a domain and start OAuth (first or additional store)  */
+/* -------------------------------------------------------------------------- */
+
+function ConnectStore({ canCancel, onCancel, onNotice }) {
+  const [domainInput, setDomainInput] = useState("");
+  const [connecting, setConnecting] = useState(false);
+
+  const domainClean = domainInput.trim().toLowerCase();
+  const domainValid = /^[a-z0-9][a-z0-9-]*$/.test(domainClean);
+
+  // Start OAuth: ask the backend for the Shopify authorize URL, then redirect the browser to it.
+  // Shopify sends the user back to the API callback, which redirects to this page with
+  // `?shopify=connected` (handled by the banner effect + the fresh connections list on reload).
+  const connect = async () => {
+    if (!domainValid || connecting) return;
+    setConnecting(true);
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connect?shop=${encodeURIComponent(domainClean)}`);
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return; // navigating away
+      }
+      onNotice({ tone: "error", text: data.error || "Could not start the Shopify connection." });
+    } catch {
+      onNotice({ tone: "error", text: "Could not reach the server to start the connection." });
+    }
+    setConnecting(false);
+  };
+
+  return (
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      {/* left: connect + how it works */}
+      <div className="space-y-6">
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="relative mb-6 w-fit">
+              <div aria-hidden="true" className="absolute -inset-2 rounded-2xl bg-[#95BF47]/20 blur-xl" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
+                <ShopifyLogo className="h-8 w-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]" />
+              </div>
+            </div>
+            {canCancel && (
+              <button
+                onClick={onCancel}
+                className="rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white"
+              >
+                Back to stores
+              </button>
+            )}
+          </div>
+          <h2 className="text-xl font-semibold text-white">
+            {canCancel ? "Connect another store" : "Connect your Shopify store"}
+          </h2>
+          <p className="mt-2 max-w-lg text-sm leading-relaxed text-neutral-400">
+            Install the portal app on your store with a single approval. No API keys to copy, no manual setup — once
+            connected, choose what to sync and the portal keeps it current. You can connect as many stores as you like.
+          </p>
+
+          <div className="mt-6 max-w-lg">
+            <label htmlFor="shop-domain" className="mb-2 block text-sm font-medium text-neutral-300">Your store domain</label>
+            <div className="flex overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900/60 transition-colors focus-within:border-[#01a0be]/50">
+              <input
+                id="shop-domain"
+                type="text"
+                inputMode="url"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={domainInput}
+                onChange={(e) => setDomainInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && connect()}
+                placeholder="your-store"
+                className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none"
+              />
+              <span className="flex select-none items-center whitespace-nowrap border-l border-neutral-700 px-3 text-sm text-neutral-500">
+                .myshopify.com
+              </span>
+            </div>
+            <p className={`mt-2 text-xs ${domainInput && !domainValid ? "text-amber-400" : "text-neutral-500"}`}>
+              {domainInput && !domainValid
+                ? "Use only lowercase letters, numbers and hyphens — just the store name."
+                : "Enter just your store name — we'll add .myshopify.com for you."}
+            </p>
+
+            <button
+              onClick={connect}
+              disabled={!domainValid || connecting}
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+            >
+              {connecting ? <SpinnerIcon className="h-4 w-4" /> : <BagIcon className="h-4 w-4" />}
+              {connecting ? "Redirecting to Shopify…" : "Connect Shopify"}
+            </button>
+          </div>
+
+          {/* how it works */}
+          <ol className="mt-8 grid grid-cols-1 gap-4 border-t border-neutral-800 pt-6 sm:grid-cols-3">
+            {[
+              "Enter your store domain",
+              "Approve the install on Shopify",
+              "Choose what to sync and go live",
+            ].map((step, i) => (
+              <li key={step} className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-xs font-bold text-white">
+                  {i + 1}
+                </span>
+                <span className="text-sm text-neutral-400">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+
+      {/* right: trust rail */}
+      <aside className="space-y-6 lg:sticky lg:top-20">
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm">
+          <h3 className="text-sm font-semibold text-white">What gets synced</h3>
+          <ul className="mt-4 space-y-3">
+            {SYNC_FLAGS.map((f) => (
+              <li key={f.key} className="flex items-start gap-3">
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-neutral-200">{f.label}</span>
+                    {f.slow && <StatusBadge tone="amber">Slow</StatusBadge>}
+                  </div>
+                  <p className="text-xs text-neutral-500">{f.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 border-t border-neutral-800 pt-4 text-xs text-neutral-500">
+            One-way push only — we never read or change your orders.
+          </p>
+        </section>
+
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+            <ShieldIcon className="h-4 w-4 text-[#01a0be]" />
+            Secure by design
+          </h3>
+          <ul className="mt-4 space-y-3">
+            {[
+              "OAuth install — no manual API keys to copy or store.",
+              "Tokens are encrypted at rest and never logged.",
+              "Least-privilege scopes only.",
+              "Every callback and webhook is HMAC-verified.",
+            ].map((t) => (
+              <li key={t} className="flex items-start gap-3 text-sm text-neutral-400">
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+                {t}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-5 mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Scopes requested</p>
+          <div className="flex flex-wrap gap-1.5">
+            {SCOPES.map((s) => (
+              <StatusBadge key={s} tone="cyan">{s}</StatusBadge>
+            ))}
+          </div>
+        </section>
+      </aside>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  ConnectionPanel — full management UI for ONE connected store               */
+/* -------------------------------------------------------------------------- */
+
+function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, onNotice, onDisconnected, onPatch }) {
+  const isDemo = !initialConn._id;
+  const myKey = connKey(initialConn);
+
+  // Build a fresh config object from a connection + the live data we know about so far.
+  // `validate` only kicks in once live locations/publications have loaded (drops a stale stored
+  // location / a removed channel); before that we trust the stored values to avoid a flicker.
+  const makeConfig = (conn, locs, pubs, validate) => {
+    const cfg = conn.config || MOCK_CONNECTION.config;
+    const storedLoc = conn.shopifyLocationId ?? cfg.shopifyLocationId ?? null;
+    const locationId = validate
+      ? (locs.some((l) => l.id === storedLoc) ? storedLoc : (locs[0]?.id ?? (isDemo ? storedLoc : null)))
+      : storedLoc;
     return {
       ...MOCK_CONNECTION.config,
       ...cfg,
-      pricelistPriority: buildPricelistPriority(initialPricelists, cfg.pricelistPriority),
+      pricelistPriority: buildPricelistPriority(pricelists, cfg.pricelistPriority),
       exportConfigId: cfg.exportConfigId ?? exportOptions[0]?._id ?? null,
       shopifyLocationId: locationId,
-      // Keep only still-existing channels (a publication could be removed in Shopify).
-      publicationIds: (cfg.publicationIds || []).filter((id) => initialPublications.some((p) => p.id === id)),
+      publicationIds: (cfg.publicationIds || []).filter((id) => (validate ? pubs.some((p) => p.id === id) : true)),
     };
   };
 
-  const [isConnected, setIsConnected] = useState(
-    initialConnected === null ? true : initialConnected
-  );
-  const [domainInput, setDomainInput] = useState("");
+  const [connection, setConnection] = useState(initialConn);
+  const [locations, setLocations] = useState(isDemo ? MOCK_LOCATIONS : []);
+  const [publications, setPublications] = useState([]);
+  const [publishingEnabled, setPublishingEnabled] = useState(false);
+  const [needsReconnect, setNeedsReconnect] = useState(false);
+  // Live store data (locations + channels) is ready: immediately for the demo, after the
+  // /detail fetch for a real store.
+  const [detailLoaded, setDetailLoaded] = useState(isDemo);
+
+  const [config, setConfig] = useState(() => makeConfig(initialConn, isDemo ? MOCK_LOCATIONS : [], [], isDemo));
+  const [savedConfig, setSavedConfig] = useState(() => makeConfig(initialConn, isDemo ? MOCK_LOCATIONS : [], [], isDemo));
+
+  // Sync-activity data. Real once a live connection exists (fetched from /activity); the MOCK_*
+  // set is only the demo fallback.
+  const [syncJobs, setSyncJobs] = useState(isDemo ? MOCK_SYNC_JOBS : []);
+  const [counts, setCounts] = useState(isDemo ? MOCK_COUNTS : { synced: 0, pending: 0, error: 0 });
+  const [unmatched, setUnmatched] = useState(isDemo ? MOCK_UNMATCHED : []);
+
   const [connecting, setConnecting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState(null); // { tone: "success" | "error", text }
-
-  const [connection, setConnection] = useState(() => ({ ...MOCK_CONNECTION, ...baseConnection }));
-  const [config, setConfig] = useState(() => seedConfig());
-  const [savedConfig, setSavedConfig] = useState(() => seedConfig());
-
-  // Sync-activity data. Real once a live connection exists (fetched from /activity); falls
-  // back to the MOCK_* demo set when there is no real connection id yet.
-  const [needsReconnect, setNeedsReconnect] = useState(Boolean(initialNeedsReconnect));
-  const [syncJobs, setSyncJobs] = useState(hasRealConnection ? [] : MOCK_SYNC_JOBS);
-  const [counts, setCounts] = useState(hasRealConnection ? { synced: 0, pending: 0, error: 0 } : MOCK_COUNTS);
-  const [unmatched, setUnmatched] = useState(hasRealConnection ? [] : MOCK_UNMATCHED);
   const [isSyncing, setIsSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
@@ -484,32 +839,55 @@ export default function ShopifyIntegrationPage({
     timers.current.forEach(clearTimeout);
   }, []);
 
-  // Surface the OAuth callback outcome (the API redirects back here with `?shopify=connected`
-  // or `?shopify=error&reason=...`), then strip the params so a refresh doesn't re-show it.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const outcome = params.get("shopify");
-    if (!outcome) return;
-
-    let msg = null;
-    if (outcome === "connected") {
-      msg = {
-        tone: "success",
-        text: params.get("webhooks") === "partial"
-          ? "Store connected. Some webhooks could not be registered — they'll be retried."
-          : "Store connected successfully.",
-      };
-    } else if (outcome === "error") {
-      msg = { tone: "error", text: `Connection failed (${params.get("reason") || "unknown error"}).` };
+  // Pulls the live sync-activity (recent runs + counts + needs-attention) for a real
+  // connection. No-op in demo mode. Returns the parsed payload (or null) so callers polling a
+  // running job can inspect it.
+  const loadActivity = async () => {
+    if (isDemo) return null;
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/activity`, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!aliveRef.current) return data;
+      setSyncJobs(data.jobs ?? []);
+      setCounts(data.counts ?? { synced: 0, pending: 0, error: 0 });
+      setUnmatched(data.unmatched ?? []);
+      return data;
+    } catch {
+      return null;
     }
+  };
 
-    const url = new URL(window.location.href);
-    ["shopify", "shop", "webhooks", "reason"].forEach((k) => url.searchParams.delete(k));
-    window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
-
-    // Defer out of the effect body: this reflects a one-time external signal (the OAuth
-    // callback's URL params) into UI state, not synchronous render-driven state.
-    if (msg) queueMicrotask(() => setNotice(msg));
+  // On mount (real store only): load the live locations + sales channels, then re-seed the
+  // config with validation, and fetch the sync activity. The demo store skips all of this.
+  useEffect(() => {
+    if (isDemo) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/nextapi/export/shopify/connection/${initialConn._id}/detail`, { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled || !aliveRef.current) return;
+        const locs = data.locations ?? [];
+        const pubs = data.publications ?? [];
+        const conn = data.connection ? { ...initialConn, ...data.connection } : initialConn;
+        setLocations(locs);
+        setPublications(pubs);
+        setPublishingEnabled(Boolean(data.publishingEnabled));
+        setNeedsReconnect(Boolean(data.needsReconnect));
+        setConnection(conn);
+        const reseeded = makeConfig(conn, locs, pubs, true);
+        setConfig(reseeded);
+        setSavedConfig(reseeded);
+      } catch {
+        /* keep the optimistic seed */
+      } finally {
+        if (!cancelled && aliveRef.current) setDetailLoaded(true);
+      }
+    })();
+    loadActivity();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
@@ -531,10 +909,7 @@ export default function ShopifyIntegrationPage({
       pricelistPriority: c.pricelistPriority.map((p, i) => (i === index ? { ...p, enabled: !p.enabled } : p)),
     }));
 
-  // Pointer-based reorder (works with mouse AND touch — native HTML5 drag never fires on
-  // touch). The grip handle starts the drag; window listeners track the pointer so it keeps
-  // working when the pointer leaves the handle, and each step swaps the dragged row with its
-  // neighbour as the pointer crosses that neighbour's midpoint (adjacent swap = no jitter).
+  // Pointer-based reorder (works with mouse AND touch — native HTML5 drag never fires on touch).
   const beginDrag = (e, index) => {
     e.preventDefault();
     draggingIdxRef.current = index;
@@ -586,31 +961,9 @@ export default function ShopifyIntegrationPage({
   }, [dragging]);
 
   /* ----- commands ----- */
-  const domainClean = domainInput.trim().toLowerCase();
-  const domainValid = /^[a-z0-9][a-z0-9-]*$/.test(domainClean);
 
-  // Start OAuth: ask the backend for the Shopify authorize URL, then redirect the browser to
-  // it. Shopify sends the user back to the API callback, which redirects to this page with
-  // `?shopify=connected` (handled by the status fetch + the banner effect below).
-  const connect = async () => {
-    if (!domainValid || connecting) return;
-    setConnecting(true);
-    try {
-      const res = await fetch(`/nextapi/export/shopify/connect?shop=${encodeURIComponent(domainClean)}`);
-      const data = await res.json();
-      if (res.ok && data.url) {
-        window.location.href = data.url;
-        return; // navigating away
-      }
-      setNotice({ tone: "error", text: data.error || "Could not start the Shopify connection." });
-    } catch {
-      setNotice({ tone: "error", text: "Could not reach the server to start the connection." });
-    }
-    setConnecting(false);
-  };
-
-  // Re-run OAuth for the already-known store to mint a fresh (refreshable) token. Used when
-  // the stored token can no longer be refreshed (Shopify retired non-expiring tokens).
+  // Re-run OAuth for this store to mint a fresh (refreshable) token. Used when the stored token
+  // can no longer be refreshed (Shopify retired non-expiring tokens) or to widen scopes.
   const reconnect = async () => {
     if (connecting || !connection.shopDomain) return;
     setConnecting(true);
@@ -621,62 +974,35 @@ export default function ShopifyIntegrationPage({
         window.location.href = data.url;
         return; // navigating away
       }
-      setNotice({ tone: "error", text: data.error || "Could not start the reconnect." });
+      onNotice({ tone: "error", text: data.error || "Could not start the reconnect." });
     } catch {
-      setNotice({ tone: "error", text: "Could not reach the server to reconnect." });
+      onNotice({ tone: "error", text: "Could not reach the server to reconnect." });
     }
     setConnecting(false);
   };
 
-  // Disconnect: delete the stored token/connection on the backend, then return to the
-  // not-connected view. Does not uninstall the app from the merchant's Shopify admin.
+  // Disconnect: delete the stored token/connection on the backend, then tell the parent to drop
+  // this store from the switcher. Does not uninstall the app from the merchant's Shopify admin.
   const disconnect = async () => {
     setConfirmDisconnect(false);
     if (connection._id) {
       try {
         await fetch(`/nextapi/export/shopify/connection/${connection._id}`, { method: "DELETE" });
       } catch {
-        /* best-effort — still drop to the not-connected view */
+        /* best-effort — still drop the store from the UI */
       }
     }
-    setIsConnected(false);
-    setDomainInput("");
+    onDisconnected(myKey);
   };
-
-  // Pulls the live sync-activity (recent runs + counts + needs-attention) for a real
-  // connection. No-op in demo mode. Returns the parsed payload (or null) so callers polling
-  // a running job can inspect it.
-  const loadActivity = async () => {
-    if (!connection._id) return null;
-    try {
-      const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/activity`, { cache: "no-store" });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (!aliveRef.current) return data;
-      setSyncJobs(data.jobs ?? []);
-      setCounts(data.counts ?? { synced: 0, pending: 0, error: 0 });
-      setUnmatched(data.unmatched ?? []);
-      return data;
-    } catch {
-      return null;
-    }
-  };
-
-  // Load real activity once when a live connection is present.
-  useEffect(() => {
-    if (hasRealConnection) loadActivity();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const sleep = (ms) => new Promise((r) => schedule(r, ms));
 
-  // Start a real stock sync, then poll /activity until the run leaves "running" (the push
-  // happens in the background on the API). Falls back to the local demo animation when there
-  // is no real connection id yet.
+  // Start a real stock sync, then poll /activity until the run leaves "running" (the push happens
+  // in the background on the API). Falls back to a local demo animation in demo mode.
   const syncNow = async () => {
     if (isSyncing) return;
 
-    if (!connection._id) {
+    if (isDemo) {
       setIsSyncing(true);
       const id = `job_${++jobSeq.current}`;
       const startedAt = new Date().toISOString();
@@ -699,7 +1025,7 @@ export default function ShopifyIntegrationPage({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (data.code === "REAUTH_REQUIRED") setNeedsReconnect(true);
-        setNotice({ tone: "error", text: data.error || "Could not start the sync." });
+        onNotice({ tone: "error", text: data.error || "Could not start the sync." });
         setIsSyncing(false);
         return;
       }
@@ -710,19 +1036,21 @@ export default function ShopifyIntegrationPage({
         const activity = await loadActivity();
         const run = activity?.jobs?.find((j) => j.id === runId);
         if (run && run.status !== "running") {
-          setConnection((c) => ({ ...c, lastSyncAt: run.time, lastSyncStatus: run.status === "failed" ? "failed" : "done" }));
+          const lastSyncStatus = run.status === "failed" ? "failed" : "done";
+          setConnection((c) => ({ ...c, lastSyncAt: run.time, lastSyncStatus }));
+          onPatch(myKey, { lastSyncAt: run.time, lastSyncStatus });
           const summary =
             run.status === "failed"
               ? `Sync failed${run.detail ? ` — ${run.detail}` : "."}`
               : run.status === "partial"
                 ? `Sync finished with items needing attention${run.detail ? ` (${run.detail}).` : "."}`
                 : "Sync complete.";
-          setNotice({ tone: run.status === "failed" ? "error" : "success", text: summary });
+          onNotice({ tone: run.status === "failed" ? "error" : "success", text: summary });
           break;
         }
       }
     } catch {
-      setNotice({ tone: "error", text: "Could not reach the server to start the sync." });
+      onNotice({ tone: "error", text: "Could not reach the server to start the sync." });
     }
     if (aliveRef.current) setIsSyncing(false);
   };
@@ -730,17 +1058,16 @@ export default function ShopifyIntegrationPage({
   const refreshActivity = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    if (connection._id) await loadActivity();
+    if (!isDemo) await loadActivity();
     else await sleep(700);
     if (aliveRef.current) setRefreshing(false);
   };
 
-  // Persist the config to the backend (PUT /shopify/connection/:id/config). Optimistically
-  // marks the form clean on success. Falls back to a local-only save when there is no real
-  // connection id yet (demo mode).
+  // Persist the config to the backend (PUT /shopify/connection/:id/config). Optimistically marks
+  // the form clean on success. Falls back to a local-only save in demo mode.
   const saveConfig = async () => {
     if (saving) return;
-    if (!connection._id) {
+    if (isDemo) {
       setSavedConfig(config);
       return;
     }
@@ -766,108 +1093,36 @@ export default function ShopifyIntegrationPage({
       });
       if (res.ok) {
         setSavedConfig(config);
-        setNotice({ tone: "success", text: "Configuration saved." });
+        onNotice({ tone: "success", text: "Configuration saved." });
       } else {
         const data = await res.json().catch(() => ({}));
-        setNotice({ tone: "error", text: data.error || "Could not save the configuration." });
+        onNotice({ tone: "error", text: data.error || "Could not save the configuration." });
       }
     } catch {
-      setNotice({ tone: "error", text: "Could not reach the server to save." });
+      onNotice({ tone: "error", text: "Could not reach the server to save." });
     }
     setSaving(false);
   };
   const discard = () => setConfig(savedConfig);
 
-  const statusMeta = {
-    active: { tone: "cyan", label: "Active" },
-    error: { tone: "red", label: "Error" },
-    uninstalled: { tone: "amber", label: "Uninstalled" },
-  }[connection.status] || { tone: "neutral", label: connection.status };
-
-  const savedLocationName =
-    locations.find((l) => l.id === savedConfig.shopifyLocationId)?.name || "—";
-
+  const statusMeta = statusMetaFor(connection.status);
+  const savedLocationName = locations.find((l) => l.id === savedConfig.shopifyLocationId)?.name || "—";
   const enabledPricelists = config.pricelistPriority.filter((p) => p.enabled).length;
   const attentionCount = unmatched.length;
   const stockOnly = config.ownership === "stock_only";
+  const scopes = connection.scopes || [];
 
   /* ====================================================================== */
   return (
-    <div className="pb-40 sm:pb-32">
-      {/* ----------------------------- Header ----------------------------- */}
-      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-          {/* Brand mark — official Shopify logo on a glassy tile lit by a soft green halo */}
-          <div className="relative shrink-0">
-            <div aria-hidden="true" className="absolute -inset-3 rounded-[1.75rem] bg-[#95BF47]/20 blur-2xl" />
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20 sm:h-[4.5rem] sm:w-[4.5rem]">
-              <ShopifyLogo className="h-9 w-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)] sm:h-10 sm:w-10" />
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-[#01a0be]">
-              <BagIcon className="h-3.5 w-3.5" />
-              Integration
-            </div>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              <span className="bg-gradient-to-r from-[#95BF47] via-[#5fae46] to-[#01a0be] bg-clip-text text-transparent">Shopify</span>
-            </h1>
-            <p className="mt-3 max-w-2xl text-neutral-400">
-              One-way push of stock, products, prices and images from the portal straight to your Shopify store.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:shrink-0">
-          {isConnected ? (
-            <>
-              <span className="inline-flex items-center gap-2">
-                {connection.status === "active" && <PingDot tone="cyan" />}
-                <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
-              </span>
-              <button
-                onClick={syncNow}
-                disabled={isSyncing}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSyncing ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
-                {isSyncing ? "Syncing…" : "Sync now"}
-              </button>
-            </>
-          ) : (
-            <StatusBadge tone="neutral">Not connected</StatusBadge>
-          )}
-        </div>
-      </header>
-
-      {notice && (
-        <div
-          className={`mb-6 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
-            notice.tone === "success"
-              ? "border-[#95BF47]/30 bg-[#95BF47]/10 text-[#b6df84]"
-              : "border-red-500/30 bg-red-500/10 text-red-300"
-          }`}
-        >
-          <span>{notice.text}</span>
-          <button
-            onClick={() => setNotice(null)}
-            aria-label="Dismiss"
-            className="shrink-0 text-current/70 transition-opacity hover:opacity-100"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {isConnected && needsReconnect && (
-        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6">
+      {needsReconnect && (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-2.5">
             <WarningIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
             <div>
               <p className="font-semibold text-amber-300">Reconnect needed</p>
               <p className="mt-0.5 text-amber-200/80">
-                Shopify retired the older access token for your store. Reconnect to refresh permissions and resume syncing — your store data is untouched.
+                Shopify retired the older access token for this store. Reconnect to refresh permissions and resume syncing — your store data is untouched.
               </p>
             </div>
           </div>
@@ -882,692 +1137,585 @@ export default function ShopifyIntegrationPage({
         </div>
       )}
 
-      {isConnected ? (
-        /* =============================== CONNECTED =============================== */
-        <div className="space-y-6">
-          {/* ---------------------- Connection summary --------------------- */}
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-3">
-                  <PingDot tone={statusMeta.tone} />
-                  <h2 className="truncate text-xl font-semibold text-white">{connection.shopDomain}</h2>
-                  <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
-                </div>
-
-                <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-4">
-                  <div>
-                    <dt className="text-neutral-500">Installed</dt>
-                    <dd className="mt-0.5 text-neutral-200">{fmtDate(connection.installedAt)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Last sync</dt>
-                    <dd className="mt-0.5 text-neutral-200">{fmtDateTime(connection.lastSyncAt)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Sync status</dt>
-                    <dd className="mt-1">
-                      <StatusBadge tone={JOB_STATUS_TONE[connection.lastSyncStatus] || "neutral"}>
-                        {connection.lastSyncStatus}
-                      </StatusBadge>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Location</dt>
-                    <dd className="mt-0.5 truncate text-neutral-200">{savedLocationName}</dd>
-                  </div>
-                </dl>
-
-                <div className="mt-5">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Granted scopes</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {connection.scopes.map((s) => (
-                      <StatusBadge key={s} tone="cyan">{s}</StatusBadge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5">
-                  {attentionCount > 0 ? (
-                    <a href="#needs-attention" className="inline-flex items-center gap-2 text-sm font-medium text-amber-400 hover:text-amber-300">
-                      <WarningIcon className="h-4 w-4" />
-                      {attentionCount} {attentionCount === 1 ? "item needs" : "items need"} attention
-                    </a>
-                  ) : (
-                    <span className="inline-flex items-center gap-2 text-sm font-medium text-green-400">
-                      <CheckIcon className="h-4 w-4" />
-                      All systems healthy
-                    </span>
-                  )}
-                </div>
-              </div>
+      {/* ---------------------- Connection summary --------------------- */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <PingDot tone={statusMeta.tone} />
+              <h2 className="truncate text-xl font-semibold text-white">{connection.shopDomain}</h2>
+              <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
             </div>
-          </section>
 
-          {/* ------------------------ Ownership mode ----------------------- */}
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <SectionHeading
-              title="Ownership mode"
-              desc="Decide how assertively the portal writes to products once they exist in your store."
-            />
-            <fieldset>
-              <legend className="sr-only">Ownership mode</legend>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                {OWNERSHIP_MODES.map((m) => {
-                  const selected = config.ownership === m.value;
-                  return (
-                    <label
-                      key={m.value}
-                      className={`group relative flex cursor-pointer flex-col rounded-xl border bg-neutral-800/50 p-5 transition-all ${
-                        selected
-                          ? "border-[#01a0be] shadow-[0_0_40px_rgba(1,160,190,0.1)]"
-                          : "border-neutral-700/50 hover:border-[#01a0be]/50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="ownership"
-                        value={m.value}
-                        checked={selected}
-                        onChange={() => setOwnership(m.value)}
-                        className="sr-only"
-                      />
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-white">{m.title}</span>
-                          {m.recommended && <StatusBadge tone="cyan">Recommended</StatusBadge>}
-                        </span>
-                        {selected && <CheckIcon className="h-5 w-5 text-[#01a0be]" />}
-                      </div>
-                      <p className="mt-2 text-xs leading-relaxed text-neutral-400">{m.desc}</p>
-                      {m.warn && selected && (
-                        <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-400">
-                          <span className="font-semibold">Heads up — </span>{m.warn}
-                        </p>
-                      )}
-                    </label>
-                  );
-                })}
+            <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-neutral-500">Installed</dt>
+                <dd className="mt-0.5 text-neutral-200">{fmtDate(connection.installedAt)}</dd>
               </div>
-            </fieldset>
-          </section>
+              <div>
+                <dt className="text-neutral-500">Last sync</dt>
+                <dd className="mt-0.5 text-neutral-200">{fmtDateTime(connection.lastSyncAt)}</dd>
+              </div>
+              <div>
+                <dt className="text-neutral-500">Sync status</dt>
+                <dd className="mt-1">
+                  <StatusBadge tone={JOB_STATUS_TONE[connection.lastSyncStatus] || "neutral"}>
+                    {connection.lastSyncStatus || "—"}
+                  </StatusBadge>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-neutral-500">Location</dt>
+                <dd className="mt-0.5 truncate text-neutral-200">{savedLocationName}</dd>
+              </div>
+            </dl>
 
-          {/* ------------------------ What to sync ------------------------- */}
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <SectionHeading title="What to sync" desc="Pick the data the portal is allowed to push to your store." />
-            {stockOnly && (
-              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-                <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-                <span><span className="font-medium text-neutral-200">Stock only</span> ownership mode syncs inventory and nothing else — these options don&apos;t apply. Switch ownership mode to enable them.</span>
+            {scopes.length > 0 && (
+              <div className="mt-5">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Granted scopes</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {scopes.map((s) => (
+                    <StatusBadge key={s} tone="cyan">{s}</StatusBadge>
+                  ))}
+                </div>
               </div>
             )}
-            <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {SYNC_FLAGS.map((f) => (
-                <li key={f.key}>
-                  <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">{f.label}</span>
-                        {f.slow && <StatusBadge tone="amber">Slow</StatusBadge>}
-                      </span>
-                      <span className="mt-1 block text-xs text-neutral-500">{f.desc}</span>
+
+            <div className="mt-5">
+              {attentionCount > 0 ? (
+                <a href="#needs-attention" className="inline-flex items-center gap-2 text-sm font-medium text-amber-400 hover:text-amber-300">
+                  <WarningIcon className="h-4 w-4" />
+                  {attentionCount} {attentionCount === 1 ? "item needs" : "items need"} attention
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-2 text-sm font-medium text-green-400">
+                  <CheckIcon className="h-4 w-4" />
+                  All systems healthy
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={syncNow}
+              disabled={isSyncing}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSyncing ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
+              {isSyncing ? "Syncing…" : "Sync now"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------ Ownership mode ----------------------- */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <SectionHeading
+          title="Ownership mode"
+          desc="Decide how assertively the portal writes to products once they exist in this store."
+        />
+        <fieldset>
+          <legend className="sr-only">Ownership mode</legend>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {OWNERSHIP_MODES.map((m) => {
+              const selected = config.ownership === m.value;
+              return (
+                <label
+                  key={m.value}
+                  className={`group relative flex cursor-pointer flex-col rounded-xl border bg-neutral-800/50 p-5 transition-all ${
+                    selected
+                      ? "border-[#01a0be] shadow-[0_0_40px_rgba(1,160,190,0.1)]"
+                      : "border-neutral-700/50 hover:border-[#01a0be]/50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`ownership-${myKey}`}
+                    value={m.value}
+                    checked={selected}
+                    onChange={() => setOwnership(m.value)}
+                    className="sr-only"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-white">{m.title}</span>
+                      {m.recommended && <StatusBadge tone="cyan">Recommended</StatusBadge>}
                     </span>
-                    <ToggleSwitch checked={!!config[f.key]} onChange={() => toggleFlag(f.key)} ariaLabel={`Sync ${f.label}`} />
+                    {selected && <CheckIcon className="h-5 w-5 text-[#01a0be]" />}
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">{m.desc}</p>
+                  {m.warn && selected && (
+                    <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-400">
+                      <span className="font-semibold">Heads up — </span>{m.warn}
+                    </p>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      </section>
+
+      {/* ------------------------ What to sync ------------------------- */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <SectionHeading title="What to sync" desc="Pick the data the portal is allowed to push to this store." />
+        {stockOnly && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+            <span><span className="font-medium text-neutral-200">Stock only</span> ownership mode syncs inventory and nothing else — these options don&apos;t apply. Switch ownership mode to enable them.</span>
+          </div>
+        )}
+        <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {SYNC_FLAGS.map((f) => (
+              <li key={f.key}>
+                <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">{f.label}</span>
+                      {f.slow && <StatusBadge tone="amber">Slow</StatusBadge>}
+                    </span>
+                    <span className="mt-1 block text-xs text-neutral-500">{f.desc}</span>
+                  </span>
+                  <ToggleSwitch checked={!!config[f.key]} onChange={() => toggleFlag(f.key)} ariaLabel={`Sync ${f.label}`} />
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      </section>
+
+      {/* ----------------------------- Pricing ------------------------- */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <SectionHeading
+          title="Pricing"
+          desc="Each variant carries several named pricelists — set which one wins and how VAT is handled."
+        />
+
+        {stockOnly && (
+          <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+            <span>Pricing doesn&apos;t apply in <span className="font-medium text-neutral-200">Stock only</span> ownership mode — prices aren&apos;t pushed. Switch ownership mode to edit pricing.</span>
+          </div>
+        )}
+        <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
+          {/* pricelist priority — drag to reorder, matching the Export settings */}
+          <p className="mb-2 text-sm font-medium text-neutral-300">Pricelist priority</p>
+          <p className="mb-3 text-xs text-neutral-500">Drag the handle to reorder — the first enabled pricelist with a valid price wins.</p>
+          <div ref={listRef} className="rounded-xl border border-neutral-700/50 bg-neutral-900/30 p-3">
+            {config.pricelistPriority.map((pl, idx) => {
+              const isFuture = nowTs > 0 && new Date(pl.valid_from).getTime() > nowTs;
+              const isDragging = draggingIdx === idx;
+              return (
+                <div
+                  key={pl._id}
+                  data-pl-row
+                  className={`group mb-2 flex select-none items-center gap-2 rounded-xl p-2.5 transition-shadow duration-150 last:mb-0 sm:gap-3 sm:p-3 ${
+                    isDragging
+                      ? "border-2 border-cyan-500/50 bg-neutral-800/90 shadow-lg shadow-cyan-500/20"
+                      : pl.enabled
+                        ? "border border-neutral-700/50 bg-neutral-800/60"
+                        : "border border-neutral-800/50 bg-neutral-900/40 opacity-60"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    aria-label={`Reorder ${pl.name}`}
+                    onPointerDown={(e) => beginDrag(e, idx)}
+                    className="flex h-10 w-10 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg bg-neutral-700/30 text-neutral-500 transition-colors hover:bg-cyan-500/20 hover:text-cyan-400 active:cursor-grabbing sm:h-9 sm:w-9"
+                  >
+                    <GripIcon className="h-5 w-5" />
+                  </button>
+
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums ${
+                    idx === 0 && pl.enabled
+                      ? "bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/30"
+                      : pl.enabled
+                        ? "bg-neutral-700/80 text-neutral-300"
+                        : "bg-neutral-800 text-neutral-500"
+                  }`}>
+                    {idx + 1}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className={`truncate text-sm font-medium ${pl.enabled ? "text-white" : "text-neutral-500"}`}>{pl.name}</span>
+                      {idx === 0 && pl.enabled && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-cyan-400/80">Primary</span>
+                      )}
+                      {isFuture && config.futureDatedGuard && <StatusBadge tone="amber">future · skipped</StatusBadge>}
+                    </div>
+                    <p className="mt-0.5 text-xs text-neutral-500">
+                      VAT {pl.vat}% · from {fmtDate(pl.valid_from)}
+                    </p>
+                  </div>
+
+                  <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+                    <ToggleSwitch checked={pl.enabled} onChange={() => togglePricelist(idx)} ariaLabel={`Enable ${pl.name}`} />
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+          {enabledPricelists === 0 && (
+            <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+              Enable at least one pricelist — with none enabled, no price can be resolved.
+            </p>
+          )}
+
+          {/* VAT mode */}
+          <div className="mt-8">
+            <p className="mb-1 text-sm font-medium text-neutral-300">VAT handling</p>
+            <p className="mb-3 text-xs text-neutral-500">Pricelists carry their own VAT (e.g. 22% vs 0%) — choose how the price reaches Shopify.</p>
+            <div className="inline-flex w-full gap-1 rounded-xl border border-neutral-700/50 bg-neutral-900/60 p-1 sm:w-auto">
+              {[
+                { v: "inclusive", label: "VAT inclusive" },
+                { v: "exclusive", label: "VAT exclusive" },
+              ].map((opt) => (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => setVatMode(opt.v)}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:flex-none sm:px-4 sm:text-sm ${
+                    config.priceVatMode === opt.v
+                      ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20"
+                      : "text-neutral-400 hover:bg-neutral-800/60 hover:text-white"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* future-dated guard */}
+          <div className="mt-6">
+            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+              <span className="min-w-0">
+                <span className="text-sm font-medium text-white">Future-dated price guard</span>
+                <span className="mt-1 block text-xs text-neutral-500">
+                  Only apply prices whose <span className="font-mono text-neutral-400">valid_from</span> date has already passed (valid_from ≤ now).
+                </span>
+              </span>
+              <ToggleSwitch checked={config.futureDatedGuard} onChange={() => toggleFlag("futureDatedGuard")} ariaLabel="Future-dated price guard" />
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      {/* --------------------- Products & location --------------------- */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <SectionHeading title="Products & location" desc="Which products are in scope, and where their inventory lands." />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <label className="block text-sm font-medium text-neutral-300">Products to sync</label>
+              <a
+                href="/export"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white"
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+                New export
+              </a>
+            </div>
+            {exportOptions.length > 0 ? (
+              <>
+                <Select
+                  ariaLabel="Products to sync"
+                  value={config.exportConfigId}
+                  onChange={(e) => setCfg({ exportConfigId: e.target.value })}
+                >
+                  <option value="" disabled>Select an export configuration…</option>
+                  {exportOptions.map((x) => (
+                    <option key={x._id} value={x._id}>{x.name}</option>
+                  ))}
+                </Select>
+                <p className="mt-2 text-xs text-neutral-500">Sync follows this export config&apos;s product filters and field rules.</p>
+              </>
+            ) : (
+              <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-5 text-center">
+                <p className="text-sm text-neutral-300">No Shopify export configurations yet.</p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Create one with the <span className="font-medium text-neutral-300">Shopify</span> preset to choose which products sync.
+                </p>
+                <a
+                  href="/export"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#01a0be] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f]"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Create export configuration
+                </a>
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-neutral-300">Shopify location</label>
+            <Select
+              ariaLabel="Shopify location"
+              value={config.shopifyLocationId}
+              disabled={!detailLoaded}
+              onChange={(e) => setCfg({ shopifyLocationId: e.target.value })}
+            >
+              {!detailLoaded && <option value="">Loading locations…</option>}
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </Select>
+            <p className="mt-2 text-xs text-neutral-500">
+              Inventory is pushed to this one location. Multi-location stores aren&apos;t supported yet.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* --------------------------- Sales channels -------------------- */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <SectionHeading
+          title="Sales channels"
+          desc="Where newly-created products are published — e.g. Online Store, Point of Sale."
+        />
+        {!detailLoaded ? (
+          <div className="h-16 animate-pulse rounded-xl border border-neutral-800 bg-neutral-800/40" />
+        ) : !publishingEnabled ? (
+          <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2.5">
+              <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+              <span className="text-amber-200/90">
+                Reconnect this store to grant publishing permission, then choose which channels new products go live on.
+              </span>
+            </div>
+            <button
+              onClick={reconnect}
+              disabled={connecting}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-neutral-950 transition-all hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {connecting ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
+              {connecting ? "Redirecting…" : "Reconnect"}
+            </button>
+          </div>
+        ) : publications.length === 0 ? (
+          <p className="text-sm text-neutral-500">No sales channels found in this store.</p>
+        ) : (
+          <>
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {publications.map((p) => (
+                <li key={p.id}>
+                  <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+                    <span className="text-sm font-medium text-white">{p.name}</span>
+                    <ToggleSwitch
+                      checked={(config.publicationIds || []).includes(p.id)}
+                      onChange={() => togglePublication(p.id)}
+                      ariaLabel={`Publish to ${p.name}`}
+                    />
                   </label>
                 </li>
               ))}
             </ul>
-            </fieldset>
-          </section>
+            <p className="mt-3 text-xs text-neutral-500">
+              New products are published to these channels. In <span className="font-medium text-neutral-300">Portal authoritative</span> mode, existing products are kept in sync too (channels added or removed on the next sync). In <span className="font-medium text-neutral-300">Create, then hand off</span>, only newly-created products are published.
+            </p>
+          </>
+        )}
+      </section>
 
-          {/* ----------------------------- Pricing ------------------------- */}
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <SectionHeading
-              title="Pricing"
-              desc="Each variant carries several named pricelists — set which one wins and how VAT is handled."
-            />
+      {/* --------------------------- Sync activity --------------------- */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <SectionHeading
+          title="Sync activity"
+          desc="The most recent push jobs and the overall state of your mapped catalog."
+          right={
+            <button
+              onClick={refreshActivity}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white disabled:opacity-50"
+            >
+              {refreshing ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
+              Refresh
+            </button>
+          }
+        />
 
-            {stockOnly && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-                <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-                <span>Pricing doesn&apos;t apply in <span className="font-medium text-neutral-200">Stock only</span> ownership mode — prices aren&apos;t pushed. Switch ownership mode to edit pricing.</span>
-              </div>
-            )}
-            <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
-            {/* pricelist priority — drag to reorder, matching the Export settings */}
-            <p className="mb-2 text-sm font-medium text-neutral-300">Pricelist priority</p>
-            <p className="mb-3 text-xs text-neutral-500">Drag the handle to reorder — the first enabled pricelist with a valid price wins.</p>
-            <div ref={listRef} className="rounded-xl border border-neutral-700/50 bg-neutral-900/30 p-3">
-              {config.pricelistPriority.map((pl, idx) => {
-                const isFuture = nowTs > 0 && new Date(pl.valid_from).getTime() > nowTs;
-                const isDragging = draggingIdx === idx;
-                return (
-                  <div
-                    key={pl._id}
-                    data-pl-row
-                    className={`group mb-2 flex select-none items-center gap-2 rounded-xl p-2.5 transition-shadow duration-150 last:mb-0 sm:gap-3 sm:p-3 ${
-                      isDragging
-                        ? "border-2 border-cyan-500/50 bg-neutral-800/90 shadow-lg shadow-cyan-500/20"
-                        : pl.enabled
-                          ? "border border-neutral-700/50 bg-neutral-800/60"
-                          : "border border-neutral-800/50 bg-neutral-900/40 opacity-60"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      aria-label={`Reorder ${pl.name}`}
-                      onPointerDown={(e) => beginDrag(e, idx)}
-                      className="flex h-10 w-10 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg bg-neutral-700/30 text-neutral-500 transition-colors hover:bg-cyan-500/20 hover:text-cyan-400 active:cursor-grabbing sm:h-9 sm:w-9"
-                    >
-                      <GripIcon className="h-5 w-5" />
-                    </button>
-
-                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums ${
-                      idx === 0 && pl.enabled
-                        ? "bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/30"
-                        : pl.enabled
-                          ? "bg-neutral-700/80 text-neutral-300"
-                          : "bg-neutral-800 text-neutral-500"
-                    }`}>
-                      {idx + 1}
-                    </span>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className={`truncate text-sm font-medium ${pl.enabled ? "text-white" : "text-neutral-500"}`}>{pl.name}</span>
-                        {idx === 0 && pl.enabled && (
-                          <span className="text-[10px] font-medium uppercase tracking-wider text-cyan-400/80">Primary</span>
-                        )}
-                        {isFuture && config.futureDatedGuard && <StatusBadge tone="amber">future · skipped</StatusBadge>}
-                      </div>
-                      <p className="mt-0.5 text-xs text-neutral-500">
-                        VAT {pl.vat}% · from {fmtDate(pl.valid_from)}
-                      </p>
-                    </div>
-
-                    <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-                      <ToggleSwitch checked={pl.enabled} onChange={() => togglePricelist(idx)} ariaLabel={`Enable ${pl.name}`} />
-                    </label>
-                  </div>
-                );
-              })}
+        {/* counts */}
+        <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { label: "Synced", value: counts.synced, tone: "text-cyan-400" },
+            { label: "Pending", value: counts.pending, tone: "text-amber-400" },
+            { label: "Error", value: counts.error, tone: "text-red-400" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-3 py-2.5 sm:px-4 sm:py-3">
+              <div className={`text-xl font-semibold tabular-nums sm:text-2xl ${s.tone}`}>{fmtNum(s.value)}</div>
+              <div className="mt-0.5 text-xs text-neutral-500">{s.label}</div>
             </div>
-            {enabledPricelists === 0 && (
-              <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-                Enable at least one pricelist — with none enabled, no price can be resolved.
-              </p>
-            )}
+          ))}
+        </div>
 
-            {/* VAT mode */}
-            <div className="mt-8">
-              <p className="mb-1 text-sm font-medium text-neutral-300">VAT handling</p>
-              <p className="mb-3 text-xs text-neutral-500">Pricelists carry their own VAT (e.g. 22% vs 0%) — choose how the price reaches Shopify.</p>
-              <div className="inline-flex w-full gap-1 rounded-xl border border-neutral-700/50 bg-neutral-900/60 p-1 sm:w-auto">
-                {[
-                  { v: "inclusive", label: "VAT inclusive" },
-                  { v: "exclusive", label: "VAT exclusive" },
-                ].map((opt) => (
-                  <button
-                    key={opt.v}
-                    type="button"
-                    onClick={() => setVatMode(opt.v)}
-                    className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:flex-none sm:px-4 sm:text-sm ${
-                      config.priceVatMode === opt.v
-                        ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20"
-                        : "text-neutral-400 hover:bg-neutral-800/60 hover:text-white"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {syncJobs.length === 0 && (
+          <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-8 text-center">
+            <p className="text-sm text-neutral-300">No sync runs yet.</p>
+            <p className="mt-1 text-xs text-neutral-500">Hit <span className="font-medium text-neutral-300">Sync now</span> to push live stock to your store.</p>
+          </div>
+        )}
 
-            {/* future-dated guard */}
-            <div className="mt-6">
-              <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
-                <span className="min-w-0">
-                  <span className="text-sm font-medium text-white">Future-dated price guard</span>
-                  <span className="mt-1 block text-xs text-neutral-500">
-                    Only apply prices whose <span className="font-mono text-neutral-400">valid_from</span> date has already passed (valid_from ≤ now).
-                  </span>
-                </span>
-                <ToggleSwitch checked={config.futureDatedGuard} onChange={() => toggleFlag("futureDatedGuard")} ariaLabel="Future-dated price guard" />
-              </label>
-            </div>
-            </fieldset>
-          </section>
-
-          {/* --------------------- Products & location --------------------- */}
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <SectionHeading title="Products & location" desc="Which products are in scope, and where their inventory lands." />
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <label className="block text-sm font-medium text-neutral-300">Products to sync</label>
-                  <a
-                    href="/export"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white"
-                  >
-                    <PlusIcon className="h-3.5 w-3.5" />
-                    New export
-                  </a>
-                </div>
-                {exportOptions.length > 0 ? (
-                  <>
-                    <Select
-                      ariaLabel="Products to sync"
-                      value={config.exportConfigId}
-                      onChange={(e) => setCfg({ exportConfigId: e.target.value })}
-                    >
-                      <option value="" disabled>Select an export configuration…</option>
-                      {exportOptions.map((x) => (
-                        <option key={x._id} value={x._id}>{x.name}</option>
-                      ))}
-                    </Select>
-                    <p className="mt-2 text-xs text-neutral-500">Sync follows this export config&apos;s product filters and field rules.</p>
-                  </>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-5 text-center">
-                    <p className="text-sm text-neutral-300">No Shopify export configurations yet.</p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      Create one with the <span className="font-medium text-neutral-300">Shopify</span> preset to choose which products sync.
-                    </p>
-                    <a
-                      href="/export"
-                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#01a0be] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f]"
-                    >
-                      <PlusIcon className="h-4 w-4" />
-                      Create export configuration
-                    </a>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-neutral-300">Shopify location</label>
-                <Select
-                  ariaLabel="Shopify location"
-                  value={config.shopifyLocationId}
-                  onChange={(e) => setCfg({ shopifyLocationId: e.target.value })}
-                >
-                  {locations.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </Select>
-                <p className="mt-2 text-xs text-neutral-500">
-                  Inventory is pushed to this one location. Multi-location stores aren&apos;t supported yet.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* --------------------------- Sales channels -------------------- */}
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <SectionHeading
-              title="Sales channels"
-              desc="Where newly-created products are published — e.g. Online Store, Point of Sale."
-            />
-            {!initialPublishingEnabled ? (
-              <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-2.5">
-                  <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-                  <span className="text-amber-200/90">
-                    Reconnect your store to grant publishing permission, then choose which channels new products go live on.
-                  </span>
-                </div>
-                <button
-                  onClick={reconnect}
-                  disabled={connecting}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-neutral-950 transition-all hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {connecting ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
-                  {connecting ? "Redirecting…" : "Reconnect"}
-                </button>
-              </div>
-            ) : initialPublications.length === 0 ? (
-              <p className="text-sm text-neutral-500">No sales channels found in your store.</p>
-            ) : (
-              <>
-                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {initialPublications.map((p) => (
-                    <li key={p.id}>
-                      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
-                        <span className="text-sm font-medium text-white">{p.name}</span>
-                        <ToggleSwitch
-                          checked={(config.publicationIds || []).includes(p.id)}
-                          onChange={() => togglePublication(p.id)}
-                          ariaLabel={`Publish to ${p.name}`}
-                        />
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-3 text-xs text-neutral-500">
-                  New products are published to these channels. In <span className="font-medium text-neutral-300">Portal authoritative</span> mode, existing products are kept in sync too (channels added or removed on the next sync). In <span className="font-medium text-neutral-300">Create, then hand off</span>, only newly-created products are published.
-                </p>
-              </>
-            )}
-          </section>
-
-          {/* --------------------------- Sync activity --------------------- */}
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <SectionHeading
-              title="Sync activity"
-              desc="The most recent push jobs and the overall state of your mapped catalog."
-              right={
-                <button
-                  onClick={refreshActivity}
-                  disabled={refreshing}
-                  className="inline-flex items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white disabled:opacity-50"
-                >
-                  {refreshing ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
-                  Refresh
-                </button>
-              }
-            />
-
-            {/* counts */}
-            <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
-              {[
-                { label: "Synced", value: counts.synced, tone: "text-cyan-400" },
-                { label: "Pending", value: counts.pending, tone: "text-amber-400" },
-                { label: "Error", value: counts.error, tone: "text-red-400" },
-              ].map((s) => (
-                <div key={s.label} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-3 py-2.5 sm:px-4 sm:py-3">
-                  <div className={`text-xl font-semibold tabular-nums sm:text-2xl ${s.tone}`}>{fmtNum(s.value)}</div>
-                  <div className="mt-0.5 text-xs text-neutral-500">{s.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {syncJobs.length === 0 && (
-              <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-8 text-center">
-                <p className="text-sm text-neutral-300">No sync runs yet.</p>
-                <p className="mt-1 text-xs text-neutral-500">Hit <span className="font-medium text-neutral-300">Sync now</span> to push live stock to your store.</p>
-              </div>
-            )}
-
-            {/* desktop table */}
-            <div className={`${syncJobs.length === 0 ? "hidden" : "hidden md:block"} overflow-x-auto rounded-xl border border-neutral-700/50`}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
-                    <th className="px-4 py-3 font-medium">Type</th>
-                    <th className="px-4 py-3 font-medium">Item</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 text-right font-medium">Attempts</th>
-                    <th className="px-4 py-3 font-medium">Time</th>
-                    <th className="px-4 py-3 font-medium">Detail</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-800">
-                  {syncJobs.map((j) => (
-                    <tr key={j.id} className="hover:bg-neutral-800/30">
-                      <td className="px-4 py-3"><StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge></td>
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-neutral-200">{jobItem(j)}</span>
-                        {jobSub(j) && <span className="ml-2 text-xs text-neutral-500">{jobSub(j)}</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5">
-                          {j.status === "running" && <PingDot tone="cyan" />}
-                          <StatusBadge tone={JOB_STATUS_TONE[j.status] || "neutral"}>{j.status}</StatusBadge>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-neutral-400">{j.attempts}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-neutral-400">{fmtDateTime(j.time)}</td>
-                      <td className="max-w-[240px] truncate px-4 py-3 text-neutral-500" title={jobDetail(j) || ""}>{jobDetail(j) || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* mobile cards */}
-            <div className="space-y-3 md:hidden">
+        {/* desktop table */}
+        <div className={`${syncJobs.length === 0 ? "hidden" : "hidden md:block"} overflow-x-auto rounded-xl border border-neutral-700/50`}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
+                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="px-4 py-3 font-medium">Item</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Attempts</th>
+                <th className="px-4 py-3 font-medium">Time</th>
+                <th className="px-4 py-3 font-medium">Detail</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-800">
               {syncJobs.map((j) => (
-                <div key={j.id} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge>
+                <tr key={j.id} className="hover:bg-neutral-800/30">
+                  <td className="px-4 py-3"><StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge></td>
+                  <td className="px-4 py-3">
+                    <span className="font-mono text-neutral-200">{jobItem(j)}</span>
+                    {jobSub(j) && <span className="ml-2 text-xs text-neutral-500">{jobSub(j)}</span>}
+                  </td>
+                  <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5">
                       {j.status === "running" && <PingDot tone="cyan" />}
-                      <StatusBadge tone={JOB_STATUS_TONE[j.status]}>{j.status}</StatusBadge>
+                      <StatusBadge tone={JOB_STATUS_TONE[j.status] || "neutral"}>{j.status}</StatusBadge>
                     </span>
-                  </div>
-                  <p className="mt-2 font-mono text-sm text-neutral-200">{jobItem(j)}</p>
-                  {jobSub(j) && <p className="text-xs text-neutral-500">{jobSub(j)}</p>}
-                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div className="flex justify-between"><dt className="text-neutral-500">Attempts</dt><dd className="tabular-nums text-neutral-300">{j.attempts}</dd></div>
-                    <div className="flex justify-between"><dt className="text-neutral-500">Time</dt><dd className="text-neutral-300">{fmtDateTime(j.time).replace(" UTC", "")}</dd></div>
-                  </dl>
-                  {jobDetail(j) && j.status === "failed" && <p className="mt-2 break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{jobDetail(j)}</p>}
-                </div>
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-neutral-400">{j.attempts}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-neutral-400">{fmtDateTime(j.time)}</td>
+                  <td className="max-w-[240px] truncate px-4 py-3 text-neutral-500" title={jobDetail(j) || ""}>{jobDetail(j) || "—"}</td>
+                </tr>
               ))}
-            </div>
-          </section>
-
-          {/* --------------------- Needs attention ------------------------- */}
-          {attentionCount > 0 && (
-            <section id="needs-attention" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-              <SectionHeading
-                icon={<WarningIcon className="h-5 w-5 text-amber-400" />}
-                title="Needs attention"
-                desc="Variants we couldn't push on the last run. Resolve the cause, or let the next sync retry."
-                right={<StatusBadge tone="red">{attentionCount}</StatusBadge>}
-              />
-
-              {/* desktop table */}
-              <div className="hidden overflow-x-auto rounded-xl border border-neutral-700/50 md:block">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
-                      <th className="px-4 py-3 font-medium">SKU</th>
-                      <th className="px-4 py-3 font-medium">Parent code</th>
-                      <th className="px-4 py-3 font-medium">Reason</th>
-                      <th className="px-4 py-3 text-right font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-800">
-                    {unmatched.map((r) => (
-                      <tr key={r.sku} className="hover:bg-neutral-800/30">
-                        <td className="px-4 py-3 font-mono text-neutral-200">{r.sku}</td>
-                        <td className="px-4 py-3 text-neutral-500">{r.parentCode}</td>
-                        <td className="px-4 py-3"><StatusBadge tone={r.tone}>{r.reason}</StatusBadge></td>
-                        <td className="px-4 py-3 text-right">
-                          <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
-                            Resolve
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* mobile cards */}
-              <div className="space-y-3 md:hidden">
-                {unmatched.map((r) => (
-                  <div key={r.sku} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-mono text-sm text-neutral-200">{r.sku}</span>
-                      <StatusBadge tone={r.tone}>{r.reason}</StatusBadge>
-                    </div>
-                    <p className="mt-1 text-xs text-neutral-500">{r.parentCode}</p>
-                    <button className="mt-3 w-full rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
-                      Resolve
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ------------------------ Danger zone -------------------------- */}
-          <section className="rounded-2xl border border-red-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-white">Disconnect store</h2>
-                <p className="mt-1 text-sm text-neutral-400">
-                  Stops all syncing and revokes access. Your Shopify products stay exactly as they are — nothing is deleted.
-                </p>
-              </div>
-              {confirmDisconnect ? (
-                <div className="flex w-full shrink-0 gap-2 sm:w-auto">
-                  <button
-                    onClick={() => setConfirmDisconnect(false)}
-                    className="flex-1 justify-center rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-2.5 text-sm font-semibold text-neutral-300 transition-all hover:border-neutral-600 hover:text-white sm:flex-none"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={disconnect}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500/90 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-red-500 sm:flex-none"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                    Yes, disconnect
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmDisconnect(true)}
-                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/5 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all hover:border-red-500/60 hover:bg-red-500/10 sm:w-auto"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  Disconnect
-                </button>
-              )}
-            </div>
-          </section>
+            </tbody>
+          </table>
         </div>
-      ) : (
-        /* ============================= NOT CONNECTED ============================= */
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          {/* left: connect + how it works */}
-          <div className="space-y-6">
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-              <div className="relative mb-6 w-fit">
-                <div aria-hidden="true" className="absolute -inset-2 rounded-2xl bg-[#95BF47]/20 blur-xl" />
-                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
-                  <ShopifyLogo className="h-8 w-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]" />
-                </div>
+
+        {/* mobile cards */}
+        <div className="space-y-3 md:hidden">
+          {syncJobs.map((j) => (
+            <div key={j.id} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge>
+                <span className="inline-flex items-center gap-1.5">
+                  {j.status === "running" && <PingDot tone="cyan" />}
+                  <StatusBadge tone={JOB_STATUS_TONE[j.status]}>{j.status}</StatusBadge>
+                </span>
               </div>
-              <h2 className="text-xl font-semibold text-white">Connect your Shopify store</h2>
-              <p className="mt-2 max-w-lg text-sm leading-relaxed text-neutral-400">
-                Install the portal app on your store with a single approval. No API keys to copy, no manual setup — once
-                connected, choose what to sync and the portal keeps it current.
-              </p>
+              <p className="mt-2 font-mono text-sm text-neutral-200">{jobItem(j)}</p>
+              {jobSub(j) && <p className="text-xs text-neutral-500">{jobSub(j)}</p>}
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div className="flex justify-between"><dt className="text-neutral-500">Attempts</dt><dd className="tabular-nums text-neutral-300">{j.attempts}</dd></div>
+                <div className="flex justify-between"><dt className="text-neutral-500">Time</dt><dd className="text-neutral-300">{fmtDateTime(j.time).replace(" UTC", "")}</dd></div>
+              </dl>
+              {jobDetail(j) && j.status === "failed" && <p className="mt-2 break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{jobDetail(j)}</p>}
+            </div>
+          ))}
+        </div>
+      </section>
 
-              <div className="mt-6 max-w-lg">
-                <label htmlFor="shop-domain" className="mb-2 block text-sm font-medium text-neutral-300">Your store domain</label>
-                <div className="flex overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900/60 transition-colors focus-within:border-[#01a0be]/50">
-                  <input
-                    id="shop-domain"
-                    type="text"
-                    inputMode="url"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    value={domainInput}
-                    onChange={(e) => setDomainInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && connect()}
-                    placeholder="your-store"
-                    className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none"
-                  />
-                  <span className="flex select-none items-center whitespace-nowrap border-l border-neutral-700 px-3 text-sm text-neutral-500">
-                    .myshopify.com
-                  </span>
-                </div>
-                <p className={`mt-2 text-xs ${domainInput && !domainValid ? "text-amber-400" : "text-neutral-500"}`}>
-                  {domainInput && !domainValid
-                    ? "Use only lowercase letters, numbers and hyphens — just the store name."
-                    : "Enter just your store name — we'll add .myshopify.com for you."}
-                </p>
+      {/* --------------------- Needs attention ------------------------- */}
+      {attentionCount > 0 && (
+        <section id="needs-attention" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+          <SectionHeading
+            icon={<WarningIcon className="h-5 w-5 text-amber-400" />}
+            title="Needs attention"
+            desc="Variants we couldn't push on the last run. Resolve the cause, or let the next sync retry."
+            right={<StatusBadge tone="red">{attentionCount}</StatusBadge>}
+          />
 
-                <button
-                  onClick={connect}
-                  disabled={!domainValid || connecting}
-                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-                >
-                  {connecting ? <SpinnerIcon className="h-4 w-4" /> : <BagIcon className="h-4 w-4" />}
-                  {connecting ? "Redirecting to Shopify…" : "Connect Shopify"}
-                </button>
-              </div>
-
-              {/* how it works */}
-              <ol className="mt-8 grid grid-cols-1 gap-4 border-t border-neutral-800 pt-6 sm:grid-cols-3">
-                {[
-                  "Enter your store domain",
-                  "Approve the install on Shopify",
-                  "Choose what to sync and go live",
-                ].map((step, i) => (
-                  <li key={step} className="flex items-start gap-3">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-xs font-bold text-white">
-                      {i + 1}
-                    </span>
-                    <span className="text-sm text-neutral-400">{step}</span>
-                  </li>
+          {/* desktop table */}
+          <div className="hidden overflow-x-auto rounded-xl border border-neutral-700/50 md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
+                  <th className="px-4 py-3 font-medium">SKU</th>
+                  <th className="px-4 py-3 font-medium">Parent code</th>
+                  <th className="px-4 py-3 font-medium">Reason</th>
+                  <th className="px-4 py-3 text-right font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-800">
+                {unmatched.map((r) => (
+                  <tr key={r.sku} className="hover:bg-neutral-800/30">
+                    <td className="px-4 py-3 font-mono text-neutral-200">{r.sku}</td>
+                    <td className="px-4 py-3 text-neutral-500">{r.parentCode}</td>
+                    <td className="px-4 py-3"><StatusBadge tone={r.tone}>{r.reason}</StatusBadge></td>
+                    <td className="px-4 py-3 text-right">
+                      <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
+                        Resolve
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </ol>
-            </section>
+              </tbody>
+            </table>
           </div>
 
-          {/* right: trust rail */}
-          <aside className="space-y-6 lg:sticky lg:top-20">
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm">
-              <h3 className="text-sm font-semibold text-white">What gets synced</h3>
-              <ul className="mt-4 space-y-3">
-                {SYNC_FLAGS.map((f) => (
-                  <li key={f.key} className="flex items-start gap-3">
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-neutral-200">{f.label}</span>
-                        {f.slow && <StatusBadge tone="amber">Slow</StatusBadge>}
-                      </div>
-                      <p className="text-xs text-neutral-500">{f.desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-4 border-t border-neutral-800 pt-4 text-xs text-neutral-500">
-                One-way push only — we never read or change your orders.
-              </p>
-            </section>
-
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-                <ShieldIcon className="h-4 w-4 text-[#01a0be]" />
-                Secure by design
-              </h3>
-              <ul className="mt-4 space-y-3">
-                {[
-                  "OAuth install — no manual API keys to copy or store.",
-                  "Tokens are encrypted at rest and never logged.",
-                  "Least-privilege scopes only.",
-                  "Every callback and webhook is HMAC-verified.",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-3 text-sm text-neutral-400">
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-                    {t}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-5 mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Scopes requested</p>
-              <div className="flex flex-wrap gap-1.5">
-                {SCOPES.map((s) => (
-                  <StatusBadge key={s} tone="cyan">{s}</StatusBadge>
-                ))}
+          {/* mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {unmatched.map((r) => (
+              <div key={r.sku} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-mono text-sm text-neutral-200">{r.sku}</span>
+                  <StatusBadge tone={r.tone}>{r.reason}</StatusBadge>
+                </div>
+                <p className="mt-1 text-xs text-neutral-500">{r.parentCode}</p>
+                <button className="mt-3 w-full rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
+                  Resolve
+                </button>
               </div>
-            </section>
-          </aside>
-        </div>
+            ))}
+          </div>
+        </section>
       )}
 
+      {/* ------------------------ Danger zone -------------------------- */}
+      <section className="rounded-2xl border border-red-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-white">Disconnect store</h2>
+            <p className="mt-1 text-sm text-neutral-400">
+              Stops all syncing and revokes access for <span className="font-medium text-neutral-200">{shopLabel(connection.shopDomain)}</span>. Your Shopify products stay exactly as they are — nothing is deleted.
+            </p>
+          </div>
+          {confirmDisconnect ? (
+            <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+              <button
+                onClick={() => setConfirmDisconnect(false)}
+                className="flex-1 justify-center rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-2.5 text-sm font-semibold text-neutral-300 transition-all hover:border-neutral-600 hover:text-white sm:flex-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={disconnect}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500/90 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-red-500 sm:flex-none"
+              >
+                <TrashIcon className="h-4 w-4" />
+                Yes, disconnect
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDisconnect(true)}
+              className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/5 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all hover:border-red-500/60 hover:bg-red-500/10 sm:w-auto"
+            >
+              <TrashIcon className="h-4 w-4" />
+              Disconnect
+            </button>
+          )}
+        </div>
+      </section>
+
       {/* --------------------------- Sticky save bar --------------------------- */}
-      {isConnected && isDirty && (
+      {isDirty && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-black/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-md animate-fade-in">
           <div className="mx-auto flex max-w-screen-2xl flex-col-reverse gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-            <p className="text-sm text-neutral-400">You have unsaved configuration changes.</p>
+            <p className="text-sm text-neutral-400">
+              Unsaved changes for <span className="font-medium text-neutral-200">{shopLabel(connection.shopDomain)}</span>.
+            </p>
             <div className="flex gap-2">
               <button
                 onClick={discard}

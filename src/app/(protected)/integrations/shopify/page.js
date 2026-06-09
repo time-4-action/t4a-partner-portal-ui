@@ -21,17 +21,19 @@ async function getShopifyExportConfigs() {
   }
 }
 
-// Fetch the current user's Shopify connection (if any) + the store's inventory locations.
-// Returns null on failure so the client component falls back to its demo state.
-async function getShopifyStatus() {
+// Fetch every Shopify store the current user has connected (lightweight — no per-store Shopify
+// calls; the client lazy-loads each store's live locations/channels on demand). Returns null on
+// failure so the client component falls back to its demo state.
+async function getShopifyConnections() {
   try {
     const { token } = await auth0.getAccessToken();
-    const res = await fetch(`${apiUrl}/shopify/status`, {
+    const res = await fetch(`${apiUrl}/shopify/connections`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data?.connections) ? data.connections : null;
   } catch {
     return null;
   }
@@ -74,9 +76,9 @@ export default async function ShopifyIntegrationRoute() {
     );
   }
 
-  const [shopifyExports, status, pricelists] = await Promise.all([
+  const [shopifyExports, connections, pricelists] = await Promise.all([
     getShopifyExportConfigs(),
-    getShopifyStatus(),
+    getShopifyConnections(),
     getShopifyPricelists(),
   ]);
 
@@ -86,13 +88,10 @@ export default async function ShopifyIntegrationRoute() {
         <ShopifyIntegrationPage
           initialExports={shopifyExports ?? []}
           ownerEmail={session?.user?.email}
-          initialConnection={status?.connection ?? null}
-          initialConnected={status ? Boolean(status.connected) : null}
-          initialLocations={status?.locations ?? []}
-          initialNeedsReconnect={Boolean(status?.needsReconnect)}
+          // null = the connections fetch failed → client shows its demo store. An empty array =
+          // the fetch succeeded but the user has no stores yet → client shows the connect screen.
+          initialConnections={connections}
           initialPricelists={pricelists ?? []}
-          initialPublications={status?.publications ?? []}
-          initialPublishingEnabled={Boolean(status?.publishingEnabled)}
         />
       </div>
     </div>
