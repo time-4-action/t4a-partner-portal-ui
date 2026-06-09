@@ -4,7 +4,8 @@
  * Main navigation bar with Auth0 integration for user authentication.
  * Features include:
  * - Responsive desktop and mobile layouts
- * - Grouped navigation: related export tools collapse into an "Exports" dropdown
+ * - Grouped navigation: catalog tools collapse into a "Products" dropdown and
+ *   third-party connectors into an "Integrations" dropdown
  * - Active-route highlighting (desktop + mobile)
  * - Auth0 user authentication status
  * - Profile dropdown menu (desktop)
@@ -49,6 +50,9 @@ const ICON_PATHS = {
   shopify: [
     "M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z",
   ],
+  integrations: [
+    "M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .37-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z",
+  ],
 };
 
 /**
@@ -88,8 +92,10 @@ function NavBadge({ label, className = "" }) {
 }
 
 /**
- * Returns navigation items. The export-role tools (Export, Categories, Shopify)
- * are grouped under a single "Exports" dropdown to keep the top bar compact.
+ * Returns navigation items. For export-role users the catalog tools are grouped
+ * under a "Products" dropdown (View All, Export, Categories) and third-party
+ * connectors under an "Integrations" dropdown (Shopify), keeping the top bar
+ * compact. Non-export users see a plain "Products" link.
  * Roles are injected into the ID token via an Auth0 Post Login Action.
  *
  * Item shape:
@@ -98,15 +104,18 @@ function NavBadge({ label, className = "" }) {
  */
 function getNavLinks(user) {
   const roles = user?.["https://time-4-action.com/roles"] ?? [];
-  const links = [
-    { href: "/", label: "Home", icon: "home" },
-    { href: "/product", label: "Products", icon: "products" },
-  ];
+  const links = [{ href: "/", label: "Home", icon: "home" }];
   if (roles.includes("export")) {
     links.push({
-      label: "Exports",
-      icon: "exports",
+      label: "Products",
+      icon: "products",
       children: [
+        {
+          href: "/product",
+          label: "View All",
+          description: "Browse the full catalog",
+          icon: "products",
+        },
         {
           href: "/export",
           label: "Export",
@@ -119,6 +128,12 @@ function getNavLinks(user) {
           description: "AI category management",
           icon: "categories",
         },
+      ],
+    });
+    links.push({
+      label: "Integrations",
+      icon: "integrations",
+      children: [
         {
           href: "/integrations/shopify",
           label: "Shopify",
@@ -128,6 +143,8 @@ function getNavLinks(user) {
         },
       ],
     });
+  } else {
+    links.push({ href: "/product", label: "Products", icon: "products" });
   }
   links.push({ href: "/contact", label: "Contact", icon: "contact" });
   return links;
