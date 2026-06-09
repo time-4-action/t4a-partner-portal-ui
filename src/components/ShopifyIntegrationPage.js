@@ -438,17 +438,25 @@ export default function ShopifyIntegrationPage({
   // When true, the connect screen is shown even though stores exist ("connect another store").
   const [adding, setAdding] = useState(seedConnections.length === 0);
   const [notice, setNotice] = useState(null); // { tone: "success" | "error", text }
+  // Store name (bare, no .myshopify.com) to prefill the connect form — set when Shopify's App URL
+  // (GET /shopify/entry) routes a not-yet-connected store here with `?connect=1&shop=`.
+  const [connectPrefill, setConnectPrefill] = useState("");
 
   const showConnect = adding || connections.length === 0;
   const selected =
     connections.find((c) => connKey(c) === selectedKey) || connections[0] || null;
 
-  // Surface the OAuth callback outcome (the API redirects back here with `?shopify=connected`
-  // or `?shopify=error&reason=...`), then strip the params so a refresh doesn't re-show it.
+  // Handle the params the portal can arrive with, then strip them so a refresh doesn't replay:
+  //   • OAuth outcome — the API redirects back with `?shopify=connected|error` after install.
+  //   • Entry routing — Shopify's App URL (GET /shopify/entry) sends a merchant here with
+  //     `?shop=<domain>` (already connected → select that store) and, when the store isn't
+  //     connected yet, `?connect=1` (open the connect form with the domain prefilled).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const outcome = params.get("shopify");
-    if (!outcome) return;
+    const shopParam = params.get("shop");        // full *.myshopify.com domain
+    const wantConnect = params.get("connect") === "1";
+    if (!outcome && !shopParam && !wantConnect) return;
 
     let msg = null;
     if (outcome === "connected") {
@@ -462,11 +470,26 @@ export default function ShopifyIntegrationPage({
       msg = { tone: "error", text: `Connection failed (${params.get("reason") || "unknown error"}).` };
     }
 
+    if (shopParam || wantConnect) {
+      const match = shopParam && connections.find((c) => c.shopDomain === shopParam);
+      if (wantConnect || (shopParam && !match)) {
+        // Not connected yet → open the connect form with the domain prefilled.
+        setAdding(true);
+        if (shopParam) setConnectPrefill(shopLabel(shopParam));
+      } else if (match) {
+        // Already connected (or just finished connecting) → jump to that store.
+        setSelectedKey(connKey(match));
+        setAdding(false);
+      }
+    }
+
     const url = new URL(window.location.href);
-    ["shopify", "shop", "webhooks", "reason"].forEach((k) => url.searchParams.delete(k));
+    ["shopify", "shop", "webhooks", "reason", "connect", "host", "hmac", "timestamp", "session", "id_token", "embedded", "locale"]
+      .forEach((k) => url.searchParams.delete(k));
     window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
 
     if (msg) queueMicrotask(() => setNotice(msg));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reflect a finished sync / status change up onto the matching switcher pill.
@@ -601,6 +624,7 @@ export default function ShopifyIntegrationPage({
           canCancel={connections.length > 0}
           onCancel={() => setAdding(false)}
           onNotice={setNotice}
+          initialDomain={connectPrefill}
         />
       ) : (
         <ConnectionPanel
@@ -621,8 +645,8 @@ export default function ShopifyIntegrationPage({
 /*  ConnectStore — enter a domain and start OAuth (first or additional store)  */
 /* -------------------------------------------------------------------------- */
 
-function ConnectStore({ canCancel, onCancel, onNotice }) {
-  const [domainInput, setDomainInput] = useState("");
+function ConnectStore({ canCancel, onCancel, onNotice, initialDomain = "" }) {
+  const [domainInput, setDomainInput] = useState(initialDomain);
   const [connecting, setConnecting] = useState(false);
 
   const domainClean = domainInput.trim().toLowerCase();
