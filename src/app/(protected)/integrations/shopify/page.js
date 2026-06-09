@@ -21,6 +21,22 @@ async function getShopifyExportConfigs() {
   }
 }
 
+// Fetch the current user's Shopify connection (if any) + the store's inventory locations.
+// Returns null on failure so the client component falls back to its demo state.
+async function getShopifyStatus() {
+  try {
+    const { token } = await auth0.getAccessToken();
+    const res = await fetch(`${apiUrl}/shopify/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export default async function ShopifyIntegrationRoute() {
   const session = await auth0.getSession();
   const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
@@ -41,12 +57,21 @@ export default async function ShopifyIntegrationRoute() {
     );
   }
 
-  const shopifyExports = await getShopifyExportConfigs();
+  const [shopifyExports, status] = await Promise.all([
+    getShopifyExportConfigs(),
+    getShopifyStatus(),
+  ]);
 
   return (
     <div className="relative p-8 bg-transparent">
       <div className="relative max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
-        <ShopifyIntegrationPage initialExports={shopifyExports ?? []} ownerEmail={session?.user?.email} />
+        <ShopifyIntegrationPage
+          initialExports={shopifyExports ?? []}
+          ownerEmail={session?.user?.email}
+          initialConnection={status?.connection ?? null}
+          initialConnected={status ? Boolean(status.connected) : null}
+          initialLocations={status?.locations ?? []}
+        />
       </div>
     </div>
   );

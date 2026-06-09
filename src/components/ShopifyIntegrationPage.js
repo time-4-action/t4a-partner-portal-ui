@@ -348,22 +348,50 @@ function SectionHeading({ title, desc, icon, right }) {
 /*  Main component                                                            */
 /* -------------------------------------------------------------------------- */
 
-export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail }) {
+export default function ShopifyIntegrationPage({
+  initialExports = [],
+  ownerEmail,
+  // Real connection state from GET /shopify/status (null when the status fetch failed —
+  // in that case we fall back to the MOCK_* demo so the page still renders something).
+  initialConnection = null,
+  initialConnected = null,
+  initialLocations = [],
+}) {
   // Real Shopify-preset export configs (from /custom-export?preset=shopify). May be empty —
   // when it is, the "Products to sync" block shows a create prompt instead of a selector.
   const exportOptions = initialExports;
 
-  const seedConfig = () => ({
-    ...MOCK_CONNECTION.config,
-    exportConfigId: MOCK_CONNECTION.config.exportConfigId ?? exportOptions[0]?._id ?? null,
-    shopifyLocationId: MOCK_CONNECTION.shopifyLocationId,
-  });
+  // Real Shopify inventory locations (from the status call). Falls back to the demo set only
+  // when the backend returned none (e.g. status fetch failed / not connected yet).
+  const locations = initialLocations.length ? initialLocations : MOCK_LOCATIONS;
 
-  const [isConnected, setIsConnected] = useState(true); // demo default: show the rich connected UI first
+  // The base connection: real one when present, else the demo. The sync-engine-only fields
+  // (jobs, counts, unmatched) stay mock until the data plane lands — only the connection +
+  // its config + locations are real in this OAuth phase.
+  const baseConnection = initialConnection || MOCK_CONNECTION;
+
+  const seedConfig = () => {
+    const cfg = baseConnection.config || MOCK_CONNECTION.config;
+    return {
+      ...MOCK_CONNECTION.config,
+      ...cfg,
+      // Until the data plane resolves real pricelist names, keep the demo template when the
+      // stored priority list is empty so the pricing panel isn't blank.
+      pricelistPriority: (cfg.pricelistPriority?.length ? cfg.pricelistPriority : MOCK_CONNECTION.config.pricelistPriority),
+      exportConfigId: cfg.exportConfigId ?? exportOptions[0]?._id ?? null,
+      shopifyLocationId: baseConnection.shopifyLocationId ?? cfg.shopifyLocationId ?? locations[0]?.id ?? null,
+    };
+  };
+
+  const [isConnected, setIsConnected] = useState(
+    initialConnected === null ? true : initialConnected
+  );
   const [domainInput, setDomainInput] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState(null); // { tone: "success" | "error", text }
 
-  const [connection, setConnection] = useState(() => ({ ...MOCK_CONNECTION }));
+  const [connection, setConnection] = useState(() => ({ ...MOCK_CONNECTION, ...baseConnection }));
   const [config, setConfig] = useState(() => seedConfig());
   const [savedConfig, setSavedConfig] = useState(() => seedConfig());
 
@@ -389,6 +417,35 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
     timers.current.push(id);
   };
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  // Surface the OAuth callback outcome (the API redirects back here with `?shopify=connected`
+  // or `?shopify=error&reason=...`), then strip the params so a refresh doesn't re-show it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get("shopify");
+    if (!outcome) return;
+
+    let msg = null;
+    if (outcome === "connected") {
+      msg = {
+        tone: "success",
+        text: params.get("webhooks") === "partial"
+          ? "Store connected. Some webhooks could not be registered — they'll be retried."
+          : "Store connected successfully.",
+      };
+    } else if (outcome === "error") {
+      msg = { tone: "error", text: `Connection failed (${params.get("reason") || "unknown error"}).` };
+    }
+
+    const url = new URL(window.location.href);
+    ["shopify", "shop", "webhooks", "reason"].forEach((k) => url.searchParams.delete(k));
+    window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+
+    // Defer out of the effect body: this reflects a one-time external signal (the OAuth
+    // callback's URL params) into UI state, not synchronous render-driven state.
+    if (msg) queueMicrotask(() => setNotice(msg));
+  }, []);
+
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
 
   /* ----- config mutators (all route through setConfig -> mark dirty) ----- */
@@ -461,20 +518,37 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
   const domainClean = domainInput.trim().toLowerCase();
   const domainValid = /^[a-z0-9][a-z0-9-]*$/.test(domainClean);
 
-  const connect = () => {
+  // Start OAuth: ask the backend for the Shopify authorize URL, then redirect the browser to
+  // it. Shopify sends the user back to the API callback, which redirects to this page with
+  // `?shopify=connected` (handled by the status fetch + the banner effect below).
+  const connect = async () => {
     if (!domainValid || connecting) return;
     setConnecting(true);
-    schedule(() => {
-      setConnection((c) => ({ ...c, shopDomain: `${domainClean}.myshopify.com`, status: "active" }));
-      setConfig(seedConfig());
-      setSavedConfig(seedConfig());
-      setIsConnected(true);
-      setConnecting(false);
-    }, 900);
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connect?shop=${encodeURIComponent(domainClean)}`);
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return; // navigating away
+      }
+      setNotice({ tone: "error", text: data.error || "Could not start the Shopify connection." });
+    } catch {
+      setNotice({ tone: "error", text: "Could not reach the server to start the connection." });
+    }
+    setConnecting(false);
   };
 
-  const disconnect = () => {
+  // Disconnect: delete the stored token/connection on the backend, then return to the
+  // not-connected view. Does not uninstall the app from the merchant's Shopify admin.
+  const disconnect = async () => {
     setConfirmDisconnect(false);
+    if (connection._id) {
+      try {
+        await fetch(`/nextapi/export/shopify/connection/${connection._id}`, { method: "DELETE" });
+      } catch {
+        /* best-effort — still drop to the not-connected view */
+      }
+    }
     setIsConnected(false);
     setDomainInput("");
   };
@@ -502,7 +576,40 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
     schedule(() => setRefreshing(false), 700);
   };
 
-  const saveConfig = () => setSavedConfig(config);
+  // Persist the config to the backend (PUT /shopify/connection/:id/config). Optimistically
+  // marks the form clean on success. Falls back to a local-only save when there is no real
+  // connection id yet (demo mode).
+  const saveConfig = async () => {
+    if (saving) return;
+    if (!connection._id) {
+      setSavedConfig(config);
+      return;
+    }
+    setSaving(true);
+    try {
+      const { pricelistPriority, priceVatMode, futureDatedGuard, syncStock, syncNewProducts,
+        syncPrices, syncDescriptions, syncImages, ownership, exportConfigId, shopifyLocationId } = config;
+      const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shopifyLocationId,
+          config: { pricelistPriority, priceVatMode, futureDatedGuard, syncStock, syncNewProducts,
+            syncPrices, syncDescriptions, syncImages, ownership, exportConfigId },
+        }),
+      });
+      if (res.ok) {
+        setSavedConfig(config);
+        setNotice({ tone: "success", text: "Configuration saved." });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setNotice({ tone: "error", text: data.error || "Could not save the configuration." });
+      }
+    } catch {
+      setNotice({ tone: "error", text: "Could not reach the server to save." });
+    }
+    setSaving(false);
+  };
   const discard = () => setConfig(savedConfig);
 
   const statusMeta = {
@@ -512,7 +619,7 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
   }[connection.status] || { tone: "neutral", label: connection.status };
 
   const savedLocationName =
-    MOCK_LOCATIONS.find((l) => l.id === savedConfig.shopifyLocationId)?.name || "—";
+    locations.find((l) => l.id === savedConfig.shopifyLocationId)?.name || "—";
 
   const enabledPricelists = config.pricelistPriority.filter((p) => p.enabled).length;
   const attentionCount = MOCK_UNMATCHED.length;
@@ -567,6 +674,25 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
           )}
         </div>
       </header>
+
+      {notice && (
+        <div
+          className={`mb-6 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+            notice.tone === "success"
+              ? "border-[#95BF47]/30 bg-[#95BF47]/10 text-[#b6df84]"
+              : "border-red-500/30 bg-red-500/10 text-red-300"
+          }`}
+        >
+          <span>{notice.text}</span>
+          <button
+            onClick={() => setNotice(null)}
+            aria-label="Dismiss"
+            className="shrink-0 text-current/70 transition-opacity hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {isConnected ? (
         /* =============================== CONNECTED =============================== */
@@ -877,7 +1003,7 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
                   value={config.shopifyLocationId}
                   onChange={(e) => setCfg({ shopifyLocationId: e.target.value })}
                 >
-                  {MOCK_LOCATIONS.map((l) => (
+                  {locations.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
                 </Select>
@@ -1208,10 +1334,11 @@ export default function ShopifyIntegrationPage({ initialExports = [], ownerEmail
               </button>
               <button
                 onClick={saveConfig}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] sm:flex-none"
+                disabled={saving}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
               >
-                <SaveIcon className="h-4 w-4" />
-                Save changes
+                {saving ? <SpinnerIcon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
+                {saving ? "Saving…" : "Save changes"}
               </button>
             </div>
           </div>
