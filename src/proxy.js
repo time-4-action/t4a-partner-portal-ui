@@ -49,7 +49,16 @@ export async function proxy(request) {
   const roles = session.user[ROLES_CLAIM] ?? [];
 
   if (!roles.includes(REQUIRED_ROLE)) {
-    return NextResponse.redirect(new URL("/unauthorized", request.url));
+    // Carry a pending Shopify-connect intent (a partner who opened the app from Shopify but
+    // isn't enabled yet) so /unauthorized can show a tailored "request access" screen naming
+    // the store, instead of the generic wall.
+    const dest = new URL("/unauthorized", request.url);
+    const shop = request.nextUrl.searchParams.get("shop");
+    if (shop) {
+      dest.searchParams.set("shop", shop);
+      dest.searchParams.set("reason", "shopify");
+    }
+    return NextResponse.redirect(dest);
   }
 
   return authResponse;

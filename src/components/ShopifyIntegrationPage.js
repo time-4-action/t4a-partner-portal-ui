@@ -441,6 +441,9 @@ export default function ShopifyIntegrationPage({
   // Store name (bare, no .myshopify.com) to prefill the connect form — set when Shopify's App URL
   // (GET /shopify/entry) routes a not-yet-connected store here with `?connect=1&shop=`.
   const [connectPrefill, setConnectPrefill] = useState("");
+  // Full *.myshopify.com domain to auto-resume connecting — set when a partner opens the app from
+  // Shopify for a store that isn't connected yet. Shows a focused card that launches OAuth.
+  const [resumeShop, setResumeShop] = useState("");
 
   const showConnect = adding || connections.length === 0;
   const selected =
@@ -471,15 +474,19 @@ export default function ShopifyIntegrationPage({
     }
 
     if (shopParam || wantConnect) {
-      const match = shopParam && connections.find((c) => c.shopDomain === shopParam);
-      if (wantConnect || (shopParam && !match)) {
-        // Not connected yet → open the connect form with the domain prefilled.
-        setAdding(true);
-        if (shopParam) setConnectPrefill(shopLabel(shopParam));
-      } else if (match) {
+      const match = shopParam ? connections.find((c) => c.shopDomain === shopParam) : null;
+      if (match) {
         // Already connected (or just finished connecting) → jump to that store.
         setSelectedKey(connKey(match));
         setAdding(false);
+      } else if (shopParam) {
+        // Opened from Shopify for a store that isn't connected → focused auto-resume (launches
+        // OAuth). Also stash the prefill so cancelling drops to the manual form, store filled in.
+        setResumeShop(shopParam);
+        setConnectPrefill(shopLabel(shopParam));
+      } else if (wantConnect) {
+        // "Connect another store" with no specific shop → the manual connect form.
+        setAdding(true);
       }
     }
 
@@ -507,8 +514,16 @@ export default function ShopifyIntegrationPage({
 
   const selectStore = (key) => {
     setAdding(false);
+    setResumeShop("");
     setNotice(null);
     setSelectedKey(key);
+  };
+
+  const startAddStore = () => {
+    setResumeShop("");
+    setConnectPrefill("");
+    setAdding(true);
+    setNotice(null);
   };
 
   return (
@@ -584,7 +599,7 @@ export default function ShopifyIntegrationPage({
             <div className="mx-1 h-9 w-px shrink-0 bg-neutral-800" />
 
             <button
-              onClick={() => { setAdding(true); setNotice(null); }}
+              onClick={startAddStore}
               className={`group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                 adding ? "bg-[#01a0be]/10 text-[#01a0be] ring-1 ring-[#01a0be]/40" : "text-neutral-400 hover:bg-neutral-800/50 hover:text-white"
               }`}
@@ -619,7 +634,17 @@ export default function ShopifyIntegrationPage({
         </div>
       )}
 
-      {showConnect ? (
+      {resumeShop ? (
+        <ResumeConnect
+          shopDomain={resumeShop}
+          onNotice={setNotice}
+          onCancel={() => {
+            setResumeShop("");
+            setConnectPrefill(shopLabel(resumeShop));
+            setAdding(true);
+          }}
+        />
+      ) : showConnect ? (
         <ConnectStore
           canCancel={connections.length > 0}
           onCancel={() => setAdding(false)}
@@ -637,6 +662,102 @@ export default function ShopifyIntegrationPage({
           onPatch={patchConnection}
         />
       )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  ResumeConnect — focused auto-launch when arriving from Shopify's App URL    */
+/* -------------------------------------------------------------------------- */
+
+// A partner opened the app from their Shopify admin for a store that isn't connected yet. They
+// already expressed intent, so we don't drop them on the settings page — we show a focused card
+// and auto-launch the OAuth install (cancelable) after a short, visible beat.
+function ResumeConnect({ shopDomain, onNotice, onCancel }) {
+  const label = shopLabel(shopDomain);
+  const [status, setStatus] = useState("counting"); // "counting" | "launching" | "error"
+  const launchedRef = useRef(false);
+
+  const launch = async () => {
+    if (launchedRef.current) return;
+    launchedRef.current = true;
+    setStatus("launching");
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connect?shop=${encodeURIComponent(shopDomain)}`);
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return; // navigating away to Shopify's consent screen
+      }
+      onNotice?.({ tone: "error", text: data.error || "Could not start the Shopify connection." });
+      launchedRef.current = false;
+      setStatus("error");
+    } catch {
+      onNotice?.({ tone: "error", text: "Could not reach the server to start the connection." });
+      launchedRef.current = false;
+      setStatus("error");
+    }
+  };
+
+  // Auto-launch after a short beat so the user sees what's happening (and can cancel).
+  useEffect(() => {
+    const t = setTimeout(launch, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="flex min-h-[55vh] items-center justify-center">
+      <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900/60 p-8 text-center backdrop-blur-sm">
+        <div className="relative mx-auto mb-6 w-fit">
+          <div aria-hidden="true" className="absolute -inset-3 rounded-[1.75rem] bg-[#95BF47]/20 blur-2xl" />
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
+            <ShopifyLogo className="h-9 w-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]" />
+          </div>
+        </div>
+
+        {status === "error" ? (
+          <>
+            <h2 className="text-xl font-semibold text-white">Couldn&apos;t start the connection</h2>
+            <p className="mt-2 text-sm text-neutral-400">
+              Something went wrong reaching Shopify for <span className="font-semibold text-white">{label}</span>. Try again, or enter the store manually.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <button
+                onClick={launch}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f]"
+              >
+                <RefreshIcon className="h-4 w-4" />
+                Try again
+              </button>
+              <button
+                onClick={onCancel}
+                className="inline-flex items-center justify-center rounded-xl border border-neutral-700 bg-neutral-900/60 px-5 py-2.5 text-sm font-semibold text-neutral-300 transition-all hover:border-neutral-600 hover:text-white"
+              >
+                Enter store manually
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="text-xl font-semibold text-white">Connecting your store</h2>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              Taking you to Shopify to approve the install for{" "}
+              <span className="font-semibold text-white">{label}</span>.
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-[#01a0be]">
+              <SpinnerIcon className="h-4 w-4" />
+              {status === "launching" ? "Redirecting to Shopify…" : "Starting…"}
+            </div>
+            <button
+              onClick={onCancel}
+              className="mt-6 text-xs font-medium text-neutral-500 underline-offset-4 transition-colors hover:text-neutral-300 hover:underline"
+            >
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
