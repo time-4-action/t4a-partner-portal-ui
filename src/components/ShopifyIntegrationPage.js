@@ -63,7 +63,7 @@ const MOCK_CONNECTION = {
     syncNewProducts: true,
     syncPrices: true,
     syncDescriptions: true,
-    syncImages: false, // OFF by default — image sync is expensive
+    syncImages: false, // OFF by default — image sync is slow (Shopify fetches + processes each URL)
     ownership: "stock_only", // "stock_only" | "portal_authoritative" | "create_then_handoff"
     pricelistPriority: [
       { _id: "pl_rrp2026", name: "RRP 2026", enabled: true, vat: 0, valid_from: "2025-10-31T22:00:00Z" },
@@ -107,7 +107,7 @@ const SYNC_FLAGS = [
   { key: "syncNewProducts", label: "New products", desc: "Create products that don't exist in your store yet." },
   { key: "syncPrices", label: "Prices", desc: "Keep variant prices in step with your pricelists." },
   { key: "syncDescriptions", label: "Descriptions", desc: "Sync titles, copy and product fields." },
-  { key: "syncImages", label: "Images", desc: "Push product and variant images.", expensive: true },
+  { key: "syncImages", label: "Images", desc: "Push product and variant images.", slow: true },
 ];
 
 const OWNERSHIP_MODES = [
@@ -999,7 +999,7 @@ export default function ShopifyIntegrationPage({
                     <span className="min-w-0">
                       <span className="flex items-center gap-2">
                         <span className="text-sm font-medium text-white">{f.label}</span>
-                        {f.expensive && <StatusBadge tone="amber">expensive</StatusBadge>}
+                        {f.slow && <StatusBadge tone="amber">Slow</StatusBadge>}
                       </span>
                       <span className="mt-1 block text-xs text-neutral-500">{f.desc}</span>
                     </span>
@@ -1464,7 +1464,7 @@ export default function ShopifyIntegrationPage({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-neutral-200">{f.label}</span>
-                        {f.expensive && <StatusBadge tone="amber">expensive</StatusBadge>}
+                        {f.slow && <StatusBadge tone="amber">Slow</StatusBadge>}
                       </div>
                       <p className="text-xs text-neutral-500">{f.desc}</p>
                     </div>
