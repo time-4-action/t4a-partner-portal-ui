@@ -183,6 +183,8 @@ const STATUS_META = {
 };
 const statusMetaFor = (status) => STATUS_META[status] || { tone: "neutral", label: status };
 
+const DOT_COLOR = { cyan: "#01a0be", red: "#f87171", amber: "#fbbf24", neutral: "#737373" };
+
 /* -------------------------------------------------------------------------- */
 /*  Formatting helpers (deterministic UTC — avoids SSR/client hydration drift) */
 /* -------------------------------------------------------------------------- */
@@ -512,50 +514,66 @@ export default function ShopifyIntegrationPage({
             </p>
           </div>
         </div>
-
-        {connections.length > 0 && (
-          <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:shrink-0">
-            <StatusBadge tone="neutral">
-              {connections.length} {connections.length === 1 ? "store" : "stores"} connected
-            </StatusBadge>
-          </div>
-        )}
       </header>
 
       {/* --------------------------- Store switcher ---------------------------- */}
       {connections.length > 0 && (
-        <nav aria-label="Connected stores" className="mb-6 -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-2">
-          {connections.map((c) => {
-            const key = connKey(c);
-            const active = key === selectedKey && !adding;
-            const tone = statusMetaFor(c.status).tone;
-            return (
-              <button
-                key={key}
-                onClick={() => selectStore(key)}
-                aria-current={active ? "true" : undefined}
-                className={`group inline-flex shrink-0 items-center gap-2.5 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
-                  active
-                    ? "border-[#01a0be]/60 bg-[#01a0be]/10 text-white shadow-[0_0_30px_rgba(1,160,190,0.08)]"
-                    : "border-neutral-800 bg-neutral-900/50 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
-                }`}
-              >
-                <PingDot tone={tone} />
-                <span className="max-w-[12rem] truncate">{shopLabel(c.shopDomain)}</span>
-              </button>
-            );
-          })}
-          <button
-            onClick={() => { setAdding(true); setNotice(null); }}
-            className={`inline-flex shrink-0 items-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm font-medium transition-all ${
-              adding
-                ? "border-[#01a0be]/60 bg-[#01a0be]/10 text-white"
-                : "border-neutral-700 text-neutral-400 hover:border-[#01a0be]/50 hover:text-white"
-            }`}
-          >
-            <PlusIcon className="h-4 w-4" />
-            Connect store
-          </button>
+        <nav aria-label="Connected stores" className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-2 backdrop-blur-sm">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            {connections.map((c) => {
+              const key = connKey(c);
+              const active = key === selectedKey && !adding;
+              const meta = statusMetaFor(c.status);
+              const label = shopLabel(c.shopDomain);
+              return (
+                <button
+                  key={key}
+                  onClick={() => selectStore(key)}
+                  aria-current={active ? "page" : undefined}
+                  className={`group relative flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all ${
+                    active
+                      ? "bg-gradient-to-br from-neutral-800 to-neutral-800/30 shadow-lg ring-1 ring-[#01a0be]/40"
+                      : "hover:bg-neutral-800/50"
+                  }`}
+                >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold transition-colors ${
+                      active
+                        ? "bg-gradient-to-br from-[#95BF47]/30 to-[#01a0be]/25 text-white"
+                        : "bg-neutral-800 text-neutral-400 group-hover:text-neutral-200"
+                    }`}
+                  >
+                    {label.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 pr-1">
+                    <span className={`block max-w-[12rem] truncate text-sm font-semibold ${active ? "text-white" : "text-neutral-300"}`}>
+                      {label}
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-500">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: DOT_COLOR[meta.tone] || DOT_COLOR.neutral }} />
+                      {meta.label}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+
+            <div className="mx-1 h-9 w-px shrink-0 bg-neutral-800" />
+
+            <button
+              onClick={() => { setAdding(true); setNotice(null); }}
+              className={`group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                adding ? "bg-[#01a0be]/10 text-[#01a0be] ring-1 ring-[#01a0be]/40" : "text-neutral-400 hover:bg-neutral-800/50 hover:text-white"
+              }`}
+            >
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed transition-colors ${
+                adding ? "border-[#01a0be]/50" : "border-neutral-700 group-hover:border-[#01a0be]/50"
+              }`}>
+                <PlusIcon className="h-4 w-4" />
+              </span>
+              Add store
+            </button>
+          </div>
         </nav>
       )}
 
@@ -895,7 +913,15 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
   /* ----- config mutators (all route through setConfig -> mark dirty) ----- */
   const setCfg = (patch) => setConfig((c) => ({ ...c, ...patch }));
   const toggleFlag = (key) => setConfig((c) => ({ ...c, [key]: !c[key] }));
-  const setOwnership = (v) => setConfig((c) => ({ ...c, ownership: v }));
+  // Picking a mode richer than stock-only opts the store up to the full push, so default every
+  // sync field ON. Only fires when leaving stock_only — switching between the two rich modes
+  // preserves whatever the partner has toggled.
+  const setOwnership = (v) =>
+    setConfig((c) =>
+      v !== "stock_only" && c.ownership === "stock_only"
+        ? { ...c, ownership: v, syncStock: true, syncNewProducts: true, syncPrices: true, syncDescriptions: true, syncImages: true }
+        : { ...c, ownership: v }
+    );
   const setVatMode = (v) => setConfig((c) => ({ ...c, priceVatMode: v }));
   const togglePublication = (id) =>
     setConfig((c) => {
