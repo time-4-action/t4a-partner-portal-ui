@@ -4,15 +4,19 @@
  * Partner-facing UI for connecting a Shopify store to the T4A Partner Portal and
  * configuring the one-way product push (stock, products, prices, descriptions, images).
  *
- * This is a UI-only build — there is no backend wired up yet. All state lives in local
- * React state seeded from mock data, and the connect / disconnect flow doubles as the
- * demo mechanism for toggling between the two top-level states:
- *   1. NOT CONNECTED — enter a myshopify domain and "connect" (would start OAuth).
+ * The control plane (OAuth connect/disconnect/config) AND Phase A of the data plane
+ * (stock-only sync: "Sync now", live sync-activity runs, counts, and the needs-attention
+ * report) are wired to the real API at /api/export/shopify/*. The remaining MOCK_* constants
+ * are used ONLY as a demo fallback when there is no real connection id (e.g. the status
+ * fetch failed), so the page still renders something rich.
+ *
+ * Two top-level states, driven by `isConnected`:
+ *   1. NOT CONNECTED — enter a myshopify domain and "connect" (starts real OAuth).
  *   2. CONNECTED     — full management UI: status, sync scope, ownership, pricing,
  *                      sync activity, needs-attention report, and disconnect.
  *
- * When the backend lands, the mock constants and the `connect/disconnect/syncNow/
- * saveConfig` handlers are the seams to replace with calls to /api/export/shopify/*.
+ * Still mock until later phases land: the price/description/image push (Phases B–D) — those
+ * toggles are configurable but Phase A only acts on inventory quantities.
  *
  * @module ShopifyIntegrationPage
  */
@@ -138,8 +142,15 @@ const JOB_STATUS_TONE = {
   running: "cyan",
   queued: "neutral",
   retry: "amber",
+  partial: "amber",
   failed: "red",
 };
+
+/* ---- sync-activity row accessors (tolerate real API rows AND the demo mock shape) ---- */
+// Real rows carry { label, detail, trigger }; the demo mock carries { parentCode, variantCode, error }.
+const jobItem = (j) => j.label ?? j.variantCode ?? j.parentCode ?? "—";
+const jobSub = (j) => (j.label ? j.trigger : j.variantCode ? j.parentCode : null);
+const jobDetail = (j) => j.detail ?? j.error ?? null;
 
 /* -------------------------------------------------------------------------- */
 /*  Formatting helpers (deterministic UTC — avoids SSR/client hydration drift) */
@@ -356,22 +367,33 @@ export default function ShopifyIntegrationPage({
   initialConnection = null,
   initialConnected = null,
   initialLocations = [],
+  // True when the stored token can't be refreshed (legacy/expired) — the UI prompts re-install.
+  initialNeedsReconnect = false,
 }) {
   // Real Shopify-preset export configs (from /custom-export?preset=shopify). May be empty —
   // when it is, the "Products to sync" block shows a create prompt instead of a selector.
   const exportOptions = initialExports;
 
-  // Real Shopify inventory locations (from the status call). Falls back to the demo set only
-  // when the backend returned none (e.g. status fetch failed / not connected yet).
-  const locations = initialLocations.length ? initialLocations : MOCK_LOCATIONS;
-
-  // The base connection: real one when present, else the demo. The sync-engine-only fields
-  // (jobs, counts, unmatched) stay mock until the data plane lands — only the connection +
-  // its config + locations are real in this OAuth phase.
+  // The base connection: real one when present, else the demo. When it's real, the sync
+  // activity (jobs/counts/unmatched) is fetched live from /activity; the demo set is only a
+  // fallback for when there is no real connection id.
   const baseConnection = initialConnection || MOCK_CONNECTION;
+  const hasRealConnection = Boolean(baseConnection._id);
+
+  // Real Shopify inventory locations come straight from the store (GET /shopify/status →
+  // GraphQL `locations`). For a real connection we show ONLY those — never the demo set — so a
+  // partner can't accidentally save a location that doesn't exist in their store. The MOCK set
+  // is used only in demo mode (no real connection id).
+  const locations = hasRealConnection ? initialLocations : (initialLocations.length ? initialLocations : MOCK_LOCATIONS);
 
   const seedConfig = () => {
     const cfg = baseConnection.config || MOCK_CONNECTION.config;
+    // Only honour a stored location if it still exists in the live list; otherwise fall back to
+    // the first real location (the stale/phantom id won't silently get re-saved).
+    const storedLoc = baseConnection.shopifyLocationId ?? cfg.shopifyLocationId ?? null;
+    const locationId = locations.some((l) => l.id === storedLoc)
+      ? storedLoc
+      : (locations[0]?.id ?? (hasRealConnection ? null : storedLoc));
     return {
       ...MOCK_CONNECTION.config,
       ...cfg,
@@ -379,7 +401,7 @@ export default function ShopifyIntegrationPage({
       // stored priority list is empty so the pricing panel isn't blank.
       pricelistPriority: (cfg.pricelistPriority?.length ? cfg.pricelistPriority : MOCK_CONNECTION.config.pricelistPriority),
       exportConfigId: cfg.exportConfigId ?? exportOptions[0]?._id ?? null,
-      shopifyLocationId: baseConnection.shopifyLocationId ?? cfg.shopifyLocationId ?? locations[0]?.id ?? null,
+      shopifyLocationId: locationId,
     };
   };
 
@@ -395,7 +417,12 @@ export default function ShopifyIntegrationPage({
   const [config, setConfig] = useState(() => seedConfig());
   const [savedConfig, setSavedConfig] = useState(() => seedConfig());
 
-  const [syncJobs, setSyncJobs] = useState(MOCK_SYNC_JOBS);
+  // Sync-activity data. Real once a live connection exists (fetched from /activity); falls
+  // back to the MOCK_* demo set when there is no real connection id yet.
+  const [needsReconnect, setNeedsReconnect] = useState(Boolean(initialNeedsReconnect));
+  const [syncJobs, setSyncJobs] = useState(hasRealConnection ? [] : MOCK_SYNC_JOBS);
+  const [counts, setCounts] = useState(hasRealConnection ? { synced: 0, pending: 0, error: 0 } : MOCK_COUNTS);
+  const [unmatched, setUnmatched] = useState(hasRealConnection ? [] : MOCK_UNMATCHED);
   const [isSyncing, setIsSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
@@ -407,6 +434,8 @@ export default function ShopifyIntegrationPage({
   const nowTs = useSyncExternalStore(noopSubscribe, getNowSnapshot, getServerNowSnapshot);
 
   const jobSeq = useRef(0);
+  // False after unmount — guards async sync polling from setting state on a gone component.
+  const aliveRef = useRef(true);
   // Track pending demo timeouts so they can be cleared if the component unmounts mid-flight.
   const timers = useRef([]);
   const schedule = (fn, ms) => {
@@ -416,7 +445,10 @@ export default function ShopifyIntegrationPage({
     }, ms);
     timers.current.push(id);
   };
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  useEffect(() => () => {
+    aliveRef.current = false;
+    timers.current.forEach(clearTimeout);
+  }, []);
 
   // Surface the OAuth callback outcome (the API redirects back here with `?shopify=connected`
   // or `?shopify=error&reason=...`), then strip the params so a refresh doesn't re-show it.
@@ -538,6 +570,25 @@ export default function ShopifyIntegrationPage({
     setConnecting(false);
   };
 
+  // Re-run OAuth for the already-known store to mint a fresh (refreshable) token. Used when
+  // the stored token can no longer be refreshed (Shopify retired non-expiring tokens).
+  const reconnect = async () => {
+    if (connecting || !connection.shopDomain) return;
+    setConnecting(true);
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connect?shop=${encodeURIComponent(connection.shopDomain)}`);
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return; // navigating away
+      }
+      setNotice({ tone: "error", text: data.error || "Could not start the reconnect." });
+    } catch {
+      setNotice({ tone: "error", text: "Could not reach the server to reconnect." });
+    }
+    setConnecting(false);
+  };
+
   // Disconnect: delete the stored token/connection on the backend, then return to the
   // not-connected view. Does not uninstall the app from the merchant's Shopify admin.
   const disconnect = async () => {
@@ -553,27 +604,96 @@ export default function ShopifyIntegrationPage({
     setDomainInput("");
   };
 
-  const syncNow = () => {
-    if (isSyncing) return;
-    setIsSyncing(true);
-    const id = `job_${++jobSeq.current}`;
-    const startedAt = new Date().toISOString();
-    setSyncJobs((jobs) => [
-      { id, type: "inventory", parentCode: "MANUAL_SYNC", variantCode: null, status: "running", attempts: 1, time: startedAt, error: null },
-      ...jobs,
-    ]);
-    schedule(() => {
-      const doneAt = new Date().toISOString();
-      setSyncJobs((jobs) => jobs.map((j) => (j.id === id ? { ...j, status: "done", time: doneAt } : j)));
-      setConnection((c) => ({ ...c, lastSyncAt: doneAt, lastSyncStatus: "done" }));
-      setIsSyncing(false);
-    }, 1800);
+  // Pulls the live sync-activity (recent runs + counts + needs-attention) for a real
+  // connection. No-op in demo mode. Returns the parsed payload (or null) so callers polling
+  // a running job can inspect it.
+  const loadActivity = async () => {
+    if (!connection._id) return null;
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/activity`, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!aliveRef.current) return data;
+      setSyncJobs(data.jobs ?? []);
+      setCounts(data.counts ?? { synced: 0, pending: 0, error: 0 });
+      setUnmatched(data.unmatched ?? []);
+      return data;
+    } catch {
+      return null;
+    }
   };
 
-  const refreshActivity = () => {
+  // Load real activity once when a live connection is present.
+  useEffect(() => {
+    if (hasRealConnection) loadActivity();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sleep = (ms) => new Promise((r) => schedule(r, ms));
+
+  // Start a real stock sync, then poll /activity until the run leaves "running" (the push
+  // happens in the background on the API). Falls back to the local demo animation when there
+  // is no real connection id yet.
+  const syncNow = async () => {
+    if (isSyncing) return;
+
+    if (!connection._id) {
+      setIsSyncing(true);
+      const id = `job_${++jobSeq.current}`;
+      const startedAt = new Date().toISOString();
+      setSyncJobs((jobs) => [
+        { id, type: "inventory", parentCode: "MANUAL_SYNC", variantCode: null, status: "running", attempts: 1, time: startedAt, error: null },
+        ...jobs,
+      ]);
+      schedule(() => {
+        const doneAt = new Date().toISOString();
+        setSyncJobs((jobs) => jobs.map((j) => (j.id === id ? { ...j, status: "done", time: doneAt } : j)));
+        setConnection((c) => ({ ...c, lastSyncAt: doneAt, lastSyncStatus: "done" }));
+        setIsSyncing(false);
+      }, 1800);
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/sync`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.code === "REAUTH_REQUIRED") setNeedsReconnect(true);
+        setNotice({ tone: "error", text: data.error || "Could not start the sync." });
+        setIsSyncing(false);
+        return;
+      }
+      const runId = data.job?.id;
+      // Poll until the run completes (cap the wait so a stuck run can't spin forever).
+      for (let i = 0; i < 40 && aliveRef.current; i++) {
+        await sleep(1500);
+        const activity = await loadActivity();
+        const run = activity?.jobs?.find((j) => j.id === runId);
+        if (run && run.status !== "running") {
+          setConnection((c) => ({ ...c, lastSyncAt: run.time, lastSyncStatus: run.status === "failed" ? "failed" : "done" }));
+          const summary =
+            run.status === "failed"
+              ? `Sync failed${run.detail ? ` — ${run.detail}` : "."}`
+              : run.status === "partial"
+                ? `Sync finished with items needing attention${run.detail ? ` (${run.detail}).` : "."}`
+                : "Sync complete.";
+          setNotice({ tone: run.status === "failed" ? "error" : "success", text: summary });
+          break;
+        }
+      }
+    } catch {
+      setNotice({ tone: "error", text: "Could not reach the server to start the sync." });
+    }
+    if (aliveRef.current) setIsSyncing(false);
+  };
+
+  const refreshActivity = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    schedule(() => setRefreshing(false), 700);
+    if (connection._id) await loadActivity();
+    else await sleep(700);
+    if (aliveRef.current) setRefreshing(false);
   };
 
   // Persist the config to the backend (PUT /shopify/connection/:id/config). Optimistically
@@ -622,7 +742,7 @@ export default function ShopifyIntegrationPage({
     locations.find((l) => l.id === savedConfig.shopifyLocationId)?.name || "—";
 
   const enabledPricelists = config.pricelistPriority.filter((p) => p.enabled).length;
-  const attentionCount = MOCK_UNMATCHED.length;
+  const attentionCount = unmatched.length;
   const stockOnly = config.ownership === "stock_only";
 
   /* ====================================================================== */
@@ -690,6 +810,28 @@ export default function ShopifyIntegrationPage({
             className="shrink-0 text-current/70 transition-opacity hover:opacity-100"
           >
             ✕
+          </button>
+        </div>
+      )}
+
+      {isConnected && needsReconnect && (
+        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2.5">
+            <WarningIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <div>
+              <p className="font-semibold text-amber-300">Reconnect needed</p>
+              <p className="mt-0.5 text-amber-200/80">
+                Shopify retired the older access token for your store. Reconnect to refresh permissions and resume syncing — your store data is untouched.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={reconnect}
+            disabled={connecting}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-neutral-950 transition-all hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {connecting ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
+            {connecting ? "Redirecting…" : "Reconnect Shopify"}
           </button>
         </div>
       )}
@@ -1034,9 +1176,9 @@ export default function ShopifyIntegrationPage({
             {/* counts */}
             <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
               {[
-                { label: "Synced", value: MOCK_COUNTS.synced, tone: "text-cyan-400" },
-                { label: "Pending", value: MOCK_COUNTS.pending, tone: "text-amber-400" },
-                { label: "Error", value: MOCK_COUNTS.error, tone: "text-red-400" },
+                { label: "Synced", value: counts.synced, tone: "text-cyan-400" },
+                { label: "Pending", value: counts.pending, tone: "text-amber-400" },
+                { label: "Error", value: counts.error, tone: "text-red-400" },
               ].map((s) => (
                 <div key={s.label} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-3 py-2.5 sm:px-4 sm:py-3">
                   <div className={`text-xl font-semibold tabular-nums sm:text-2xl ${s.tone}`}>{fmtNum(s.value)}</div>
@@ -1045,8 +1187,15 @@ export default function ShopifyIntegrationPage({
               ))}
             </div>
 
+            {syncJobs.length === 0 && (
+              <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-8 text-center">
+                <p className="text-sm text-neutral-300">No sync runs yet.</p>
+                <p className="mt-1 text-xs text-neutral-500">Hit <span className="font-medium text-neutral-300">Sync now</span> to push live stock to your store.</p>
+              </div>
+            )}
+
             {/* desktop table */}
-            <div className="hidden overflow-x-auto rounded-xl border border-neutral-700/50 md:block">
+            <div className={`${syncJobs.length === 0 ? "hidden" : "hidden md:block"} overflow-x-auto rounded-xl border border-neutral-700/50`}>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
@@ -1063,18 +1212,18 @@ export default function ShopifyIntegrationPage({
                     <tr key={j.id} className="hover:bg-neutral-800/30">
                       <td className="px-4 py-3"><StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge></td>
                       <td className="px-4 py-3">
-                        <span className="font-mono text-neutral-200">{j.variantCode || j.parentCode}</span>
-                        {j.variantCode && <span className="ml-2 text-xs text-neutral-500">{j.parentCode}</span>}
+                        <span className="font-mono text-neutral-200">{jobItem(j)}</span>
+                        {jobSub(j) && <span className="ml-2 text-xs text-neutral-500">{jobSub(j)}</span>}
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5">
                           {j.status === "running" && <PingDot tone="cyan" />}
-                          <StatusBadge tone={JOB_STATUS_TONE[j.status]}>{j.status}</StatusBadge>
+                          <StatusBadge tone={JOB_STATUS_TONE[j.status] || "neutral"}>{j.status}</StatusBadge>
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-neutral-400">{j.attempts}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-neutral-400">{fmtDateTime(j.time)}</td>
-                      <td className="max-w-[240px] truncate px-4 py-3 text-neutral-500" title={j.error || ""}>{j.error || "—"}</td>
+                      <td className="max-w-[240px] truncate px-4 py-3 text-neutral-500" title={jobDetail(j) || ""}>{jobDetail(j) || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1092,13 +1241,13 @@ export default function ShopifyIntegrationPage({
                       <StatusBadge tone={JOB_STATUS_TONE[j.status]}>{j.status}</StatusBadge>
                     </span>
                   </div>
-                  <p className="mt-2 font-mono text-sm text-neutral-200">{j.variantCode || j.parentCode}</p>
-                  {j.variantCode && <p className="text-xs text-neutral-500">{j.parentCode}</p>}
+                  <p className="mt-2 font-mono text-sm text-neutral-200">{jobItem(j)}</p>
+                  {jobSub(j) && <p className="text-xs text-neutral-500">{jobSub(j)}</p>}
                   <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <div className="flex justify-between"><dt className="text-neutral-500">Attempts</dt><dd className="tabular-nums text-neutral-300">{j.attempts}</dd></div>
                     <div className="flex justify-between"><dt className="text-neutral-500">Time</dt><dd className="text-neutral-300">{fmtDateTime(j.time).replace(" UTC", "")}</dd></div>
                   </dl>
-                  {j.error && <p className="mt-2 break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{j.error}</p>}
+                  {jobDetail(j) && j.status === "failed" && <p className="mt-2 break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{jobDetail(j)}</p>}
                 </div>
               ))}
             </div>
@@ -1126,7 +1275,7 @@ export default function ShopifyIntegrationPage({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-800">
-                    {MOCK_UNMATCHED.map((r) => (
+                    {unmatched.map((r) => (
                       <tr key={r.sku} className="hover:bg-neutral-800/30">
                         <td className="px-4 py-3 font-mono text-neutral-200">{r.sku}</td>
                         <td className="px-4 py-3 text-neutral-500">{r.parentCode}</td>
@@ -1144,7 +1293,7 @@ export default function ShopifyIntegrationPage({
 
               {/* mobile cards */}
               <div className="space-y-3 md:hidden">
-                {MOCK_UNMATCHED.map((r) => (
+                {unmatched.map((r) => (
                   <div key={r.sku} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-mono text-sm text-neutral-200">{r.sku}</span>
