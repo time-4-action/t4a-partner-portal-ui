@@ -1244,7 +1244,7 @@ export default function ShopifyIntegrationPage({
                   ))}
                 </ul>
                 <p className="mt-3 text-xs text-neutral-500">
-                  Applies when the portal creates a product. Existing products aren&apos;t re-published.
+                  New products are published to these channels. In <span className="font-medium text-neutral-300">Portal authoritative</span> mode, existing products are kept in sync too (channels added or removed on the next sync). In <span className="font-medium text-neutral-300">Create, then hand off</span>, only newly-created products are published.
                 </p>
               </>
             )}
