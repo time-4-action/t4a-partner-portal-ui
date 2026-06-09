@@ -112,9 +112,14 @@ const SYNC_FLAGS = [
 
 const OWNERSHIP_MODES = [
   {
+    value: "create_then_handoff",
+    title: "Create, then hand off",
+    recommended: true,
+    desc: "Creates each product once, then only keeps stock in sync.",
+  },
+  {
     value: "stock_only",
     title: "Stock only",
-    recommended: true,
     desc: "Only updates inventory quantities. Never touches your titles, prices, or descriptions.",
   },
   {
@@ -122,11 +127,6 @@ const OWNERSHIP_MODES = [
     title: "Portal authoritative",
     desc: "Overwrites portal-managed fields on every sync.",
     warn: "Any edits you make to title, description, price or images in Shopify will be overwritten on the next sync.",
-  },
-  {
-    value: "create_then_handoff",
-    title: "Create, then hand off",
-    desc: "Creates each product once, then only keeps stock in sync.",
   },
 ];
 
