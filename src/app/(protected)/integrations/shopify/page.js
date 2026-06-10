@@ -57,6 +57,24 @@ async function getOwnSources() {
   }
 }
 
+// Fetch the exports with AI categorization enabled — the per-source "AI categorization" picker
+// adds the chosen export's AI categories to the source's Shopify tags. Empty on failure → the
+// section simply doesn't render.
+async function getAiExports() {
+  try {
+    const { token } = await auth0.getAccessToken();
+    const res = await fetch(`${apiUrl}/exports`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}
+
 // Fetch the distinct pricelists in the catalogue so the pricing panel seeds from real names
 // (not mock). Empty on failure → the panel falls back to its demo template.
 async function getShopifyPricelists() {
@@ -94,11 +112,12 @@ export default async function ShopifyIntegrationRoute() {
     );
   }
 
-  const [shopifyExports, connections, pricelists, ownSources] = await Promise.all([
+  const [shopifyExports, connections, pricelists, ownSources, aiExports] = await Promise.all([
     getShopifyExportConfigs(),
     getShopifyConnections(),
     getShopifyPricelists(),
     getOwnSources(),
+    getAiExports(),
   ]);
 
   return (
@@ -112,6 +131,7 @@ export default async function ShopifyIntegrationRoute() {
           initialConnections={connections}
           initialPricelists={pricelists ?? []}
           initialFeeds={ownSources ?? []}
+          initialAiExports={aiExports ?? []}
         />
       </div>
     </div>

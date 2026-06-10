@@ -13,7 +13,10 @@ export async function GET(request, { params }) {
     const { id } = await params;
     try {
         const token = await getToken();
-        const response = await fetch(`${BACKEND}/shopify/connection/${id}/activity`, {
+        // Forward ?limit= so the run-history modal can ask for a longer window.
+        const limit = new URL(request.url).searchParams.get('limit');
+        const qs = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+        const response = await fetch(`${BACKEND}/shopify/connection/${id}/activity${qs}`, {
             headers: { 'Authorization': `Bearer ${token}` },
             cache: 'no-store'
         });

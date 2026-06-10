@@ -213,6 +213,31 @@ function fmtNum(n) {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+function fmtDuration(startIso, endIso) {
+  if (!startIso || !endIso) return null;
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+// Friendly labels for the per-run counts shown in the run-detail modal, in display order.
+const RUN_COUNT_LABELS = [
+  ["inScope", "In scope"],
+  ["matched", "Matched"],
+  ["pushed", "Stock pushed"],
+  ["createdProducts", "Products created"],
+  ["createdVariants", "Variants created"],
+  ["pricesPushed", "Prices pushed"],
+  ["contentPushed", "Content pushed"],
+  ["imagesPushed", "Images added"],
+  ["variantImagesLinked", "Variant images linked"],
+  ["publishedProducts", "Published"],
+  ["unmatched", "Unmatched"],
+  ["failed", "Failed"],
+];
+
 // Merge the catalogue's real pricelists with the connection's stored priority/enabled state:
 // stored names (still in the catalogue) keep their order + enabled flag; newly-seen pricelists
 // are appended newest-first; names no longer in the catalogue are dropped. Each row carries
@@ -598,6 +623,9 @@ export default function ShopifyIntegrationPage({
   // The user's Own Source feeds (GET /external/sources) — offered as an alternative push scope
   // ("Own source" vs a Patrik export config) in each store's Products-to-sync selector.
   initialFeeds = [],
+  // Exports with AI categorization enabled (GET /exports) — a Patrik source can pick one and
+  // its AI categories are pushed as Shopify tags for that source.
+  initialAiExports = [],
 }) {
   const isDemo = initialConnections === null;
   const seedConnections = isDemo ? [MOCK_CONNECTION, MOCK_CONNECTION_2] : initialConnections;
@@ -825,6 +853,7 @@ export default function ShopifyIntegrationPage({
           connection={selected}
           exportOptions={initialExports}
           feedOptions={initialFeeds}
+          aiExportOptions={initialAiExports}
           pricelists={initialPricelists}
           onNotice={setNotice}
           onDisconnected={handleDisconnected}
@@ -1101,7 +1130,7 @@ function ConnectStore({ canCancel, onCancel, onNotice, initialDomain = "" }) {
 /*  ConnectionPanel — full management UI for ONE connected store               */
 /* -------------------------------------------------------------------------- */
 
-function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions = [], pricelists, onNotice, onDisconnected, onPatch }) {
+function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions = [], aiExportOptions = [], pricelists, onNotice, onDisconnected, onPatch }) {
   const isDemo = !initialConn._id;
   const myKey = connKey(initialConn);
 
@@ -1189,6 +1218,11 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
   const [syncJobs, setSyncJobs] = useState(isDemo ? MOCK_SYNC_JOBS : []);
   const [counts, setCounts] = useState(isDemo ? MOCK_COUNTS : { synced: 0, pending: 0, error: 0 });
   const [unmatched, setUnmatched] = useState(isDemo ? MOCK_UNMATCHED : []);
+  // Run-history modal (the panel itself shows only the latest few runs) + per-run detail modal.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyJobs, setHistoryJobs] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [detailJob, setDetailJob] = useState(null);
 
   const [connecting, setConnecting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1242,6 +1276,26 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       return data;
     } catch {
       return null;
+    }
+  };
+
+  // Opens the run-history modal: the panel only ever shows the latest few runs, so this pulls
+  // a longer window (?limit=100). Demo store just reuses its mock rows.
+  const openHistory = async () => {
+    setHistoryOpen(true);
+    if (isDemo) {
+      setHistoryJobs(syncJobs);
+      return;
+    }
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/activity?limit=100`, { cache: "no-store" });
+      const data = res.ok ? await res.json() : null;
+      if (aliveRef.current) setHistoryJobs(data?.jobs ?? syncJobs);
+    } catch {
+      if (aliveRef.current) setHistoryJobs(syncJobs);
+    } finally {
+      if (aliveRef.current) setHistoryLoading(false);
     }
   };
 
@@ -1369,6 +1423,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       : (kind === "feed" ? { ...s, type: "own_source", feedId: id, exportConfigId: undefined } : { ...s, type: "export_config", exportConfigId: id, feedId: undefined })));
   };
   const setScopeLocation = (i, locId) => setScopes(sourceScopes.map((s, idx) => idx === i ? { ...s, locationId: locId } : s));
+  // Per-source AI categorization (Patrik sources only): its categories are pushed as tags.
+  const setScopeAi = (i, id) => setScopes(sourceScopes.map((s, idx) => idx === i ? { ...s, aiExportId: id || undefined } : s));
   const removeScope = (i) => {
     const next = sourceScopes.filter((_, idx) => idx !== i);
     setScopes(next);
@@ -1732,6 +1788,9 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
                 : (exportOptions.find((x) => x._id === s.exportConfigId)?.name || "Export");
               const modeLabel = (OWNERSHIP_MODES.find((m) => m.value === s.ownership)?.title) || "Stock only";
               const locName = locations.find((l) => l.id === s.locationId)?.name;
+              const aiName = s.type !== "own_source" && s.aiExportId
+                ? (aiExportOptions.find((x) => x._id === s.aiExportId)?.name || "AI")
+                : null;
               const openEditor = () => { selectScope(i); setEditingScopeIdx(i); };
               return (
                 <div key={i} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
@@ -1776,6 +1835,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
                   {/* quick summary so each source's setup is legible at a glance */}
                   <p className="mt-2 text-xs text-neutral-500">
                     {modeLabel}{locName ? ` · ${locName}` : ""} · {[s.syncStock && "stock", s.syncPrices && "prices", s.syncDescriptions && "content", s.syncTags && "tags", s.syncImages && "images", s.syncNewProducts && "new"].filter(Boolean).join(", ") || "nothing selected"}
+                    {aiName && <span className="text-cyan-500/90"> · AI tags: {aiName}</span>}
                   </p>
                 </div>
               );
@@ -1882,6 +1942,62 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
           </ul>
         </fieldset>
       </section>
+
+      {/* --------------------- AI categorization (tags) ---------------- */}
+      {activeScope?.type !== "own_source" && aiExportOptions.length > 0 && (
+        <section className="border-t border-neutral-800 pt-8">
+          <SectionHeading
+            title="AI categorization"
+            desc="Tag pushed products with smart AI categories. Products categorized by the chosen categorization get those categories (full path included) as their Shopify tags; the rest keep the catalogue's categories."
+            right={
+              <a
+                href="/categories"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Manage
+              </a>
+            }
+          />
+          {stockOnly ? (
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
+              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+              <span><span className="font-medium text-neutral-200">Stock only</span> ownership never touches tags — switch ownership mode to use AI categories.</span>
+            </div>
+          ) : activeScope?.aiExportId && !config.syncTags ? (
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90">
+              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+              <span><span className="font-medium">Tags sync is off</span> for this source — AI categories are only applied when a product is first created. Turn on <span className="font-medium">Tags</span> under What to sync to keep them updated.</span>
+            </div>
+          ) : null}
+          <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
+            <legend className="sr-only">AI categorization</legend>
+            <label className="mb-1 block text-xs font-medium text-neutral-400">Categorization</label>
+            <Select
+              ariaLabel="AI categorization"
+              value={activeScope?.aiExportId || ""}
+              onChange={(e) => setScopeAi(editingScopeIdx, e.target.value || null)}
+            >
+              <option value="">None — catalogue categories only</option>
+              {aiExportOptions.map((x) => (
+                <option key={x._id} value={x._id}>{x.name}</option>
+              ))}
+            </Select>
+            {(() => {
+              const sel = aiExportOptions.find((x) => x._id === activeScope?.aiExportId);
+              return (
+                <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                  {sel
+                    ? (sel.description || <>Products categorized by <span className="font-medium text-cyan-500/90">{sel.name}</span> get its AI categories as Shopify tags (full path included); the rest keep the catalogue&apos;s categories.</>)
+                    : "Tags come from the catalogue's own categories only."}
+                </p>
+              );
+            })()}
+          </fieldset>
+        </section>
+      )}
 
       {/* ----------------------------- Pricing ------------------------- */}
       <section className="border-t border-neutral-800 pt-8">
@@ -2112,8 +2228,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800">
-              {syncJobs.map((j) => (
-                <tr key={j.id} className="hover:bg-neutral-800/30">
+              {syncJobs.slice(0, 5).map((j) => (
+                <tr key={j.id} onClick={() => setDetailJob(j)} className="cursor-pointer hover:bg-neutral-800/30">
                   <td className="px-4 py-3"><StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge></td>
                   <td className="px-4 py-3">
                     <span className="font-mono text-neutral-200">{jobItem(j)}</span>
@@ -2136,8 +2252,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
 
         {/* mobile cards */}
         <div className="space-y-3 md:hidden">
-          {syncJobs.map((j) => (
-            <div key={j.id} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
+          {syncJobs.slice(0, 5).map((j) => (
+            <div key={j.id} role="button" tabIndex={0} onClick={() => setDetailJob(j)} className="cursor-pointer rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
               <div className="flex items-center justify-between gap-2">
                 <StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge>
                 <span className="inline-flex items-center gap-1.5">
@@ -2155,7 +2271,177 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
             </div>
           ))}
         </div>
+
+        {/* latest-5 window + full history */}
+        {syncJobs.length > 0 && (
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <p className="text-xs text-neutral-500">
+              Showing the {Math.min(syncJobs.length, 5)} most recent {syncJobs.length === 1 ? "run" : "runs"} · click a run for details
+            </p>
+            <button
+              onClick={openHistory}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+            >
+              View all runs
+            </button>
+          </div>
+        )}
       </section>
+
+      {/* ----------------------- Run history modal --------------------- */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6" onClick={() => setHistoryOpen(false)}>
+          <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-white">Sync history</h2>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  {historyLoading ? "Loading…" : `${historyJobs?.length ?? 0} ${(historyJobs?.length ?? 0) === 1 ? "run" : "runs"}`} · click a run for details
+                </p>
+              </div>
+              <button type="button" onClick={() => setHistoryOpen(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-6">
+              {historyLoading ? (
+                <div className="space-y-2 py-2">
+                  {[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-11 animate-pulse rounded-lg bg-neutral-800/40" />)}
+                </div>
+              ) : !historyJobs?.length ? (
+                <p className="py-10 text-center text-sm text-neutral-500">No sync runs yet.</p>
+              ) : (
+                <ul className="divide-y divide-neutral-800/70">
+                  {historyJobs.map((j) => (
+                    <li key={j.id}>
+                      <button
+                        type="button"
+                        onClick={() => setDetailJob(j)}
+                        className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-neutral-800/30"
+                      >
+                        <StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge>
+                        <span className="inline-flex shrink-0 items-center gap-1.5">
+                          {j.status === "running" && <PingDot tone="cyan" />}
+                          <StatusBadge tone={JOB_STATUS_TONE[j.status] || "neutral"}>{j.status}</StatusBadge>
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-neutral-500">{jobDetail(j) || jobItem(j)}</span>
+                        <span className="shrink-0 whitespace-nowrap text-xs text-neutral-400">{fmtDateTime(j.time)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------ Run detail modal --------------------- */}
+      {detailJob && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6" onClick={() => setDetailJob(null)}>
+          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <h2 className="text-base font-semibold text-white">Run details</h2>
+                <StatusBadge tone="neutral">{JOB_TYPE_LABEL[detailJob.type] || detailJob.type}</StatusBadge>
+                <span className="inline-flex items-center gap-1.5">
+                  {detailJob.status === "running" && <PingDot tone="cyan" />}
+                  <StatusBadge tone={JOB_STATUS_TONE[detailJob.status] || "neutral"}>{detailJob.status}</StatusBadge>
+                </span>
+              </div>
+              <button type="button" onClick={() => setDetailJob(null)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-6 py-5">
+              {/* run meta */}
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-neutral-500">Trigger</dt>
+                  <dd className="mt-0.5 capitalize text-neutral-200">{detailJob.trigger || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-neutral-500">Started</dt>
+                  <dd className="mt-0.5 text-neutral-200">{fmtDateTime(detailJob.startedAt || detailJob.time)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-neutral-500">Duration</dt>
+                  <dd className="mt-0.5 text-neutral-200">{fmtDuration(detailJob.startedAt, detailJob.finishedAt) || "—"}</dd>
+                </div>
+              </dl>
+
+              {detailJob.error && (
+                <p className="break-words rounded-lg bg-red-500/10 px-3 py-2.5 text-sm text-red-400">{detailJob.error}</p>
+              )}
+
+              {/* per-source breakdown — which sources ran, where, and in which ownership mode */}
+              {detailJob.scopes?.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-neutral-300">Sources in this run</p>
+                  <ul className="space-y-2">
+                    {detailJob.scopes.map((s, i) => {
+                      const modeLabel = OWNERSHIP_MODES.find((m) => m.value === s.ownership)?.title || s.ownership || "—";
+                      const locName = locations.find((l) => l.id === s.locationId)?.name || (s.locationId ? `…${String(s.locationId).slice(-6)}` : "—");
+                      return (
+                        <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-3 py-2.5">
+                          <span className="text-sm font-medium text-neutral-100">{s.source || "—"}</span>
+                          <StatusBadge tone="neutral">{s.type === "own_source" ? "Own source" : "Patrik export"}</StatusBadge>
+                          <span className="text-xs text-neutral-500">{modeLabel}</span>
+                          <span className="ml-auto text-xs text-neutral-500">
+                            {locName}
+                            {typeof s.products === "number" ? ` · ${fmtNum(s.products)} items` : ""}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              {/* full counts */}
+              {detailJob.counts && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-neutral-300">What this run did</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {RUN_COUNT_LABELS.map(([key, label]) => {
+                      const v = detailJob.counts[key] || 0;
+                      const danger = (key === "failed" || key === "unmatched") && v > 0;
+                      return (
+                        <div key={key} className={`rounded-xl border px-3 py-2.5 ${v ? "border-neutral-700/50 bg-neutral-800/40" : "border-neutral-800/50 bg-neutral-900/30 opacity-50"}`}>
+                          <div className={`text-lg font-semibold tabular-nums ${danger ? "text-red-400" : v ? "text-neutral-100" : "text-neutral-500"}`}>{fmtNum(v)}</div>
+                          <div className="mt-0.5 text-xs text-neutral-500">{label}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* per-product errors */}
+              {detailJob.errors?.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-neutral-300">Errors ({detailJob.errors.length})</p>
+                  <ul className="space-y-1.5">
+                    {detailJob.errors.map((e, i) => (
+                      <li key={i} className="break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                        {e.parentCode && <span className="mr-2 font-mono text-red-200">{e.parentCode}</span>}
+                        {e.error || String(e)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {!detailJob.counts && jobDetail(detailJob) && (
+                <p className="text-sm text-neutral-400">{jobDetail(detailJob)}</p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+              <button type="button" onClick={() => setDetailJob(null)} className="rounded-lg bg-[#01a0be] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --------------------- Needs attention ------------------------- */}
       {attentionCount > 0 && (
