@@ -1379,15 +1379,15 @@ export default function CategoriesPage({ initialExports }) {
                 onClose={() => setExportForm({ open: false, initial: null })} onSave={onExportSaved} />
 
             <div className="space-y-8 pb-16">
-                {/* Header */}
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#01a0be]/20 to-cyan-400/10 ring-1 ring-[#01a0be]/20 flex items-center justify-center text-[#01a0be]">
-                            <Ic.Tag />
-                        </div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight font-orbitron">Category Management</h1>
+                {/* Compact header — small icon + title on one line, matching the Export / Shopify pages. */}
+                <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10 text-[#01a0be]">
+                        <Ic.Tag />
                     </div>
-                    <p className="text-sm text-neutral-500 ml-12">Define categories, manage AI assignments and manually override product categorizations.</p>
+                    <div className="min-w-0">
+                        <h1 className="text-xl font-bold tracking-tight text-white">Category Management</h1>
+                        <p className="truncate text-xs text-neutral-500">Define categories, manage AI assignments and manually override product categorizations.</p>
+                    </div>
                 </div>
 
                 {/* Export selector */}

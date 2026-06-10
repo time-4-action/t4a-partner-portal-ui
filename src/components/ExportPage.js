@@ -23,6 +23,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import ProductDetailModal from "./ProductDetailModal";
 
 /**
  * Export preset configurations.
@@ -449,6 +450,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     const [previewConfig, setPreviewConfig] = useState(null); // null = live filteredProducts, or saved config object
     const [previewView, setPreviewView] = useState('grid'); // 'grid' | 'list'
     const [previewSearch, setPreviewSearch] = useState('');
+    const [detailProduct, setDetailProduct] = useState(null); // product whose detail modal is open
     const [fieldInfoModal, setFieldInfoModal] = useState(null); // field object | null
     const [aiLeafMode, setAiLeafMode] = useState({ ai_tags: false, ai_category_names: false });
     const [inventoryLocationName, setInventoryLocationName] = useState('');
@@ -1596,28 +1598,36 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
     return (
         <div className="min-h-screen">
-            {/* Header */}
-            <div className="mb-8">
-                <div className="flex flex-col gap-6">
-                    {/* Title Row */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <h1 className="text-3xl font-bold text-white tracking-tight">
-                                Product Export
-                            </h1>
-                            <p className="text-neutral-400 mt-1">
-                                Create and manage custom product exports
-                            </p>
-                        </div>
+            {/* ----------------------------- Header ----------------------------- */}
+            {/* Compact header — small icon + title + badge on one line, matching the Shopify / Own Sources pages. */}
+            <header className="mb-6 flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
+                    <svg className="h-5 w-5 text-[#3fd0ea]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                </div>
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-xl font-bold tracking-tight text-white">Export</h1>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+                            Products
+                        </span>
                     </div>
+                    <p className="truncate text-xs text-neutral-500">
+                        Build, save and share custom product exports — Shopify CSV, inventory, or your own field set.
+                    </p>
+                </div>
+            </header>
 
-                    {/* Tab Switcher + Preview button on the same row */}
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex bg-neutral-900/60 border border-neutral-700/50 rounded-xl p-1 w-fit gap-1">
+            {/* Tab switcher + Preview — same glass nav-bar shell as the Shopify store switcher */}
+            <nav className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-2 backdrop-blur-sm">
+                <div className="flex items-center justify-between gap-4">
+                        <div className="flex w-fit gap-1">
                             <button
                                 onClick={() => setActiveTab("configure")}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "configure"
-                                        ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20"
+                                        ? "bg-[#01a0be] text-white shadow-md shadow-cyan-500/20"
                                         : "text-neutral-400 hover:text-white hover:bg-neutral-800/60"
                                     }`}
                             >
@@ -1629,7 +1639,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             <button
                                 onClick={() => setActiveTab("saved")}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "saved"
-                                        ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20"
+                                        ? "bg-[#01a0be] text-white shadow-md shadow-cyan-500/20"
                                         : "text-neutral-400 hover:text-white hover:bg-neutral-800/60"
                                     }`}
                             >
@@ -1648,7 +1658,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         {/* Preview button — lives in the header, always accessible */}
                         <button
                             onClick={() => { setPreviewConfig(null); setPreviewSearch(''); setShowPreview(true); }}
-                            className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 hover:bg-neutral-700/80 border border-neutral-700/50 hover:border-neutral-600/60 text-neutral-400 hover:text-white rounded-xl text-sm font-medium transition-all"
+                            className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 hover:bg-neutral-700/80 border border-neutral-800 hover:border-neutral-600/60 text-neutral-400 hover:text-white rounded-xl text-sm font-medium transition-all"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1660,8 +1670,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </span>
                         </button>
                     </div>
-                </div>
-            </div>
+            </nav>
 
             {activeTab === "configure" ? (
                 <div className="space-y-6">
@@ -1703,7 +1712,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         ];
                         const STEP_META = ALL_STEPS.filter(s => stepsOrder.includes(s.id));
                         return (
-                            <div className="bg-neutral-900/60 border border-neutral-700/50 rounded-2xl overflow-hidden">
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl overflow-hidden">
                                 <div className="flex divide-x divide-neutral-800">
                                     {STEP_META.map(({ id, label, sub, icon }, i) => {
                                         const thisIdx = stepsOrder.indexOf(id);
@@ -1720,10 +1729,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 }`}
                                             >
                                                 {isActive && (
-                                                    <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-cyan-500 to-blue-500" />
+                                                    <div className="absolute top-0 inset-x-0 h-[2px] bg-[#01a0be]" />
                                                 )}
                                                 <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                                                    isActive ? 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25'
+                                                    isActive ? 'bg-[#01a0be] text-white shadow-lg shadow-cyan-500/25'
                                                     : isDone ? 'bg-green-500/10 text-green-400 ring-1 ring-green-500/20'
                                                     : 'bg-neutral-800 text-neutral-600'
                                                 }`}>
@@ -1748,7 +1757,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     {exportStep === 'format' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Preset Cards */}
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-6 border border-neutral-700/50">
+                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-6 border border-neutral-800">
                                 <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider mb-5">Export Format</h2>
                                 <div className="grid grid-cols-2 gap-3">
                                     {Object.entries(EXPORT_PRESETS).map(([key, preset]) => (
@@ -1756,7 +1765,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             key={key}
                                             onClick={() => handlePresetChange(key)}
                                             className={`flex flex-col items-start gap-3 p-5 rounded-2xl border transition-all duration-200 text-left ${selectedPreset === key
-                                                ? 'bg-gradient-to-br from-cyan-500/15 to-blue-500/15 border-cyan-500/50 shadow-lg shadow-cyan-500/10'
+                                                ? 'bg-[#01a0be]/10 border-[#01a0be]/50 shadow-lg shadow-[#01a0be]/10'
                                                 : 'bg-neutral-800/50 border-neutral-700/40 hover:bg-neutral-700/50 hover:border-neutral-600/60'
                                             }`}
                                         >
@@ -1777,8 +1786,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                             {/* Right column: Shopify Location (inventory) or Pricelist Priority (others) */}
                             {selectedPreset === 'inventory' ? (
-                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden flex flex-col">
-                                    <div className="px-6 py-5 border-b border-neutral-700/50">
+                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden flex flex-col">
+                                    <div className="px-6 py-5 border-b border-neutral-800">
                                         <div className="flex items-center gap-2">
                                             <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -1794,7 +1803,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             value={inventoryLocationName}
                                             onChange={(e) => setInventoryLocationName(e.target.value)}
                                             placeholder="e.g. pATRIK"
-                                            className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-700/50 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
+                                            className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-800 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
                                         />
                                         <div className="flex items-start gap-2.5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                                             <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1808,8 +1817,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     </div>
                                 </div>
                             ) : pricelistPriority.length > 0 ? (
-                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden flex flex-col">
-                                    <div className="px-6 py-5 border-b border-neutral-700/50">
+                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden flex flex-col">
+                                    <div className="px-6 py-5 border-b border-neutral-800">
                                         <div className="flex items-center gap-2">
                                             <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
@@ -1820,7 +1829,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     </div>
                                     <div className="p-4 flex-1">
                                         {dropIndicator === 0 && draggedIndex !== 0 && (
-                                            <div className="h-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
+                                            <div className="h-1 bg-[#01a0be] rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
                                         )}
                                         {pricelistPriority.map((pl, idx) => (
                                             <div key={pl.name}>
@@ -1837,7 +1846,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                           ${draggedIndex === idx
                                                         ? "opacity-50 scale-95 bg-neutral-900/50 border-2 border-dashed border-cyan-500/50"
                                                         : pl.enabled
-                                                            ? "bg-neutral-800/60 border border-neutral-700/50 hover:border-cyan-500/30 hover:bg-neutral-800/80"
+                                                            ? "bg-neutral-800/60 border border-neutral-800 hover:border-cyan-500/30 hover:bg-neutral-800/80"
                                                             : "bg-neutral-900/40 border border-neutral-800/50 opacity-50"
                                                     }
                           group
@@ -1892,14 +1901,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             after:transition-all after:duration-200 after:shadow-sm
                             peer-checked:after:translate-x-[16px]
                             ${pl.enabled
-                                                            ? "bg-gradient-to-r from-cyan-500 to-blue-500"
+                                                            ? "bg-[#01a0be]"
                                                             : "bg-neutral-700"
                                                         }
                           `} />
                                                     </label>
                                                 </div>
                                                 {dropIndicator === idx + 1 && draggedIndex !== idx && draggedIndex !== idx + 1 && (
-                                                    <div className="h-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
+                                                    <div className="h-1 bg-[#01a0be] rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
                                                 )}
                                             </div>
                                         ))}
@@ -1913,7 +1922,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     )}
                                 </div>
                             ) : (
-                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 flex items-center justify-center p-12">
+                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 flex items-center justify-center p-12">
                                     <div className="text-center">
                                         <svg className="w-10 h-10 text-neutral-700 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1929,9 +1938,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     {exportStep === 'filters' && (
                         <div className="space-y-5">
                             {/* Unified filter card */}
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
+                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
                                 {/* Header */}
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50">
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
                                     <div className="flex items-center gap-3">
                                         <h2 className="text-sm font-semibold text-white">Filters</h2>
                                         {(() => {
@@ -2036,8 +2045,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                         {/* Custom Categories Tree — full width */}
                         {availableAiExports.length > 0 && (
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
-                                <div className="px-6 py-4 border-b border-neutral-700/50">
+                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
+                                <div className="px-6 py-4 border-b border-neutral-800">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <svg className="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2072,7 +2081,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         className={`flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-medium transition-all ${
                                                             isActive
                                                                 ? "bg-purple-500/20 text-purple-300 border border-purple-500/50"
-                                                                : "bg-neutral-800/50 text-neutral-400 border border-neutral-700/50 hover:border-neutral-600 hover:text-white"
+                                                                : "bg-neutral-800/50 text-neutral-400 border border-neutral-800 hover:border-neutral-600 hover:text-white"
                                                         }`}
                                                     >
                                                         {exp.logo && <img src={exp.logo} alt="" className="w-3.5 h-3.5 object-contain rounded-sm" />}
@@ -2165,8 +2174,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                         {/* Product Category chips — dynamic, only categories still present after other filters */}
                         {availableCategories.length > 0 && (
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50">
+                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
                                     <div className="flex items-center gap-3">
                                         <svg className="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -2218,8 +2227,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             preset defaults so the generated CSV always matches Shopify's import schema.
                             Only the Variant Option Name (below) stays editable. */}
                         {selectedPreset !== 'shopify' && (
-                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
-                            <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-700/50">
+                        <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
+                            <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-800">
                                 <div>
                                     <h2 className="text-sm font-semibold text-white">Select Fields</h2>
                                     <p className="text-xs text-neutral-500 mt-0.5">Choose which columns to include in your export</p>
@@ -2253,7 +2262,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             <button
                                                 onClick={() => toggleField(field)}
                                                 className={`w-full flex items-center gap-2 px-3 py-2.5 pr-8 rounded-xl text-sm transition-all ${isSelected
-                                                        ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-white"
+                                                        ? "bg-[#01a0be]/15 border border-[#01a0be]/50 text-white"
                                                         : "bg-neutral-800/50 border border-neutral-700/30 text-neutral-400 hover:text-white hover:border-neutral-600"
                                                     }`}
                                             >
@@ -2284,8 +2293,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                         {/* Option1 Name customization — shown when option1 fields are selected */}
                         {selectedFields.includes('option1_name') && (
-                            <div className="mt-4 bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
-                                <div className="px-6 py-4 border-b border-neutral-700/50">
+                            <div className="mt-4 bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
+                                <div className="px-6 py-4 border-b border-neutral-800">
                                     <div className="flex items-center gap-2">
                                         <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -2302,7 +2311,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         value={option1Name}
                                         onChange={(e) => setOption1Name(e.target.value)}
                                         placeholder="Variant"
-                                        className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-700/50 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
+                                        className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-800 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
                                     />
                                     <p className="text-xs text-neutral-500 mt-2">Leave empty to use the generic default: <span className="text-neutral-400 font-medium">Variant</span>.</p>
                                 </div>
@@ -2315,19 +2324,19 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         <div className="space-y-6">
                             {/* Stats Bar */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
+                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-5 border border-neutral-800">
                                     <div className="text-3xl font-bold text-cyan-400">{filteredProducts.length}</div>
                                     <div className="text-xs text-neutral-500 mt-1">Products</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
+                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-5 border border-neutral-800">
                                     <div className="text-3xl font-bold text-blue-400">{totalRows}</div>
                                     <div className="text-xs text-neutral-500 mt-1">Export Rows</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
+                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-5 border border-neutral-800">
                                     <div className="text-3xl font-bold text-purple-400">{selectedPreset === 'inventory' ? 12 : selectedFields.length}</div>
                                     <div className="text-xs text-neutral-500 mt-1">{selectedPreset === 'inventory' ? 'Fixed Columns' : 'Fields'}</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-5 border border-neutral-700/50">
+                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-5 border border-neutral-800">
                                     {selectedPreset === 'inventory' ? (
                                         <>
                                             <div className="text-lg font-bold text-pink-400 truncate" title={inventoryLocationName || 'Not set'}>{inventoryLocationName || 'No location'}</div>
@@ -2343,8 +2352,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
 
                             {/* Download */}
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50">
+                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
                                     <div>
                                         <h2 className="text-sm font-semibold text-white">Download</h2>
                                         <p className="text-xs text-neutral-500 mt-0.5">{filteredProducts.length} products · {totalRows} rows{selectedPreset === 'inventory' ? ` · ${inventoryLocationName || 'No location'}` : ` · ${selectedFields.length} fields`}</p>
@@ -2390,7 +2399,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
 
                             {/* Preview */}
-                            <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl p-6 border border-neutral-700/50">
+                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-6 border border-neutral-800">
                                 <div className="flex items-center justify-between mb-4">
                                     <h2 className="text-lg font-semibold text-white">Preview</h2>
                                     {filters.aiExportId !== "all" && filters.aiCategory.length > 0 && (
@@ -2463,7 +2472,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     );
                                 })()}
 
-                                <div className="overflow-x-auto rounded-xl border border-neutral-700/50">
+                                <div className="overflow-x-auto rounded-xl border border-neutral-800">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="bg-neutral-800/80">
@@ -2617,7 +2626,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 if (idx > 0) setExportStep(steps[idx - 1]);
                             }}
                             disabled={exportStep === 'format'}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-0 disabled:pointer-events-none bg-neutral-800/80 hover:bg-neutral-700/80 text-neutral-300 hover:text-white border border-neutral-700/50"
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-0 disabled:pointer-events-none bg-neutral-800/80 hover:bg-neutral-700/80 text-neutral-300 hover:text-white border border-neutral-800"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -2632,7 +2641,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     const idx = steps.indexOf(exportStep);
                                     if (idx < steps.length - 1) setExportStep(steps[idx + 1]);
                                 }}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white shadow-md shadow-cyan-500/20"
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-[#01a0be] hover:bg-[#0bb6d4] text-white shadow-md shadow-cyan-500/20"
                             >
                                 {exportStep === 'format' && 'Set Filters'}
                                 {exportStep === 'filters' && selectedPreset === 'inventory' ? 'Review & Export' : ''}
@@ -2672,7 +2681,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             <button
                                 onClick={loadSavedExports}
                                 disabled={isLoadingExports}
-                                className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 hover:bg-neutral-700/80 text-neutral-300 hover:text-white rounded-xl text-sm font-medium transition-all border border-neutral-700/50"
+                                className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 hover:bg-neutral-700/80 text-neutral-300 hover:text-white rounded-xl text-sm font-medium transition-all border border-neutral-800"
                             >
                                 <RefreshIcon />
                                 {isLoadingExports ? "Loading..." : "Refresh"}
@@ -2681,22 +2690,22 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     </div>
 
                     {isLoadingExports ? (
-                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 p-16">
+                        <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 p-16">
                             <div className="flex flex-col items-center justify-center gap-4">
                                 <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
                                 <p className="text-neutral-400">Loading saved exports...</p>
                             </div>
                         </div>
                     ) : savedExports.length === 0 ? (
-                        <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 py-20 px-8">
+                        <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 py-20 px-8">
                             <div className="flex flex-col items-center justify-center text-center max-w-sm mx-auto">
                                 <div className="relative mb-6">
-                                    <div className="w-20 h-20 bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl flex items-center justify-center border border-neutral-700/50 shadow-xl">
+                                    <div className="w-20 h-20 bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl flex items-center justify-center border border-neutral-800 shadow-xl">
                                         <svg className="w-9 h-9 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                                         </svg>
                                     </div>
-                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg flex items-center justify-center shadow-lg">
+                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#01a0be] rounded-lg flex items-center justify-center shadow-lg">
                                         <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                                         </svg>
@@ -2706,7 +2715,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <p className="text-sm text-neutral-500 mb-6 leading-relaxed">Configure an export with your preferred settings, then save it for quick access and shareable API links.</p>
                                 <button
                                     onClick={() => setActiveTab("configure")}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl font-semibold transition-all shadow-lg shadow-cyan-500/25 text-sm"
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-[#01a0be] hover:bg-[#0bb6d4] text-white rounded-xl font-semibold transition-all shadow-lg shadow-cyan-500/25 text-sm"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2744,7 +2753,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 return (
                                 <div
                                     key={config._id}
-                                    className="group relative bg-gradient-to-br from-neutral-800/90 to-neutral-900/90 backdrop-blur-sm border border-neutral-700/50 rounded-2xl overflow-hidden hover:border-neutral-500/60 hover:shadow-xl hover:shadow-black/30 transition-all duration-200"
+                                    className="group relative bg-neutral-900/40 backdrop-blur-sm border border-neutral-800 rounded-2xl overflow-hidden hover:border-neutral-500/60 hover:shadow-xl hover:shadow-black/30 transition-all duration-200"
                                 >
                                     {/* Top gradient accent bar */}
                                     <div className={`h-[3px] bg-gradient-to-r ${style.gradient}`} />
@@ -2775,7 +2784,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                                         {/* Stats chips */}
                                         <div className="flex flex-wrap items-center gap-2 mb-4">
-                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-700/50 text-xs text-neutral-400">
+                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-800 text-xs text-neutral-400">
                                                 <svg className="w-3 h-3 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h8" />
                                                 </svg>
@@ -2788,14 +2797,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 </span>
                                             )}
                                             {(config.pricelistPriority?.filter(p => p.enabled).length ?? 0) > 0 && (
-                                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-700/50 text-xs text-neutral-400">
+                                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-800 text-xs text-neutral-400">
                                                     <svg className="w-3 h-3 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
                                                     <span className="font-medium text-neutral-300">{config.pricelistPriority.filter(p => p.enabled).length}</span> pricelist{config.pricelistPriority.filter(p => p.enabled).length !== 1 ? 's' : ''}
                                                 </span>
                                             )}
-                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-700/50 text-xs text-neutral-500 ml-auto">
+                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-800 text-xs text-neutral-500 ml-auto">
                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                 </svg>
@@ -2894,7 +2903,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         {/* Panel header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800/80 bg-neutral-900/80 shrink-0">
                             <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                                <div className="w-8 h-8 bg-[#01a0be] rounded-lg flex items-center justify-center shrink-0">
                                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -2912,7 +2921,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 {/* Grid / List toggle */}
-                                <div className="flex bg-neutral-800/80 border border-neutral-700/50 rounded-lg p-0.5">
+                                <div className="flex bg-neutral-800/80 border border-neutral-800 rounded-lg p-0.5">
                                     <button
                                         onClick={() => setPreviewView('grid')}
                                         className={`p-1.5 rounded-md transition-all ${previewView === 'grid' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
@@ -2984,7 +2993,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         const minPrice = allPrices.length ? Math.min(...allPrices) : null;
                                         const hasStock = variants.some(v => v.stock_amount > 0);
                                         return (
-                                            <div key={product._id || product.token} className="group bg-neutral-900/70 border border-neutral-800/60 rounded-xl overflow-hidden hover:border-neutral-600/60 hover:shadow-lg hover:shadow-black/30 transition-all">
+                                            <div key={product._id || product.token} role="button" tabIndex={0} onClick={() => setDetailProduct(product)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailProduct(product); } }} className="group cursor-pointer bg-neutral-900/70 border border-neutral-800/60 rounded-xl overflow-hidden hover:border-[#01a0be]/40 hover:shadow-lg hover:shadow-black/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#01a0be]/50">
                                                 <div className="relative aspect-square bg-neutral-800">
                                                     {imgSrc ? (
                                                         <img src={imgSrc} alt={product.product_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -3010,7 +3019,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     {product.categories?.length > 0 && (
                                                         <div className="mt-1.5 flex flex-wrap gap-1">
                                                             {product.categories.slice(0, 2).map(cat => (
-                                                                <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-500 rounded-md border border-neutral-700/50 truncate max-w-[80px]">{cat}</span>
+                                                                <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-500 rounded-md border border-neutral-800 truncate max-w-[80px]">{cat}</span>
                                                             ))}
                                                         </div>
                                                     )}
@@ -3028,7 +3037,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         const minPrice = allPrices.length ? Math.min(...allPrices) : null;
                                         const hasStock = variants.some(v => v.stock_amount > 0);
                                         return (
-                                            <div key={product._id || product.token} className="flex items-center gap-3 p-2.5 bg-neutral-900/60 border border-neutral-800/50 rounded-xl hover:border-neutral-700/60 hover:bg-neutral-800/40 transition-all group">
+                                            <div key={product._id || product.token} role="button" tabIndex={0} onClick={() => setDetailProduct(product)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailProduct(product); } }} className="flex items-center gap-3 p-2.5 bg-neutral-900/60 border border-neutral-800/50 rounded-xl cursor-pointer hover:border-[#01a0be]/40 hover:bg-neutral-800/40 transition-all group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#01a0be]/50">
                                                 <div className="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-neutral-800">
                                                     {imgSrc ? (
                                                         <img src={imgSrc} alt={product.product_name} className="w-full h-full object-cover" />
@@ -3065,11 +3074,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 </div>
             )}
 
+            {/* Product Detail Modal — opened by clicking a product in the preview */}
+            {detailProduct && (
+                <ProductDetailModal product={detailProduct} onClose={() => setDetailProduct(null)} />
+            )}
+
             {/* Field Info Modal */}
             {fieldInfoModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setFieldInfoModal(null)}>
                     <div className="bg-neutral-900 rounded-2xl w-full max-w-md border border-neutral-700/60 overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="h-0.5 w-full bg-gradient-to-r from-cyan-500 to-blue-500" />
+                        <div className="h-0.5 w-full bg-[#01a0be]" />
                         <div className="p-6 space-y-5">
 
                             {/* Header */}
@@ -3091,7 +3105,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-purple-500/[0.07] border border-purple-500/20">
                                     <svg className="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
                                     <p className="text-xs text-neutral-400">
-                                        Populated by <span className="text-purple-300 font-medium">Gemini AI</span> based on your export's custom category tree
+                                        Populated by <span className="text-purple-300 font-medium">Gemini AI</span> based on your export&apos;s custom category tree
                                         {fieldInfoModal.key === "ai_tags" && <> · used as <span className="text-white font-medium">Collection</span> in Shopify</>}
                                     </p>
                                 </div>
@@ -3139,7 +3153,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         </div>
                                                         <p className="text-xs text-neutral-600 mt-0.5">{opt.subtitle}</p>
                                                     </div>
-                                                    <code className={`text-[11px] font-mono px-2 py-1 rounded-lg shrink-0 ${active ? "text-cyan-300 bg-cyan-500/10 border border-cyan-500/20" : "text-neutral-500 bg-neutral-800 border border-neutral-700/50"}`}>{opt.example}</code>
+                                                    <code className={`text-[11px] font-mono px-2 py-1 rounded-lg shrink-0 ${active ? "text-cyan-300 bg-cyan-500/10 border border-cyan-500/20" : "text-neutral-500 bg-neutral-800 border border-neutral-800"}`}>{opt.example}</code>
                                                 </button>
                                             );
                                         })}
@@ -3200,7 +3214,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             <button
                                 onClick={handleSaveExport}
                                 disabled={isSaving || !exportName.trim()}
-                                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 disabled:from-neutral-600 disabled:to-neutral-700 text-white rounded-xl font-medium transition-all disabled:cursor-not-allowed"
+                                className="flex-1 py-2.5 px-4 bg-[#01a0be] hover:bg-[#0bb6d4] disabled:bg-neutral-700 disabled:opacity-60 text-white rounded-xl font-medium transition-all disabled:cursor-not-allowed"
                             >
                                 {isSaving ? "Saving..." : "Save Export"}
                             </button>
@@ -3372,7 +3386,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 ) : (
                                     <div className="space-y-2">
                                         {exportKeys.map(key => (
-                                            <div key={key.keyId} className={`rounded-xl border transition-all ${key.isActive ? 'bg-neutral-800/40 border-neutral-700/50' : 'bg-neutral-800/10 border-neutral-800/40 opacity-40'}`}>
+                                            <div key={key.keyId} className={`rounded-xl border transition-all ${key.isActive ? 'bg-neutral-800/40 border-neutral-800' : 'bg-neutral-800/10 border-neutral-800/40 opacity-40'}`}>
                                                 {/* Key row */}
                                                 <div className="flex items-center gap-2 p-3">
                                                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${key.isActive ? 'bg-green-500' : 'bg-neutral-600'}`} />
@@ -3446,7 +3460,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-neutral-800 rounded-2xl w-full max-w-lg border border-neutral-700 max-h-[90vh] flex flex-col shadow-2xl">
                         {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-700/50 shrink-0">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
                                     <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3489,7 +3503,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <p className="text-xs text-neutral-600 mt-1.5">User must also have the export role in Auth0.</p>
                             </div>
 
-                            <div className="border-t border-neutral-700/50" />
+                            <div className="border-t border-neutral-800" />
 
                             {/* Access list */}
                             <div>
@@ -3522,7 +3536,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         {exportAccess.map(entry => {
                                             const initials = entry.email.split('@')[0].slice(0, 2).toUpperCase();
                                             return (
-                                                <div key={entry.email} className="flex items-center gap-3 p-3 bg-neutral-900/50 rounded-xl border border-neutral-700/50">
+                                                <div key={entry.email} className="flex items-center gap-3 p-3 bg-neutral-900/50 rounded-xl border border-neutral-800">
                                                     <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
                                                         <span className="text-xs font-semibold text-blue-400">{initials}</span>
                                                     </div>
