@@ -643,6 +643,9 @@ function ProductsTab({ exportId, toast }) {
     const [filter, setFilter] = useState("all");
     const [triggering, setTriggering] = useState(false);
     const [confirm, setConfirm] = useState(null);
+    // Latest AI-categorization run (polled while running → live progress in the stats card).
+    const [aiRun, setAiRun] = useState(null);
+    const pollRef = useRef(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -657,6 +660,40 @@ function ProductsTab({ exportId, toast }) {
     }, [exportId]);
 
     useEffect(() => { if (exportId) load(); }, [exportId, load]);
+
+    const fetchAiRun = useCallback(async () => {
+        try {
+            const d = await (await fetch(`/nextapi/exports/${exportId}/ai-status`, { cache: "no-store" })).json();
+            const run = d.run ?? null;
+            setAiRun(run);
+            return run;
+        } catch { return null; }
+    }, [exportId]);
+
+    const stopAiPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+    const startAiPolling = useCallback(() => {
+        stopAiPolling();
+        pollRef.current = setInterval(async () => {
+            const run = await fetchAiRun();
+            if (run && run.status === "running") return;
+            stopAiPolling();
+            if (run?.status === "done") { toast(`AI categorized ${run.categorized ?? 0} products`, "success"); load(); }
+            else if (run?.status === "failed") toast(run.error || "AI categorization failed", "error");
+        }, 2500);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchAiRun, load]);
+
+    // On mount / category-set switch: if a run is already going (page reload mid-run), resume polling.
+    useEffect(() => {
+        if (!exportId) return undefined;
+        let cancelled = false;
+        (async () => {
+            const run = await fetchAiRun();
+            if (!cancelled && run?.status === "running") startAiPolling();
+        })();
+        return () => { cancelled = true; stopAiPolling(); };
+    }, [exportId, fetchAiRun, startAiPolling]);
 
     const stats = useMemo(() => {
         const total = products.length, categorized = products.filter(p => p.aiCategory).length;
@@ -693,8 +730,12 @@ function ProductsTab({ exportId, toast }) {
         setTriggering(true);
         try {
             const r = await fetch("/nextapi/ai-categorization", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ exportId }) });
-            const d = await r.json();
-            if (r.status === 202 || d.message) toast("AI categorization started", "success"); else throw new Error(d.error);
+            const d = await r.json().catch(() => ({}));
+            // Only a 202 means the run actually started — error responses ALSO carry `message`.
+            if (r.status !== 202) throw new Error(d.message || d.error || `Could not start AI categorization (HTTP ${r.status})`);
+            toast("AI categorization started", "success");
+            setAiRun({ status: "running", total: Math.max(stats.total - stats.categorized, 0), processed: 0, categorized: 0, batch: 0, totalBatches: 0 });
+            startAiPolling();
         } catch (e) { toast(e.message, "error"); }
         finally { setTriggering(false); }
     };
@@ -712,7 +753,30 @@ function ProductsTab({ exportId, toast }) {
         }
     });
 
-    const pctColor = stats.pct >= 80 ? "#22c55e" : stats.pct >= 50 ? "#f59e0b" : "#ef4444";
+    // While a run is going, the stat tiles track it live without reloading the product list:
+    // categorized-at-run-start = total − run.total (run.total = uncategorized when it began),
+    // so categorized-now = total − run.total + run.categorized. Independent of list state.
+    const aiRunning = aiRun?.status === "running";
+    const liveCategorized = aiRunning && stats.total
+        ? Math.min(Math.max(stats.total - (aiRun.total || 0) + (aiRun.categorized || 0), stats.categorized), stats.total)
+        : stats.categorized;
+    const livePct = stats.total ? Math.round((liveCategorized / stats.total) * 100) : 0;
+
+    // ETA from the run's own pace: elapsed / processed × remaining.
+    const aiEta = (() => {
+        if (!aiRunning || !aiRun.startedAt || !aiRun.processed || !aiRun.total) return null;
+        const elapsedMs = Date.now() - new Date(aiRun.startedAt).getTime();
+        if (elapsedMs <= 0) return null;
+        const remainingMs = (aiRun.total - aiRun.processed) * (elapsedMs / aiRun.processed);
+        if (!Number.isFinite(remainingMs) || remainingMs < 0) return null;
+        const s = Math.round(remainingMs / 1000);
+        if (s < 5) return "almost done";
+        if (s < 90) return `~${s}s left`;
+        const m = Math.round(s / 60);
+        return `~${m} min left`;
+    })();
+
+    const pctColor = livePct >= 80 ? "#22c55e" : livePct >= 50 ? "#f59e0b" : "#ef4444";
 
     return (
         <>
@@ -726,27 +790,52 @@ function ProductsTab({ exportId, toast }) {
                             <div>
                                 <p className={`${S.label} mb-1`}>Categorized</p>
                                 <p className="text-2xl font-bold text-white tabular-nums">
-                                    {stats.categorized}
+                                    {liveCategorized}
                                     <span className="text-sm font-normal text-neutral-600 ml-1">/ {stats.total}</span>
                                 </p>
                             </div>
                             <div className="w-px h-8 bg-white/[0.06]" />
                             <div>
                                 <p className={`${S.label} mb-1`}>Coverage</p>
-                                <p className="text-2xl font-bold tabular-nums" style={{ color: pctColor }}>{stats.pct}%</p>
+                                <p className="text-2xl font-bold tabular-nums" style={{ color: pctColor }}>{livePct}%</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={triggerAI} disabled={triggering} className={S.btnPrimary}>
-                                {triggering ? <Ic.Refresh spin /> : <Ic.Spark />}Trigger AI
+                            <button onClick={triggerAI} disabled={triggering || aiRun?.status === "running"} className={S.btnPrimary}>
+                                {(triggering || aiRun?.status === "running") ? <Ic.Refresh spin /> : <Ic.Spark />}
+                                {aiRun?.status === "running" ? "Categorizing…" : "Trigger AI"}
                             </button>
                             <button onClick={load} disabled={loading} className={`${S.btnOutline} w-9 px-0 justify-center`}><Ic.Refresh spin={loading} /></button>
                             {stats.categorized > 0 && <button onClick={clearAll} className={S.btnDanger}><Ic.Trash /></button>}
                         </div>
                     </div>
+
+                    {/* Live AI-run progress (polled) */}
+                    {aiRun?.status === "running" && (
+                        <div className="mb-4 rounded-xl bg-[#01a0be]/[0.06] ring-1 ring-[#01a0be]/20 p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                                <span className="flex items-center gap-2 text-sm font-medium text-white">
+                                    <Ic.Refresh spin />AI is categorizing with Claude…
+                                </span>
+                                <span className="text-xs text-neutral-400 tabular-nums">
+                                    {aiRun.totalBatches ? `Batch ${Math.max(aiRun.batch || 0, 1)}/${aiRun.totalBatches} · ` : ""}
+                                    {aiRun.processed ?? 0}/{aiRun.total || "…"} products · {aiRun.categorized ?? 0} categorized
+                                    {aiEta ? <span className="text-[#01a0be]"> · {aiEta}</span> : ""}
+                                </span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                <div
+                                    className="h-full rounded-full bg-[#01a0be] transition-all duration-500"
+                                    style={{ width: `${aiRun.total ? Math.max(Math.round(((aiRun.processed || 0) / aiRun.total) * 100), 3) : 3}%`, boxShadow: "0 0 8px #01a0be60" }}
+                                />
+                            </div>
+                            {aiRun.error && <p className="mt-2 text-xs text-amber-400">Last batch issue: {aiRun.error}</p>}
+                        </div>
+                    )}
+
                     {/* Progress */}
                     <div className="h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${stats.pct}%`, backgroundColor: pctColor, boxShadow: `0 0 8px ${pctColor}60` }} />
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${livePct}%`, backgroundColor: pctColor, boxShadow: `0 0 8px ${pctColor}60` }} />
                     </div>
                 </div>
 
