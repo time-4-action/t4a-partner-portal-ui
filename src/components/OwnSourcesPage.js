@@ -56,7 +56,7 @@ function HealthPill({ source }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${tones[tone]}`}>{label}</span>;
 }
 
-function Button({ children, onClick, variant = "ghost", disabled, type = "button" }) {
+function Button({ children, onClick, variant = "ghost", disabled, type = "button", className = "", title, ariaLabel }) {
   const base = "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const variants = {
     primary: "text-white shadow-lg",
@@ -64,7 +64,7 @@ function Button({ children, onClick, variant = "ghost", disabled, type = "button
     danger: "border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20",
   };
   const style = variant === "primary" ? { backgroundColor: ACCENT } : undefined;
-  return <button type={type} onClick={onClick} disabled={disabled} style={style} className={`${base} ${variants[variant]}`}>{children}</button>;
+  return <button type={type} onClick={onClick} disabled={disabled} title={title} aria-label={ariaLabel} style={style} className={`${base} ${variants[variant]} ${className}`}>{children}</button>;
 }
 
 function Field({ label, children, hint }) {
@@ -239,17 +239,17 @@ function DefList({ rows, mono }) {
 function HelpModal({ onClose }) {
   useLockBody();
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={onClose}>
-      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900" onClick={(e) => e.stopPropagation()}>
-        <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Own Sources guide</h2>
-            <p className="text-sm text-neutral-400">How to connect your own supplier feed and what every field does — from adding a source to going live.</p>
+    <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-4" onClick={onClose}>
+      <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 sm:h-auto sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+          <div className="min-w-0">
+            <h2 className="mb-0 text-lg font-semibold leading-tight text-white">Own Sources guide</h2>
+            <p className="mt-1 hidden text-sm text-neutral-400 sm:block">How to connect your own supplier feed and what every field does — from adding a source to going live.</p>
           </div>
           <CloseButton onClick={onClose} />
         </div>
 
-        <div className="overflow-y-auto overscroll-contain px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
           {/* Overview */}
           <div className="rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] px-4 py-3.5 text-sm leading-relaxed text-neutral-300">
             <span className="font-medium text-white">How it works.</span> You register a supplier&apos;s JSON feed; the portal fetches and validates it, matches products by SKU, and pushes them to your Shopify store <span className="text-neutral-200">alongside Patrik</span> — the same one-way sync. Nothing is written until a feed validates cleanly.
@@ -379,28 +379,30 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(""); // shown inline inside the modal so it isn't hidden behind it
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const setSchedule = (patch) => setForm((f) => ({ ...f, schedule: { ...f.schedule, ...patch } }));
   const setOptions = (patch) => setForm((f) => ({ ...f, options: { ...f.options, ...patch } }));
 
   const runTest = async () => {
-    setTesting(true); setTestResult(null);
+    setTesting(true); setTestResult(null); setError("");
     try {
       const res = await fetch("/nextapi/export/external/test", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: form.url, authHeaderName: form.authHeaderName || undefined, authToken: form.authToken || undefined }),
       });
       const data = await res.json();
-      if (!res.ok) { onNotice({ tone: "error", text: data.error || "Test failed." }); }
+      if (!res.ok) { setError(data.error || "Feed test failed — check the URL and auth, then try again."); }
       else setTestResult(data);
-    } catch { onNotice({ tone: "error", text: "Could not reach the server to test." }); }
+    } catch { setError("Could not reach the server to test the feed."); }
     setTesting(false);
   };
 
   const save = async () => {
+    setError("");
     if (!form.brand.trim() || !/^https?:\/\//i.test(form.url)) {
-      onNotice({ tone: "error", text: "A brand name and a valid https feed URL are required." });
+      setError("A brand name and a valid https feed URL are required.");
       return;
     }
     setSaving(true);
@@ -424,29 +426,29 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
       }
       const data = await res.json();
       if (res.ok) { onNotice({ tone: "success", text: isNew ? "Feed registered." : "Feed updated." }); onSaved(); }
-      else onNotice({ tone: "error", text: data.error || "Could not save the feed." });
-    } catch { onNotice({ tone: "error", text: "Could not reach the server to save." }); }
+      else setError(data.error || "Could not save the feed.");
+    } catch { setError("Could not reach the server to save the feed."); }
     setSaving(false);
   };
 
   const sched = form.schedule;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
-          <h2 className="text-base font-semibold text-white">{isNew ? "Add source" : `Edit ${source.brand}`}</h2>
+    <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={onClose}>
+      <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-950 shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+          <h2 className="mb-0 text-base font-semibold leading-none text-white">{isNew ? "Add source" : `Edit ${source.brand}`}</h2>
           <div className="flex items-center gap-3">
             {onHelp && <button type="button" onClick={onHelp} className="text-xs font-medium text-[#01a0be] hover:underline">Guide</button>}
             <CloseButton onClick={onClose} />
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
           <Field label="Brand"><input className={inputCls} value={form.brand} onChange={(e) => set({ brand: e.target.value })} placeholder="Recharge" /></Field>
           <Field label="Feed URL" hint="A stable https URL returning the JSON feed in the published contract."><input className={inputCls} value={form.url} onChange={(e) => set({ url: e.target.value })} placeholder="https://recharge.si/feeds/t4a.json" /></Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Auth header name" hint="Optional"><input className={inputCls} value={form.authHeaderName} onChange={(e) => set({ authHeaderName: e.target.value })} placeholder="X-Api-Key" /></Field>
             <Field label="Auth token" hint={form.hasAuthToken ? "Saved — leave blank to keep" : "Optional, write-only"}><input className={inputCls} type="password" value={form.authToken} onChange={(e) => set({ authToken: e.target.value })} placeholder={form.hasAuthToken ? "••••••••" : ""} /></Field>
           </div>
@@ -461,7 +463,7 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
             />
             {sched.enabled && (
               <div className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Frequency">
                     <Select ariaLabel="Frequency" value={sched.frequency} onChange={(e) => setSchedule({ frequency: e.target.value })}>
                       <option value="every_hours">Every N hours</option>
@@ -472,7 +474,7 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
                   {sched.frequency === "every_hours" && <Field label="Every (hours)"><input type="number" min="1" className={inputCls} value={sched.everyHours} onChange={(e) => setSchedule({ everyHours: Number(e.target.value) })} /></Field>}
                   {sched.frequency !== "every_hours" && <Field label="Time of day"><input type="time" className={inputCls} value={sched.timeOfDay} onChange={(e) => setSchedule({ timeOfDay: e.target.value })} /></Field>}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {sched.frequency === "weekly" && (
                     <Field label="Weekday">
                       <Select ariaLabel="Weekday" value={sched.weekday} onChange={(e) => setSchedule({ weekday: Number(e.target.value) })}>
@@ -491,7 +493,7 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
           </div>
 
           {/* Options */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Default status (missing in feed)">
               <Select ariaLabel="Default status" value={form.options.defaultStatus} onChange={(e) => setOptions({ defaultStatus: e.target.value })}>
                 <option value="active">Active</option>
@@ -530,9 +532,17 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
           </div>
         </div>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
-          <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={save} disabled={saving}>{saving ? "Saving…" : (isNew ? "Save source" : "Save changes")}</Button>
+        <div className="shrink-0 border-t border-neutral-800 bg-neutral-900/40">
+          {error && (
+            <div className="flex items-start gap-2.5 border-b border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 sm:px-6">
+              <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 px-4 py-3 sm:px-6 sm:py-4">
+            <Button onClick={onClose} className="flex-1 py-2.5 sm:flex-none sm:py-1.5">Cancel</Button>
+            <Button variant="primary" onClick={save} disabled={saving} className="flex-1 py-2.5 sm:flex-none sm:py-1.5">{saving ? "Saving…" : (isNew ? "Save source" : "Save changes")}</Button>
+          </div>
         </div>
       </div>
     </div>
@@ -555,14 +565,15 @@ function SourceActivity({ source, onClose }) {
     fetch(`/nextapi/export/external/sources/${source.feedId}/activity`).then((r) => r.json()).then(setData).catch(() => setData({ runs: [] }));
   }, [source.feedId]);
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={onClose}>
-      <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border border-neutral-800 bg-neutral-900 p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">{source.brand} — import history</h2>
+    <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-4" onClick={onClose}>
+      <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 sm:h-auto sm:max-h-[80vh] sm:max-w-2xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+          <h2 className="mb-0 truncate text-lg font-semibold leading-tight text-white">{source.brand} — import history</h2>
           <CloseButton onClick={onClose} />
         </div>
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
         {!data ? <p className="text-sm text-neutral-500">Loading…</p> : (data.runs?.length ? (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[32rem] text-sm">
             <thead><tr className="border-b border-neutral-800 text-left text-xs uppercase tracking-wider text-neutral-500"><th className="py-2">Time</th><th>Trigger</th><th>Result</th><th>Changes</th></tr></thead>
             <tbody className="divide-y divide-neutral-800">
               {data.runs.map((r) => (
@@ -576,6 +587,7 @@ function SourceActivity({ source, onClose }) {
             </tbody>
           </table>
         ) : <p className="text-sm text-neutral-500">No imports yet.</p>)}
+        </div>
       </div>
     </div>
   );
@@ -806,6 +818,7 @@ export default function OwnSourcesPage({ initialSources }) {
   const [notice, setNotice] = useState(null);
   const [busyFeed, setBusyFeed] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const failed = initialSources === null;
 
   const refresh = useCallback(async () => {
@@ -815,6 +828,8 @@ export default function OwnSourcesPage({ initialSources }) {
       if (Array.isArray(data?.sources)) setSources(data.sources);
     } catch { /* keep current */ }
   }, []);
+
+  const manualRefresh = async () => { setRefreshing(true); await refresh(); setRefreshing(false); };
 
   const importNow = async (s) => {
     setBusyFeed(s.feedId);
@@ -836,10 +851,37 @@ export default function OwnSourcesPage({ initialSources }) {
     } catch { setNotice({ tone: "error", text: "Could not reach the server." }); }
   };
 
+  // Per-source actions as icon buttons — flex-1 (fill) in the mobile cards, auto-width in the desktop table.
+  const renderActions = (s) => {
+    const busy = busyFeed === s.feedId;
+    const cls = "flex-1 px-2 sm:flex-none sm:px-2.5";
+    return (
+      <>
+        <Button onClick={() => setPreviewFor(s)} ariaLabel="Preview" title="Preview" className={cls}>
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+        </Button>
+        <Button onClick={() => importNow(s)} disabled={busy} ariaLabel="Import now" title="Import now" className={cls}>
+          {busy
+            ? <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+            : <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 0 1 0 1.971l-11.54 6.348a1.125 1.125 0 0 1-1.667-.985V5.653Z" /></svg>}
+        </Button>
+        <Button onClick={() => setActivityFor(s)} ariaLabel="Import history" title="Import history" className={cls}>
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        </Button>
+        <Button onClick={() => setEditing(s)} ariaLabel="Edit" title="Edit" className={cls}>
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
+        </Button>
+        <Button variant="danger" onClick={() => remove(s)} ariaLabel="Remove" title="Remove" className={cls}>
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+        </Button>
+      </>
+    );
+  };
+
   return (
     <div>
       {/* Compact header — small icon + title + badge on one line, actions on the right */}
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <header className="mb-6 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
             <svg className="h-5 w-5 text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
@@ -849,22 +891,24 @@ export default function OwnSourcesPage({ initialSources }) {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-white">Own sources</h1>
+              <h1 className="mb-0 text-xl font-bold leading-none tracking-tight text-white">Own sources</h1>
               <span className="inline-flex items-center rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
                 Feeds
               </span>
             </div>
-            <p className="truncate text-xs text-neutral-500">Register your own brand feeds and push them to your Shopify store, alongside Patrik.</p>
+            <p className="mt-1 hidden text-xs text-neutral-500 sm:block">Register your own brand feeds and push them to your Shopify store, alongside Patrik.</p>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <Button onClick={() => setHelpOpen(true)}>
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M12 17h.008M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Guide
-          </Button>
-          <Button variant="primary" onClick={() => setEditing("new")}>+ Add source</Button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setHelpOpen(true)}
+          aria-label="Open guide"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
+        >
+          <svg className="h-4 w-4 text-[#01a0be]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+          Guide
+        </button>
       </header>
 
       {notice && (
@@ -882,39 +926,69 @@ export default function OwnSourcesPage({ initialSources }) {
           <div className="mt-5"><Button variant="primary" onClick={() => setEditing("new")}>+ Add your first source</Button></div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-neutral-800">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-neutral-800 bg-neutral-900/60 text-left text-xs uppercase tracking-wider text-neutral-500">
-              <th className="px-4 py-3">Brand</th><th>Feed</th><th>Health</th><th>Last import</th><th>Schedule</th><th className="text-right px-4">Actions</th>
-            </tr></thead>
-            <tbody className="divide-y divide-neutral-800">
-              {sources.map((s) => {
-                const c = s.health?.counts;
-                return (
-                  <tr key={s.feedId} className="bg-neutral-900/20">
-                    <td className="px-4 py-3 font-medium text-white">{s.brand}</td>
-                    <td className="max-w-[180px] truncate text-neutral-400" title={s.feed?.url}>{s.feed?.url}</td>
-                    <td><HealthPill source={s} /></td>
-                    <td className="text-neutral-400">{c && s.health?.lastImportAt ? `${c.products} products · ${c.variants} variants` : "—"}</td>
-                    <td className="text-neutral-500 text-xs">{describeSchedule(s.schedule || {})}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1.5">
-                        <Button onClick={() => setPreviewFor(s)}>
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                          Preview
-                        </Button>
-                        <Button onClick={() => importNow(s)} disabled={busyFeed === s.feedId}>{busyFeed === s.feedId ? "…" : "Import now"}</Button>
-                        <Button onClick={() => setActivityFor(s)}>History</Button>
-                        <Button onClick={() => setEditing(s)}>Edit</Button>
-                        <Button variant="danger" onClick={() => remove(s)}>Remove</Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Toolbar — section title + refresh + add, like the Export "Saved exports" bar */}
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold text-white">Your feeds</h2>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <Button onClick={manualRefresh} disabled={refreshing} className="flex-1 py-2 sm:flex-none sm:py-1.5">
+                <svg className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                Refresh
+              </Button>
+              <Button variant="primary" onClick={() => setEditing("new")} className="flex-1 py-2 sm:flex-none sm:py-1.5">+ Add source</Button>
+            </div>
+          </div>
+
+          {/* Mobile: one card per source */}
+          <div className="space-y-3 sm:hidden">
+            {sources.map((s) => {
+              const c = s.health?.counts;
+              return (
+                <div key={s.feedId} className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-medium text-white">{s.brand}</p>
+                    <HealthPill source={s} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
+                    <span>{c && s.health?.lastImportAt ? `${c.products} products · ${c.variants} variants` : "Not imported yet"}</span>
+                    <span className="text-neutral-600">· {describeSchedule(s.schedule || {})}</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-1.5 border-t border-neutral-800 pt-3">
+                    {renderActions(s)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden overflow-hidden rounded-2xl border border-neutral-800 sm:block">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-neutral-800 bg-neutral-900/60 text-left text-xs uppercase tracking-wider text-neutral-500">
+                <th className="px-4 py-3">Brand</th><th>Feed</th><th>Health</th><th>Last import</th><th>Schedule</th><th className="text-right px-4">Actions</th>
+              </tr></thead>
+              <tbody className="divide-y divide-neutral-800">
+                {sources.map((s) => {
+                  const c = s.health?.counts;
+                  return (
+                    <tr key={s.feedId} className="bg-neutral-900/20">
+                      <td className="px-4 py-3 font-medium text-white">{s.brand}</td>
+                      <td className="max-w-[180px] truncate text-neutral-400" title={s.feed?.url}>{s.feed?.url}</td>
+                      <td><HealthPill source={s} /></td>
+                      <td className="text-neutral-400">{c && s.health?.lastImportAt ? `${c.products} products · ${c.variants} variants` : "—"}</td>
+                      <td className="text-neutral-500 text-xs">{describeSchedule(s.schedule || {})}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1.5">
+                          {renderActions(s)}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {editing && (
