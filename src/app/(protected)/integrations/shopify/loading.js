@@ -1,7 +1,7 @@
 export default function Loading() {
   return (
-    <div className="relative p-8 bg-transparent">
-      <div className="relative max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
+    <div className="relative bg-transparent py-6 lg:py-8">
+      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
         {/* Compact header — icon tile + title + badge + subtitle */}
         <div className="mb-6 flex items-center gap-3">
           <div className="h-10 w-10 shrink-0 rounded-xl bg-neutral-700/40 animate-pulse" />

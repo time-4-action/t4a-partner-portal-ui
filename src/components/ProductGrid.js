@@ -310,8 +310,8 @@ export default function ProductGrid({ initialProducts = [] }) {
             </svg>
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight text-white">Products Overview</h1>
-            <p className="text-xs text-neutral-500">
+            <h1 className="mb-0 text-xl font-bold leading-none tracking-tight text-white">Products Overview</h1>
+            <p className="mt-1 text-xs text-neutral-500">
               {isSearching
                 ? `${results.length} of ${products.length} products`
                 : `${products.length} products`}
