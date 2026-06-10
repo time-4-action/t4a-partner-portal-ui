@@ -327,6 +327,30 @@ const FORMAT_META = {
     },
 };
 
+// Per-preset accent styling shared by the Saved list and the export detail modal
+const PRESET_STYLE = {
+    shopify: { gradient: 'from-emerald-500 to-green-400', badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20', iconBg: 'bg-emerald-500/15 text-emerald-400' },
+    simple:  { gradient: 'from-cyan-500 to-blue-400',    badge: 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20',       iconBg: 'bg-cyan-500/15 text-cyan-400' },
+    detailed:{ gradient: 'from-violet-500 to-purple-400', badge: 'bg-violet-500/15 text-violet-400 border border-violet-500/20', iconBg: 'bg-violet-500/15 text-violet-400' },
+    inventory:{ gradient: 'from-amber-500 to-orange-400', badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/20',   iconBg: 'bg-amber-500/15 text-amber-400' },
+};
+
+// Count active filters on a saved config (backwards-compatible: handles legacy string or new array)
+function countConfigFilters(config) {
+    const f = config.filters || {};
+    const cats = Array.isArray(f.category) ? f.category : (f.category && f.category !== 'all' ? [f.category] : []);
+    const aiCats = Array.isArray(f.aiCategory) ? f.aiCategory : (f.aiCategory && f.aiCategory !== 'all' ? [f.aiCategory] : []);
+    return [
+        f.search, f.stockStatus !== 'all' && f.stockStatus,
+        f.minPrice, f.maxPrice,
+        cats.length > 0 && 'cat',
+        f.aiExportId !== 'all' && f.aiExportId,
+        aiCats.length > 0 && 'aiCat',
+        f.imageFilter !== 'all' && f.imageFilter,
+        f.showNew, f.showRecommended, f.excludeCloseOut,
+    ].filter(Boolean).length;
+}
+
 /**
  * Export Page Component
  *
@@ -418,7 +442,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     });
     const [pricelistPriority, setPricelistPriority] = useState([]);
     const [exportStatus, setExportStatus] = useState("");
-    const [activeTab, setActiveTab] = useState("configure"); // configure, saved
+    const [activeTab, setActiveTab] = useState("saved"); // "saved" = page body, "configure" = configurator modal open
     const [savedExports, setSavedExports] = useState([]);
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [exportName, setExportName] = useState("");
@@ -451,6 +475,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     const [previewView, setPreviewView] = useState('grid'); // 'grid' | 'list'
     const [previewSearch, setPreviewSearch] = useState('');
     const [detailProduct, setDetailProduct] = useState(null); // product whose detail modal is open
+    const [detailConfig, setDetailConfig] = useState(null); // saved export whose detail modal is open
     const [fieldInfoModal, setFieldInfoModal] = useState(null); // field object | null
     const [aiLeafMode, setAiLeafMode] = useState({ ai_tags: false, ai_category_names: false });
     const [inventoryLocationName, setInventoryLocationName] = useState('');
@@ -1292,12 +1317,67 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             setSavedExports((prev) => [result.data, ...prev]);
             setCurrentConfigId(result.data._id);
             setShowSaveModal(false);
-            setExportName("");
-            setExportDescription("");
             setExportStatus("Export saved!");
             setTimeout(() => setExportStatus(""), 3000);
         } catch (error) {
             console.error("Save export error:", error);
+            setExportStatus("Failed to connect to server");
+            setTimeout(() => setExportStatus(""), 4000);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // Update the export being edited - PUT /nextapi/export/custom-export/:id
+    const handleUpdateExport = async () => {
+        if (!currentConfigId) return;
+        if (!exportName.trim()) {
+            setExportStatus("Please enter a name");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const exportConfig = {
+                name: exportName.trim(),
+                description: exportDescription.trim() || null,
+                preset: selectedPreset,
+                selectedFields: selectedPreset === 'inventory' ? ['sku'] : selectedFields,
+                filters,
+                pricelistPriority,
+                aiLeafMode,
+                ...(selectedPreset === 'inventory' && { inventoryLocationName }),
+                ...(option1Name && { option1Name }),
+            };
+
+            const response = await fetch(`/nextapi/export/custom-export/${currentConfigId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(exportConfig),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                if (result.code === "DUPLICATE_NAME") {
+                    setExportStatus("Export with this name already exists");
+                } else if (result.code === "VALIDATION_ERROR") {
+                    setExportStatus(result.error || "Validation failed");
+                } else {
+                    setExportStatus(result.error || "Failed to update export");
+                }
+                setTimeout(() => setExportStatus(""), 4000);
+                return;
+            }
+
+            setSavedExports((prev) => prev.map((e) =>
+                e._id === currentConfigId ? (result.data || { ...e, ...exportConfig }) : e
+            ));
+            setShowSaveModal(false);
+            setExportStatus("Export updated!");
+            setTimeout(() => setExportStatus(""), 3000);
+        } catch (error) {
+            console.error("Update export error:", error);
             setExportStatus("Failed to connect to server");
             setTimeout(() => setExportStatus(""), 4000);
         } finally {
@@ -1373,11 +1453,43 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         setInventoryLocationName(config.inventoryLocationName || '');
         setOption1Name(config.option1Name || '');
 
+        // Prefill name/description so the save modal can update this export in place
+        setExportName(config.name || '');
+        setExportDescription(config.description || '');
+
         setCurrentConfigId(config._id);
         setActiveTab("configure");
         setExportStep("format");
         setExportStatus("Configuration loaded!");
         setTimeout(() => setExportStatus(""), 3000);
+    };
+
+    // Reset the configurator to a fresh state and open it — used by "+ New export"
+    const startNewExport = () => {
+        setCurrentConfigId(null);
+        setExportName("");
+        setExportDescription("");
+        setSelectedPreset("shopify");
+        setSelectedFields(EXPORT_PRESETS.shopify.fields.filter((f) => f.default).flatMap((f) => f.group ? f.group.map((g) => g.key) : [f.key]));
+        setFilters({
+            search: "",
+            stockStatus: "all",
+            minPrice: "",
+            maxPrice: "",
+            category: [],
+            aiExportId: "all",
+            aiCategory: [],
+            imageFilter: "all",
+            showNew: false,
+            showRecommended: false,
+            excludeCloseOut: false,
+        });
+        setPricelistPriority(availablePricelists.map((pl, idx) => ({ name: pl.name, enabled: true, priority: idx })));
+        setAiLeafMode({ ai_tags: false, ai_category_names: false });
+        setInventoryLocationName("");
+        setOption1Name("");
+        setExportStep("format");
+        setActiveTab("configure");
     };
 
     // Delete export - DELETE /nextapi/export/custom-export/:id
@@ -1620,59 +1732,46 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 </div>
             </header>
 
-            {/* Tab switcher + Preview — same glass nav-bar shell as the Shopify store switcher */}
-            <nav className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-2 backdrop-blur-sm">
-                <div className="flex items-center justify-between gap-4">
-                        <div className="flex w-fit gap-1">
-                            <button
-                                onClick={() => setActiveTab("configure")}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "configure"
-                                        ? "bg-[#01a0be] text-white shadow-md shadow-cyan-500/20"
-                                        : "text-neutral-400 hover:text-white hover:bg-neutral-800/60"
-                                    }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                                </svg>
-                                Configure
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("saved")}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "saved"
-                                        ? "bg-[#01a0be] text-white shadow-md shadow-cyan-500/20"
-                                        : "text-neutral-400 hover:text-white hover:bg-neutral-800/60"
-                                    }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                                </svg>
-                                Saved
-                                {savedExports.length > 0 && (
-                                    <span className={`px-1.5 py-0.5 text-[11px] rounded-full font-semibold ${activeTab === "saved" ? "bg-white/20 text-white" : "bg-cyan-500/20 text-cyan-400"}`}>
-                                        {savedExports.length}
+            {/* ── Configurator modal — create a new export or edit a saved one ── */}
+            {activeTab === "configure" && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6">
+                    <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl">
+                        {/* Modal header */}
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+                            <div className="min-w-0">
+                                <h2 className="truncate text-base font-semibold text-white">
+                                    {currentConfigId
+                                        ? `Edit ${savedExports.find(e => e._id === currentConfigId)?.name || exportName || "export"}`
+                                        : "New export"}
+                                </h2>
+                                <p className="mt-0.5 truncate text-xs text-neutral-500">Pick a format, filter products, choose fields — then download or save.</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                    onClick={() => { setPreviewConfig(null); setPreviewSearch(''); setShowPreview(true); }}
+                                    className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    Preview
+                                    <span className="rounded-md bg-neutral-700/60 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-neutral-400">
+                                        {filteredProducts.length}
                                     </span>
-                                )}
-                            </button>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("saved")}
+                                    aria-label="Close"
+                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                                >
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Preview button — lives in the header, always accessible */}
-                        <button
-                            onClick={() => { setPreviewConfig(null); setPreviewSearch(''); setShowPreview(true); }}
-                            className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 hover:bg-neutral-700/80 border border-neutral-800 hover:border-neutral-600/60 text-neutral-400 hover:text-white rounded-xl text-sm font-medium transition-all"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            Preview
-                            <span className="text-[11px] font-semibold tabular-nums px-1.5 py-0.5 bg-neutral-700/60 text-neutral-400 rounded-md">
-                                {filteredProducts.length}
-                            </span>
-                        </button>
-                    </div>
-            </nav>
-
-            {activeTab === "configure" ? (
+                        {/* Modal body — the full step-by-step configurator */}
+                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
                 <div className="space-y-6">
                     {/* Step Indicator */}
                     {(() => {
@@ -2652,27 +2751,49 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 </svg>
                             </button>
                         ) : (
-                            <button
-                                onClick={() => setShowSaveModal(true)}
-                                disabled={selectedPreset !== 'inventory' && selectedFields.length === 0}
-                                className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-800/50 disabled:cursor-not-allowed border border-neutral-700 hover:border-neutral-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-sm"
-                            >
-                                <SaveIcon /> Save Config
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {currentConfigId && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#01a0be]/25 bg-[#01a0be]/10 px-2.5 py-1.5 text-xs font-medium text-[#01a0be]">
+                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        <span className="max-w-[180px] truncate">
+                                            Editing {savedExports.find(e => e._id === currentConfigId)?.name || exportName || "export"}
+                                        </span>
+                                        <button
+                                            onClick={() => { setCurrentConfigId(null); setExportName(""); setExportDescription(""); }}
+                                            title="Stop editing — next save creates a new export"
+                                            className="ml-0.5 rounded p-0.5 text-[#01a0be]/70 transition-colors hover:bg-[#01a0be]/15 hover:text-[#01a0be]"
+                                        >
+                                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </span>
+                                )}
+                                <button
+                                    onClick={() => setShowSaveModal(true)}
+                                    disabled={selectedPreset !== 'inventory' && selectedFields.length === 0}
+                                    className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-800/50 disabled:cursor-not-allowed border border-neutral-700 hover:border-neutral-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-sm"
+                                >
+                                    <SaveIcon /> Save Config
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
-            ) : (
-                /* Saved Exports Tab */
+            {/* ── Saved exports — the page body ── */}
                 <div className="space-y-6">
                     {/* Header Bar */}
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl font-semibold text-white">Saved Export Configurations</h2>
-                            <p className="text-sm text-neutral-400 mt-1">Load or download your saved export presets</p>
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <h2 className="text-xl font-semibold text-white">Saved exports</h2>
+                            <p className="text-sm text-neutral-400 mt-1">Open an export for details, downloads and sharing — or create a new one.</p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex shrink-0 items-center gap-2">
                             {exportStatus && (
                                 <span className={`text-sm font-medium ${exportStatus.includes("!") ? "text-green-400" : "text-amber-400"}`}>
                                     {exportStatus}
@@ -2681,10 +2802,19 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             <button
                                 onClick={loadSavedExports}
                                 disabled={isLoadingExports}
-                                className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 hover:bg-neutral-700/80 text-neutral-300 hover:text-white rounded-xl text-sm font-medium transition-all border border-neutral-800"
+                                className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <RefreshIcon />
                                 {isLoadingExports ? "Loading..." : "Refresh"}
+                            </button>
+                            <button
+                                onClick={startNewExport}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#0bb6d4]"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                New export
                             </button>
                         </div>
                     </div>
@@ -2714,7 +2844,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <h3 className="text-lg font-semibold text-white mb-2">No saved exports yet</h3>
                                 <p className="text-sm text-neutral-500 mb-6 leading-relaxed">Configure an export with your preferred settings, then save it for quick access and shareable API links.</p>
                                 <button
-                                    onClick={() => setActiveTab("configure")}
+                                    onClick={startNewExport}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-[#01a0be] hover:bg-[#0bb6d4] text-white rounded-xl font-semibold transition-all shadow-lg shadow-cyan-500/25 text-sm"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2725,173 +2855,86 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
                         </div>
                     ) : (
-                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                            {savedExports.map((config) => {
-                                const PRESET_STYLE = {
-                                    shopify: { gradient: 'from-emerald-500 to-green-400', badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20', iconBg: 'bg-emerald-500/15 text-emerald-400' },
-                                    simple:  { gradient: 'from-cyan-500 to-blue-400',    badge: 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20',       iconBg: 'bg-cyan-500/15 text-cyan-400' },
-                                    detailed:{ gradient: 'from-violet-500 to-purple-400', badge: 'bg-violet-500/15 text-violet-400 border border-violet-500/20', iconBg: 'bg-violet-500/15 text-violet-400' },
-                                    inventory:{ gradient: 'from-amber-500 to-orange-400', badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/20',   iconBg: 'bg-amber-500/15 text-amber-400' },
-                                };
-                                const style = PRESET_STYLE[config.preset] || PRESET_STYLE.simple;
-                                const preset = EXPORT_PRESETS[config.preset];
-
-                                // Count active filters (backwards-compatible: handles legacy string or new array)
-                                const f = config.filters || {};
-                                const fCats = Array.isArray(f.category) ? f.category : (f.category && f.category !== 'all' ? [f.category] : []);
-                                const fAiCats = Array.isArray(f.aiCategory) ? f.aiCategory : (f.aiCategory && f.aiCategory !== 'all' ? [f.aiCategory] : []);
-                                const activeFilterCount = [
-                                    f.search, f.stockStatus !== 'all' && f.stockStatus,
-                                    f.minPrice, f.maxPrice,
-                                    fCats.length > 0 && 'cat',
-                                    f.aiExportId !== 'all' && f.aiExportId,
-                                    fAiCats.length > 0 && 'aiCat',
-                                    f.imageFilter !== 'all' && f.imageFilter,
-                                    f.showNew, f.showRecommended, f.excludeCloseOut,
-                                ].filter(Boolean).length;
-
-                                return (
-                                <div
-                                    key={config._id}
-                                    className="group relative bg-neutral-900/40 backdrop-blur-sm border border-neutral-800 rounded-2xl overflow-hidden hover:border-neutral-500/60 hover:shadow-xl hover:shadow-black/30 transition-all duration-200"
-                                >
-                                    {/* Top gradient accent bar */}
-                                    <div className={`h-[3px] bg-gradient-to-r ${style.gradient}`} />
-
-                                    {/* Card body */}
-                                    <div className="p-5">
-                                        {/* Header row: icon + title + preset badge */}
-                                        <div className="flex items-start gap-3 mb-4">
-                                            <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${style.iconBg}`}>
-                                                {preset?.icon || (
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="font-semibold text-white truncate text-base leading-tight">{config.name}</h3>
-                                                {config.description ? (
-                                                    <p className="text-xs text-neutral-500 mt-0.5 line-clamp-2 leading-relaxed">{config.description}</p>
-                                                ) : (
-                                                    <p className="text-xs text-neutral-600 mt-0.5 italic">No description</p>
-                                                )}
-                                            </div>
-                                            <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase tracking-wide ${style.badge}`}>
-                                                {preset?.name || config.preset}
-                                            </span>
-                                        </div>
-
-                                        {/* Stats chips */}
-                                        <div className="flex flex-wrap items-center gap-2 mb-4">
-                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-800 text-xs text-neutral-400">
-                                                <svg className="w-3 h-3 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h8" />
-                                                </svg>
-                                                <span className="font-medium text-neutral-300">{config.selectedFields?.length || 0}</span> fields
-                                            </span>
-                                            {activeFilterCount > 0 && (
-                                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-400">
-                                                    <FilterIcon />
-                                                    <span className="font-medium">{activeFilterCount}</span> filter{activeFilterCount !== 1 ? 's' : ''}
-                                                </span>
-                                            )}
-                                            {(config.pricelistPriority?.filter(p => p.enabled).length ?? 0) > 0 && (
-                                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-800 text-xs text-neutral-400">
-                                                    <svg className="w-3 h-3 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                    <span className="font-medium text-neutral-300">{config.pricelistPriority.filter(p => p.enabled).length}</span> pricelist{config.pricelistPriority.filter(p => p.enabled).length !== 1 ? 's' : ''}
-                                                </span>
-                                            )}
-                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-800 text-xs text-neutral-500 ml-auto">
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                </svg>
-                                                {formatDate(config.createdAt)}
-                                            </span>
-                                        </div>
-
-                                        {/* Download section */}
-                                        <div className="mb-3">
-                                            <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-widest mb-2">Download</p>
-                                            <div className="grid gap-1.5 grid-cols-3">
-                                                {['csv', 'json', 'xml'].map((fmt) => {
-                                                    const meta = FORMAT_META[fmt];
-                                                    const dlKey = `${config._id}-${fmt}`;
-                                                    const isLoading = downloadingId === dlKey;
-                                                    return (
+                        /* Minimal list — one row per export, details & actions live in the modal */
+                        <div className="overflow-hidden rounded-2xl border border-neutral-800">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-neutral-800 bg-neutral-900/60 text-left text-xs uppercase tracking-wider text-neutral-500">
+                                        <th className="px-4 py-3 font-medium">Export</th>
+                                        <th className="font-medium">Format</th>
+                                        <th className="hidden font-medium md:table-cell">Fields</th>
+                                        <th className="hidden font-medium md:table-cell">Filters</th>
+                                        <th className="hidden font-medium lg:table-cell">Created</th>
+                                        <th className="px-4 text-right font-medium">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800">
+                                    {savedExports.map((config) => {
+                                        const style = PRESET_STYLE[config.preset] || PRESET_STYLE.simple;
+                                        const preset = EXPORT_PRESETS[config.preset];
+                                        const filterCount = countConfigFilters(config);
+                                        return (
+                                            <tr
+                                                key={config._id}
+                                                onClick={() => setDetailConfig(config)}
+                                                className="cursor-pointer bg-neutral-900/20 transition-colors hover:bg-neutral-800/40"
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <div className="flex min-w-0 items-center gap-3">
+                                                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${style.iconBg}`}>
+                                                            {preset?.icon || (
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                </svg>
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="truncate font-medium text-white">{config.name}</p>
+                                                            {config.description && (
+                                                                <p className="max-w-[320px] truncate text-xs text-neutral-500">{config.description}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${style.badge}`}>
+                                                        {preset?.name || config.preset}
+                                                    </span>
+                                                </td>
+                                                <td className="hidden text-neutral-400 md:table-cell">{config.selectedFields?.length || 0}</td>
+                                                <td className="hidden text-neutral-400 md:table-cell">{filterCount > 0 ? filterCount : "—"}</td>
+                                                <td className="hidden text-xs text-neutral-500 lg:table-cell">{formatDate(config.createdAt)}</td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex justify-end gap-1.5">
                                                         <button
-                                                            key={fmt}
-                                                            onClick={() => downloadFromAPI(config._id, fmt)}
-                                                            disabled={!!downloadingId}
-                                                            title={`Download as ${meta.label}`}
-                                                            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                                                                isLoading
-                                                                    ? 'bg-neutral-800 text-neutral-500 cursor-wait'
-                                                                    : `${meta.bg} ${meta.text} disabled:opacity-40 disabled:cursor-not-allowed`
-                                                            }`}
+                                                            onClick={(e) => { e.stopPropagation(); loadExportConfig(config); }}
+                                                            title="Edit this export in the configurator"
+                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
                                                         >
-                                                            {isLoading ? <SpinnerIcon /> : meta.icon}
-                                                            {meta.label}
+                                                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
+                                                            Edit
                                                         </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Card footer */}
-                                    <div className="border-t border-neutral-700/40 px-4 py-3 flex items-center gap-2 bg-neutral-900/30">
-                                        <button
-                                            onClick={() => loadExportConfig(config)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400 rounded-xl text-xs font-semibold transition-colors border border-cyan-500/20"
-                                        >
-                                            <LoadIcon />
-                                            Load Config
-                                        </button>
-                                        <button
-                                            onClick={() => { setPreviewConfig(config); setPreviewSearch(''); setShowPreview(true); }}
-                                            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-neutral-700/50 hover:bg-neutral-600/50 text-neutral-300 rounded-xl text-xs font-semibold transition-colors border border-neutral-600/30"
-                                            title="Preview products for this export"
-                                        >
-                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                            Preview
-                                        </button>
-                                        <button
-                                            onClick={() => openKeysModal(config._id)}
-                                            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-xl text-xs font-semibold transition-colors border border-purple-500/20"
-                                            title="API Keys"
-                                        >
-                                            <KeyIcon />
-                                            Keys
-                                        </button>
-                                        <button
-                                            onClick={() => openAccessModal(config._id)}
-                                            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-xl text-xs font-semibold transition-colors border border-blue-500/20"
-                                            title="Manage access"
-                                        >
-                                            <UsersIcon />
-                                            Access
-                                        </button>
-                                        <button
-                                            onClick={() => deleteExport(config._id)}
-                                            className="flex items-center justify-center py-2 px-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors border border-red-500/20"
-                                            title="Delete export"
-                                        >
-                                            <TrashIcon />
-                                        </button>
-                                    </div>
-                                </div>
-                                );
-                            })}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setDetailConfig(config); }}
+                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                                        >
+                                                            Details
+                                                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>
-            )}
 
             {/* Product Preview Panel */}
             {showPreview && (
@@ -3074,6 +3117,171 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 </div>
             )}
 
+            {/* Saved Export Detail Modal — summary, downloads and every action for one saved export */}
+            {detailConfig && (() => {
+                const style = PRESET_STYLE[detailConfig.preset] || PRESET_STYLE.simple;
+                const preset = EXPORT_PRESETS[detailConfig.preset];
+                const filterCount = countConfigFilters(detailConfig);
+                const enabledPricelists = detailConfig.pricelistPriority?.filter(p => p.enabled) || [];
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onClick={() => setDetailConfig(null)}>
+                        <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            {/* Top gradient accent bar — same per-preset accent as the old cards */}
+                            <div className={`h-[3px] shrink-0 bg-gradient-to-r ${style.gradient}`} />
+
+                            {/* Header */}
+                            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${style.iconBg}`}>
+                                        {preset?.icon || (
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="truncate text-base font-semibold text-white">{detailConfig.name}</h3>
+                                            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${style.badge}`}>
+                                                {preset?.name || detailConfig.preset}
+                                            </span>
+                                        </div>
+                                        {detailConfig.description ? (
+                                            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-neutral-500">{detailConfig.description}</p>
+                                        ) : (
+                                            <p className="mt-0.5 text-xs italic text-neutral-600">No description</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setDetailConfig(null)}
+                                    aria-label="Close"
+                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                                >
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5">
+                                {/* Configuration summary */}
+                                <dl className="divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+                                    {[
+                                        ["Format", preset?.name || detailConfig.preset],
+                                        ["Fields", `${detailConfig.selectedFields?.length || 0} selected`],
+                                        ["Filters", filterCount > 0 ? `${filterCount} active` : "None"],
+                                        ["Pricelists", enabledPricelists.length > 0 ? enabledPricelists.map(p => p.name).join(", ") : "—"],
+                                        ...(detailConfig.inventoryLocationName ? [["Shopify location", detailConfig.inventoryLocationName]] : []),
+                                        ["Created", formatDate(detailConfig.createdAt) || "—"],
+                                    ].map(([k, v]) => (
+                                        <div key={k} className="grid grid-cols-[7.5rem_1fr] gap-2 px-4 py-2.5">
+                                            <dt className="text-xs font-medium text-neutral-500">{k}</dt>
+                                            <dd className="text-xs leading-relaxed text-neutral-300">{v}</dd>
+                                        </div>
+                                    ))}
+                                </dl>
+
+                                {/* Download */}
+                                <div>
+                                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Download</p>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {['csv', 'json', 'xml'].map((fmt) => {
+                                            const meta = FORMAT_META[fmt];
+                                            const dlKey = `${detailConfig._id}-${fmt}`;
+                                            const isLoading = downloadingId === dlKey;
+                                            return (
+                                                <button
+                                                    key={fmt}
+                                                    onClick={() => downloadFromAPI(detailConfig._id, fmt)}
+                                                    disabled={!!downloadingId}
+                                                    title={`Download as ${meta.label}`}
+                                                    className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-all ${
+                                                        isLoading
+                                                            ? 'bg-neutral-800 text-neutral-500 cursor-wait'
+                                                            : `${meta.bg} ${meta.text} disabled:opacity-40 disabled:cursor-not-allowed`
+                                                    }`}
+                                                >
+                                                    {isLoading ? <SpinnerIcon /> : meta.icon}
+                                                    {meta.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Manage */}
+                                <div>
+                                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Manage</p>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        <button
+                                            onClick={() => { setDetailConfig(null); setPreviewConfig(detailConfig); setPreviewSearch(''); setShowPreview(true); }}
+                                            className="flex items-center justify-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-800/60 py-2.5 text-xs font-semibold text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                            title="Preview products for this export"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            Preview
+                                        </button>
+                                        <button
+                                            onClick={() => openKeysModal(detailConfig._id)}
+                                            className="flex items-center justify-center gap-1.5 rounded-xl border border-purple-500/20 bg-purple-500/10 py-2.5 text-xs font-semibold text-purple-400 transition-colors hover:bg-purple-500/20"
+                                            title="API Keys"
+                                        >
+                                            <KeyIcon />
+                                            Keys
+                                        </button>
+                                        <button
+                                            onClick={() => openAccessModal(detailConfig._id)}
+                                            className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-500/20 bg-blue-500/10 py-2.5 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/20"
+                                            title="Manage access"
+                                        >
+                                            <UsersIcon />
+                                            Access
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+                                <button
+                                    onClick={() => {
+                                        if (confirm(`Delete "${detailConfig.name}"? This also removes its API keys and shared access.`)) {
+                                            deleteExport(detailConfig._id);
+                                            setDetailConfig(null);
+                                        }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/20"
+                                >
+                                    <TrashIcon />
+                                    Delete
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setDetailConfig(null)}
+                                        className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        onClick={() => { loadExportConfig(detailConfig); setDetailConfig(null); }}
+                                        title="Open in the configurator — change filters or fields, then Update or Save as new"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#0bb6d4]"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit config
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Product Detail Modal — opened by clicking a product in the preview */}
             {detailProduct && (
                 <ProductDetailModal product={detailProduct} onClose={() => setDetailProduct(null)} />
@@ -3166,58 +3374,105 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 </div>
             )}
 
-            {/* Save Modal */}
+            {/* Save Modal — creates a new export, or updates the one being edited */}
             {showSaveModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-neutral-800 rounded-2xl p-6 w-full max-w-md border border-neutral-700">
-                        <h3 className="text-xl font-semibold text-white mb-4">Save Export Configuration</h3>
-                        <div className="space-y-4">
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowSaveModal(false)}>
+                    <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+                            <h3 className="text-base font-semibold text-white">{currentConfigId ? "Save changes" : "Save export"}</h3>
+                            <button
+                                onClick={() => setShowSaveModal(false)}
+                                aria-label="Close"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="space-y-4 px-6 py-5">
+                            {currentConfigId && (
+                                <div className="rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] px-4 py-3 text-xs leading-relaxed text-neutral-300">
+                                    <span className="font-medium text-white">You are editing &quot;{savedExports.find(e => e._id === currentConfigId)?.name || exportName}&quot;.</span>{" "}
+                                    Update overwrites it — Save as new creates a copy.
+                                </div>
+                            )}
                             <div>
-                                <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                                    Export Name *
-                                </label>
+                                <label className="mb-1.5 block text-sm font-medium text-neutral-300">Export name *</label>
                                 <input
                                     type="text"
                                     value={exportName}
                                     onChange={(e) => setExportName(e.target.value)}
                                     placeholder="My Shopify Export"
-                                    className="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                                    className="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-[#01a0be] focus:outline-none"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-                                    Description (optional)
-                                </label>
+                                <label className="mb-1.5 block text-sm font-medium text-neutral-300">Description (optional)</label>
                                 <textarea
                                     value={exportDescription}
                                     onChange={(e) => setExportDescription(e.target.value)}
                                     placeholder="Weekly export for online store"
                                     rows={3}
-                                    className="w-full px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 resize-none"
+                                    className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-[#01a0be] focus:outline-none"
                                 />
                             </div>
-                            <div className="bg-neutral-900/50 rounded-xl p-4">
-                                <div className="text-xs text-neutral-400 space-y-1">
-                                    <div>Format: <span className="text-white">{currentPreset.name}</span></div>
-                                    <div>Fields: <span className="text-white">{selectedFields.length}</span></div>
-                                    <div>Products: <span className="text-white">{filteredProducts.length}</span></div>
-                                </div>
-                            </div>
+                            <dl className="divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+                                {[
+                                    ["Format", currentPreset.name],
+                                    ["Fields", selectedPreset === 'inventory' ? "Fixed inventory columns" : `${selectedFields.length} selected`],
+                                    ["Products", `${filteredProducts.length}`],
+                                ].map(([k, v]) => (
+                                    <div key={k} className="grid grid-cols-[7.5rem_1fr] gap-2 px-4 py-2.5">
+                                        <dt className="text-xs font-medium text-neutral-500">{k}</dt>
+                                        <dd className="text-xs text-neutral-300">{v}</dd>
+                                    </div>
+                                ))}
+                            </dl>
                         </div>
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowSaveModal(false)}
-                                className="flex-1 py-2.5 px-4 bg-neutral-700 hover:bg-neutral-600 text-white rounded-xl font-medium transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSaveExport}
-                                disabled={isSaving || !exportName.trim()}
-                                className="flex-1 py-2.5 px-4 bg-[#01a0be] hover:bg-[#0bb6d4] disabled:bg-neutral-700 disabled:opacity-60 text-white rounded-xl font-medium transition-all disabled:cursor-not-allowed"
-                            >
-                                {isSaving ? "Saving..." : "Save Export"}
-                            </button>
+
+                        {/* Footer */}
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+                            <span className={`min-w-0 truncate text-xs font-medium ${exportStatus ? (exportStatus.includes("!") ? "text-green-400" : "text-amber-400") : "text-transparent"}`}>
+                                {exportStatus || "·"}
+                            </span>
+                            <div className="flex shrink-0 items-center gap-2">
+                            {currentConfigId ? (
+                                <>
+                                    <button
+                                        onClick={handleSaveExport}
+                                        disabled={isSaving || !exportName.trim()}
+                                        className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {isSaving ? "Saving…" : "Save as new"}
+                                    </button>
+                                    <button
+                                        onClick={handleUpdateExport}
+                                        disabled={isSaving || !exportName.trim()}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#0bb6d4] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {isSaving ? "Updating…" : "Update export"}
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => setShowSaveModal(false)}
+                                        className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSaveExport}
+                                        disabled={isSaving || !exportName.trim()}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#0bb6d4] disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {isSaving ? "Saving…" : "Save export"}
+                                    </button>
+                                </>
+                            )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3225,29 +3480,37 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
             {/* API Keys Modal */}
             {showKeysModal && (
-                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-neutral-900 rounded-2xl w-full max-w-lg border border-neutral-700/60 max-h-[90vh] flex flex-col shadow-2xl">
+                <div
+                    className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                    onClick={() => { if (!createdKeyRaw) closeKeysModal(); }}
+                >
+                    <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Top gradient accent bar */}
+                        <div className="h-[3px] shrink-0 bg-gradient-to-r from-purple-500 to-fuchsia-400" />
+
                         {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-purple-500/15 rounded-lg flex items-center justify-center ring-1 ring-purple-500/20">
-                                    <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-400">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                     </svg>
                                 </div>
-                                <div>
-                                    <h3 className="font-semibold text-white text-sm">API Keys</h3>
-                                    {activeExportName && <p className="text-xs text-neutral-500 truncate max-w-[220px]">{activeExportName}</p>}
+                                <div className="min-w-0">
+                                    <h3 className="text-base font-semibold text-white">API keys</h3>
+                                    <p className="truncate text-xs text-neutral-500">{activeExportName || "Authenticate the export endpoints"}</p>
                                 </div>
                             </div>
-                            <button onClick={closeKeysModal} className="text-neutral-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-neutral-800">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                            <button
+                                onClick={closeKeysModal}
+                                aria-label="Close"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
 
-                        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+                        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5">
                             {/* ── New key — one-time display ── */}
                             {createdKeyRaw && (
                                 <div className="rounded-xl border border-amber-500/20 overflow-hidden">
@@ -3325,7 +3588,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                             {/* ── Create new key ── */}
                             <div>
-                                <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">New key</p>
+                                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">New key</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -3333,12 +3596,12 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         onChange={(e) => setNewKeyName(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
                                         placeholder="e.g. Shopify Integration"
-                                        className="flex-1 px-3.5 py-2.5 bg-neutral-800/60 border border-neutral-700/60 rounded-xl text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/40 text-sm transition-colors"
+                                        className="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-purple-500/60 focus:outline-none"
                                     />
                                     <button
                                         onClick={handleCreateKey}
                                         disabled={isKeyLoading || !newKeyName.trim()}
-                                        className="px-4 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 disabled:opacity-40 disabled:cursor-not-allowed text-purple-400 rounded-xl text-sm font-medium transition-colors flex items-center gap-1.5 ring-1 ring-purple-500/20"
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-3.5 py-2 text-sm font-medium text-purple-400 transition-colors hover:bg-purple-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                         {isKeyLoading ? (
                                             <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -3353,16 +3616,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         Generate
                                     </button>
                                 </div>
+                                <p className="mt-1.5 text-xs text-neutral-600">Shown once on creation — send it in the <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-purple-400">X-Api-Key</code> header.</p>
                             </div>
-
-                            <div className="border-t border-neutral-800" />
 
                             {/* ── Key list ── */}
                             <div>
-                                <div className="flex items-center justify-between mb-3">
-                                    <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Keys</p>
+                                <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Keys</p>
                                     {exportKeys.filter(k => k.isActive).length > 0 && (
-                                        <span className="text-xs text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full ring-1 ring-purple-500/15">
+                                        <span className="inline-flex items-center rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-400">
                                             {exportKeys.filter(k => k.isActive).length} active
                                         </span>
                                     )}
@@ -3384,22 +3646,28 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         <p className="text-xs text-neutral-700 mt-1">Generate one above to get started</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2">
+                                    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-800">
                                         {exportKeys.map(key => (
-                                            <div key={key.keyId} className={`rounded-xl border transition-all ${key.isActive ? 'bg-neutral-800/40 border-neutral-800' : 'bg-neutral-800/10 border-neutral-800/40 opacity-40'}`}>
+                                            <div key={key.keyId} className={`transition-opacity ${key.isActive ? 'bg-neutral-900/40' : 'bg-neutral-900/20 opacity-40'}`}>
                                                 {/* Key row */}
-                                                <div className="flex items-center gap-2 p-3">
-                                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${key.isActive ? 'bg-green-500' : 'bg-neutral-600'}`} />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium text-white truncate leading-tight">{key.name}</p>
-                                                        <p className="text-xs text-neutral-500 font-mono leading-tight">{key.keyPrefix}···</p>
+                                                <div className="flex items-center gap-3 px-4 py-3">
+                                                    <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${key.isActive ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-sm font-medium leading-tight text-white">{key.name}</p>
+                                                        <p className="mt-0.5 truncate text-xs leading-tight text-neutral-500">
+                                                            <span className="font-mono">{key.keyPrefix}···</span>
+                                                            <span className="ml-2 text-neutral-600">
+                                                                Created {formatDate(key.createdAt)}
+                                                                {key.lastUsedAt && ` · Last used ${formatDate(key.lastUsedAt)}`}
+                                                            </span>
+                                                        </p>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                    <div className="flex shrink-0 items-center gap-1.5">
                                                         {key.isActive && (
                                                             <button
                                                                 onClick={() => setExpandedKeyId(expandedKeyId === key.keyId ? null : key.keyId)}
                                                                 title="Show endpoints"
-                                                                className={`p-1.5 rounded-lg text-xs transition-colors ${expandedKeyId === key.keyId ? 'bg-purple-500/20 text-purple-400' : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700/50'}`}
+                                                                className={`rounded-lg border p-1.5 text-xs transition-colors ${expandedKeyId === key.keyId ? 'border-purple-500/20 bg-purple-500/20 text-purple-400' : 'border-transparent text-neutral-500 hover:bg-neutral-800 hover:text-neutral-300'}`}
                                                             >
                                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -3409,20 +3677,20 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         {key.isActive ? (
                                                             <button
                                                                 onClick={() => handleRevokeKey(key.keyId)}
-                                                                className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                                                                className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20"
                                                             >
                                                                 Revoke
                                                             </button>
                                                         ) : (
-                                                            <span className="px-2.5 py-1 bg-neutral-800 text-neutral-600 rounded-lg text-xs">Revoked</span>
+                                                            <span className="rounded-lg bg-neutral-800 px-2.5 py-1 text-xs text-neutral-600">Revoked</span>
                                                         )}
                                                     </div>
                                                 </div>
                                                 {/* Expandable endpoints panel */}
                                                 {expandedKeyId === key.keyId && (
-                                                    <div className="px-3 pb-3 space-y-2 border-t border-neutral-700/40 pt-3">
-                                                        <p className="text-xs text-neutral-500 mb-2">
-                                                            Set header <code className="text-purple-400 bg-neutral-800 px-1.5 py-0.5 rounded font-mono">X-Api-Key: &lt;your-key&gt;</code>
+                                                    <div className="space-y-2 border-t border-neutral-800 px-4 pb-3 pt-3">
+                                                        <p className="mb-2 text-xs text-neutral-500">
+                                                            Set header <code className="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-purple-400">X-Api-Key: &lt;your-key&gt;</code>
                                                         </p>
                                                         {[['CSV', 'csv', 'text-cyan-400'], ['JSON', 'json', 'text-emerald-400'], ['XML', 'xml', 'text-orange-400']].map(([label, fmt, color]) => (
                                                             <div key={fmt} className="flex items-center gap-2">
@@ -3440,16 +3708,21 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         ))}
                                                     </div>
                                                 )}
-                                                {/* Timestamps */}
-                                                <p className="text-xs text-neutral-700 px-3 pb-2.5">
-                                                    Created {formatDate(key.createdAt)}
-                                                    {key.lastUsedAt && <span className="ml-2.5">· Last used {formatDate(key.lastUsedAt)}</span>}
-                                                </p>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex shrink-0 justify-end border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+                            <button
+                                onClick={closeKeysModal}
+                                className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -3457,32 +3730,37 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
             {/* Access Control Modal */}
             {showAccessModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-neutral-800 rounded-2xl w-full max-w-lg border border-neutral-700 max-h-[90vh] flex flex-col shadow-2xl">
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeAccessModal}>
+                    <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Top gradient accent bar */}
+                        <div className="h-[3px] shrink-0 bg-gradient-to-r from-blue-500 to-sky-400" />
+
                         {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
                                 </div>
-                                <div>
-                                    <h3 className="font-semibold text-white text-sm">Access Control</h3>
-                                    {activeExportName && <p className="text-xs text-neutral-500 truncate max-w-[220px]">{activeExportName}</p>}
+                                <div className="min-w-0">
+                                    <h3 className="text-base font-semibold text-white">Access</h3>
+                                    <p className="truncate text-xs text-neutral-500">{activeExportName || "Share this export with other users"}</p>
                                 </div>
                             </div>
-                            <button onClick={closeAccessModal} className="text-neutral-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-neutral-700/50">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                            <button
+                                onClick={closeAccessModal}
+                                aria-label="Close"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
 
-                        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+                        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5">
                             {/* Grant access */}
                             <div>
-                                <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2">Grant Access</p>
+                                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Grant access</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="email"
@@ -3490,31 +3768,32 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         onChange={(e) => setNewGrantEmail(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleGrantAccess()}
                                         placeholder="user@example.com"
-                                        className="flex-1 px-4 py-2.5 bg-neutral-900 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-sm"
+                                        className="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-blue-500/60 focus:outline-none"
                                     />
                                     <button
                                         onClick={handleGrantAccess}
                                         disabled={isAccessLoading || !newGrantEmail.trim()}
-                                        className="px-4 py-2.5 bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-40 disabled:cursor-not-allowed text-blue-400 rounded-xl text-sm font-medium transition-colors"
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3.5 py-2 text-sm font-medium text-blue-400 transition-colors hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
                                         Grant
                                     </button>
                                 </div>
-                                <p className="text-xs text-neutral-600 mt-1.5">User must also have the export role in Auth0.</p>
+                                <p className="mt-1.5 text-xs text-neutral-600">User must also have the export role in Auth0.</p>
                             </div>
-
-                            <div className="border-t border-neutral-800" />
 
                             {/* Access list */}
                             <div>
-                                <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2">
-                                    Users with Access
+                                <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Users with access</p>
                                     {exportAccess.length > 0 && (
-                                        <span className="ml-2 text-blue-400 normal-case font-normal tracking-normal">
+                                        <span className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">
                                             {exportAccess.length} {exportAccess.length === 1 ? 'user' : 'users'}
                                         </span>
                                     )}
-                                </p>
+                                </div>
                                 {isAccessLoading ? (
                                     <div className="flex items-center justify-center py-8 text-neutral-500 text-sm gap-2">
                                         <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -3532,27 +3811,27 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         <p className="text-xs text-neutral-700 mt-1">Enter an email above to grant access</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2">
+                                    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-800">
                                         {exportAccess.map(entry => {
                                             const initials = entry.email.split('@')[0].slice(0, 2).toUpperCase();
                                             return (
-                                                <div key={entry.email} className="flex items-center gap-3 p-3 bg-neutral-900/50 rounded-xl border border-neutral-800">
-                                                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
+                                                <div key={entry.email} className="flex items-center gap-3 bg-neutral-900/40 px-4 py-3">
+                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/15">
                                                         <span className="text-xs font-semibold text-blue-400">{initials}</span>
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium text-white truncate">{entry.email}</p>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-sm font-medium text-white">{entry.email}</p>
                                                         <p className="text-xs text-neutral-500">
                                                             Granted {formatDate(entry.grantedAt)}
                                                             {' · '}
-                                                            <span className={entry.sub ? 'text-green-500' : 'text-neutral-600'}>
+                                                            <span className={entry.sub ? 'text-emerald-400' : 'text-neutral-600'}>
                                                                 {entry.sub ? 'Active' : 'Pending login'}
                                                             </span>
                                                         </p>
                                                     </div>
                                                     <button
                                                         onClick={() => handleRevokeAccess(entry.email)}
-                                                        className="shrink-0 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                                                        className="shrink-0 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20"
                                                     >
                                                         Revoke
                                                     </button>
@@ -3562,6 +3841,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex shrink-0 justify-end border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+                            <button
+                                onClick={closeAccessModal}
+                                className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>
