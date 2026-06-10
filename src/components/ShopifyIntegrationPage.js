@@ -106,6 +106,13 @@ const MOCK_UNMATCHED = [
 // Aggregate of shopify_product_map state (separate from the visible job rows above).
 const MOCK_COUNTS = { synced: 1284, pending: 17, error: 6 };
 
+// Handed-off products the merchant deleted in Shopify (create_then_handoff only). They are NOT
+// auto-recreated — the partner explicitly opts each one back in via "Recreate on next sync".
+const MOCK_DELETED_IN_STORE = [
+  { parentCode: "WING_FREEWING_GO", skus: ["WFG-4M", "WFG-5M", "WFG-6M"], deletedInStoreAt: "2026-06-09T08:12:00Z", recreateRequested: false },
+  { parentCode: "LEASH_COILED_10", skus: ["LC10-BLK"], deletedInStoreAt: "2026-06-10T14:40:00Z", recreateRequested: true },
+];
+
 // A second demo store so the switcher itself is demonstrable when the fetch fails.
 const MOCK_CONNECTION_2 = {
   shopDomain: "patrik-outlet.myshopify.com",
@@ -130,20 +137,23 @@ const SYNC_FLAGS = [
 const OWNERSHIP_MODES = [
   {
     value: "create_then_handoff",
-    title: "Create, then hand off",
+    title: "Create, then leave it to you",
     recommended: true,
-    desc: "Creates each product once, then only keeps stock in sync.",
+    desc: "Adds each product to your store once, then only keeps stock up to date. Your edits in Shopify are safe.",
+    icon: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z",
   },
   {
     value: "stock_only",
     title: "Stock only",
-    desc: "Only updates inventory quantities. Never touches your titles, prices, or descriptions.",
+    desc: "Just keeps inventory numbers up to date. Never touches your titles, prices, descriptions or images.",
+    icon: "M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z",
   },
   {
     value: "portal_authoritative",
-    title: "Portal authoritative",
-    desc: "Overwrites portal-managed fields on every sync.",
-    warn: "Any edits you make to title, description, price or images in Shopify will be overwritten on the next sync.",
+    title: "Keep everything in sync",
+    desc: "The portal keeps products fully up to date on every sync — titles, prices, images and more.",
+    warn: "Any edits you make in Shopify to title, description, price or images will be overwritten on the next sync.",
+    icon: "M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99",
   },
 ];
 
@@ -207,6 +217,25 @@ function fmtDate(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+// Human-friendly relative time, e.g. "a few seconds ago", "10 minutes ago", "2 hours ago".
+// Falls back to an absolute date once it's older than a month.
+function relTime(iso) {
+  if (!iso) return "never";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 0) return "just now";
+  if (s < 10) return "just now";
+  if (s < 60) return "a few seconds ago";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} minute${m === 1 ? "" : "s"} ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const days = Math.floor(h / 24);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return fmtDate(iso);
 }
 
 function fmtNum(n) {
@@ -313,6 +342,11 @@ const TrashIcon = (p) => (
 const CheckIcon = (p) => (
   <Svg {...p}>
     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+  </Svg>
+);
+const UndoIcon = (p) => (
+  <Svg {...p}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
   </Svg>
 );
 const WarningIcon = (p) => (
@@ -456,6 +490,16 @@ export default function ShopifyIntegrationPage({
   // Full *.myshopify.com domain to auto-resume connecting — set when a partner opens the app from
   // Shopify for a store that isn't connected yet. Shows a focused card that launches OAuth.
   const [resumeShop, setResumeShop] = useState("");
+  // Returning from "Create export" (?addSource=<id>): the export to auto-add as a source on the
+  // selected store. Cleared once a panel consumes it (so switching stores doesn't re-add it).
+  const [addSourceId, setAddSourceId] = useState(null);
+  const [showHelp, setShowHelp] = useState(false); // standard "Guide" help modal
+  useEffect(() => {
+    if (!showHelp) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [showHelp]);
 
   const showConnect = adding || connections.length === 0;
   const selected =
@@ -471,7 +515,9 @@ export default function ShopifyIntegrationPage({
     const outcome = params.get("shopify");
     const shopParam = params.get("shop");        // full *.myshopify.com domain
     const wantConnect = params.get("connect") === "1";
-    if (!outcome && !shopParam && !wantConnect) return;
+    const addSrc = params.get("addSource");      // export id to auto-add as a source ("Create export")
+    if (!outcome && !shopParam && !wantConnect && !addSrc) return;
+    if (addSrc) setAddSourceId(addSrc);
 
     let msg = null;
     if (outcome === "connected") {
@@ -503,7 +549,7 @@ export default function ShopifyIntegrationPage({
     }
 
     const url = new URL(window.location.href);
-    ["shopify", "shop", "webhooks", "reason", "connect", "host", "hmac", "timestamp", "session", "id_token", "embedded", "locale"]
+    ["shopify", "shop", "webhooks", "reason", "connect", "addSource", "host", "hmac", "timestamp", "session", "id_token", "embedded", "locale"]
       .forEach((k) => url.searchParams.delete(k));
     window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
 
@@ -543,29 +589,90 @@ export default function ShopifyIntegrationPage({
   return (
     <div className="pb-40 sm:pb-32">
       {/* ----------------------------- Header ----------------------------- */}
-      {/* Compact header — small icon + title + badge on one line, matching the Export / Own Sources pages. */}
-      <header className="mb-6 flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#95BF47]/30 bg-[#95BF47]/10">
-          <ShopifyLogo className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-white">Shopify</h1>
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-              <BagIcon className="h-3 w-3" />
-              Integration
-            </span>
+      {/* Compact header — icon + title + badge on the left, Guide button on the right (matches the
+          Export / Categories / Own Sources pages). */}
+      <header className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#95BF47]/30 bg-[#95BF47]/10">
+            <ShopifyLogo className="h-5 w-5" />
           </div>
-          <p className="truncate text-xs text-neutral-500">
-            One-way push of stock, products, prices and images from the portal straight to your Shopify stores.
-          </p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="mb-0 text-xl font-bold leading-none tracking-tight text-white">Shopify</h1>
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
+                <BagIcon className="h-3 w-3" />
+                Integration
+              </span>
+            </div>
+            <p className="mt-1 hidden text-xs text-neutral-500 sm:block">
+              One-way push of stock, products, prices and images from the portal straight to your Shopify stores.
+            </p>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowHelp(true)}
+          aria-label="Open guide"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
+        >
+          <svg className="h-4 w-4 text-[#01a0be]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+          Guide
+        </button>
       </header>
+
+      {/* ----------------------------- Help modal ----------------------------- */}
+      {showHelp && (
+        <div className="fixed inset-0 z-[80] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-4" onClick={() => setShowHelp(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-2xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+              <h2 className="mb-0 text-base font-semibold leading-none text-white">How Shopify sync works</h2>
+              <button type="button" onClick={() => setShowHelp(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-6 sm:px-6">
+              <p className="text-[15px] leading-relaxed text-neutral-200">
+                Connect your Shopify store and the portal keeps it stocked with the catalogue{" "}
+                <span className="font-semibold text-white">automatically</span> — stock, products, prices, descriptions and images, pushed one way (portal → your store). Nothing is ever deleted from your store.
+              </p>
+
+              <div>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">How it works — 4 steps</h3>
+                <ol className="space-y-3">
+                  {[
+                    ["Connect your store", "One secure click links your Shopify store to the portal."],
+                    ["Add a source & location", "Point a Patrik export (or your own feed) at a Shopify location — that's what gets pushed."],
+                    ["Choose how much to manage", "From Stock-only up to Keep-everything-in-sync, plus exactly what to push (prices, images, tags…)."],
+                    ["Let it sync", "It pushes automatically on every catalogue update — or hit Sync now any time."],
+                  ].map(([title, desc], i) => (
+                    <li key={title} className="flex gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 font-orbitron text-sm font-bold text-[#01a0be]">{i + 1}</span>
+                      <p className="pt-0.5 text-[15px] leading-snug text-neutral-300">
+                        <span className="font-semibold text-white">{title}.</span> {desc}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div className="flex gap-3 rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] p-4">
+                <svg className="h-5 w-5 shrink-0 text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                <p className="text-[15px] leading-snug text-neutral-300">
+                  <span className="font-semibold text-white">Your edits are safe.</span> In <span className="font-medium text-[#01a0be]">Create, then leave it to you</span>, the portal adds each product once and then only keeps stock current — anything you change in Shopify stays.
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 justify-end border-t border-neutral-800 px-5 py-3.5 sm:px-6">
+              <button onClick={() => setShowHelp(false)} className="rounded-lg bg-[#01a0be] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">Got it</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --------------------------- Store switcher ---------------------------- */}
       {connections.length > 0 && (
         <nav aria-label="Connected stores" className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-2 backdrop-blur-sm">
-          <div className="flex items-center gap-1.5 overflow-x-auto">
+          <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {connections.map((c) => {
               const key = connKey(c);
               const active = key === selectedKey && !adding;
@@ -576,7 +683,7 @@ export default function ShopifyIntegrationPage({
                   key={key}
                   onClick={() => selectStore(key)}
                   aria-current={active ? "page" : undefined}
-                  className={`group relative flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all ${
+                  className={`group relative flex shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-all sm:gap-3 sm:px-3 sm:py-2.5 ${
                     active
                       ? "bg-gradient-to-br from-neutral-800 to-neutral-800/30 shadow-lg"
                       : "hover:bg-neutral-800/50"
@@ -592,7 +699,7 @@ export default function ShopifyIntegrationPage({
                     {label.charAt(0).toUpperCase()}
                   </span>
                   <span className="min-w-0 pr-1">
-                    <span className={`block max-w-[12rem] truncate text-sm font-semibold ${active ? "text-white" : "text-neutral-300"}`}>
+                    <span className={`block max-w-[7.5rem] truncate text-sm font-semibold sm:max-w-[12rem] ${active ? "text-white" : "text-neutral-300"}`}>
                       {label}
                     </span>
                     <span className="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-500">
@@ -608,7 +715,8 @@ export default function ShopifyIntegrationPage({
 
             <button
               onClick={startAddStore}
-              className={`group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+              aria-label="Add store"
+              className={`group flex shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all sm:gap-3 sm:px-3 sm:py-2.5 ${
                 adding ? "bg-[#01a0be]/10 text-[#01a0be] ring-1 ring-[#01a0be]/40" : "text-neutral-400 hover:bg-neutral-800/50 hover:text-white"
               }`}
             >
@@ -617,7 +725,7 @@ export default function ShopifyIntegrationPage({
               }`}>
                 <PlusIcon className="h-4 w-4" />
               </span>
-              Add store
+              <span className="hidden whitespace-nowrap sm:inline">Add store</span>
             </button>
           </div>
         </nav>
@@ -667,6 +775,8 @@ export default function ShopifyIntegrationPage({
           feedOptions={initialFeeds}
           aiExportOptions={initialAiExports}
           pricelists={initialPricelists}
+          addSourceId={addSourceId}
+          onAddSourceConsumed={() => setAddSourceId(null)}
           onNotice={setNotice}
           onDisconnected={handleDisconnected}
           onPatch={patchConnection}
@@ -807,7 +917,7 @@ function ConnectStore({ canCancel, onCancel, onNotice, initialDomain = "" }) {
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       {/* left: connect + how it works */}
       <div className="space-y-6">
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
           <div className="flex items-start justify-between gap-4">
             <div className="relative mb-6 w-fit">
               <div aria-hidden="true" className="absolute -inset-2 rounded-2xl bg-[#95BF47]/20 blur-xl" />
@@ -942,7 +1052,7 @@ function ConnectStore({ canCancel, onCancel, onNotice, initialDomain = "" }) {
 /*  ConnectionPanel — full management UI for ONE connected store               */
 /* -------------------------------------------------------------------------- */
 
-function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions = [], aiExportOptions = [], pricelists, onNotice, onDisconnected, onPatch }) {
+function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions = [], aiExportOptions = [], pricelists, addSourceId, onAddSourceConsumed, onNotice, onDisconnected, onPatch }) {
   const isDemo = !initialConn._id;
   const myKey = connKey(initialConn);
 
@@ -988,8 +1098,11 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       };
     };
     const scopes = (() => {
-      if (Array.isArray(cfg.scopes) && cfg.scopes.length) return cfg.scopes.map((s) => withCfg(s, false));
-      if (cfg.scope) return [withCfg({ ...cfg.scope, locationId }, true)];
+      // Drop any sourceless scope (no export / no feed) — it would show as a phantom "Select a
+      // source…" row (or hide behind the empty state) and dirty the config for nothing.
+      const withSource = (s) => s.exportConfigId || s.feedId;
+      if (Array.isArray(cfg.scopes) && cfg.scopes.length) return cfg.scopes.filter(withSource).map((s) => withCfg(s, false));
+      if (cfg.scope && withSource(cfg.scope)) return [withCfg({ ...cfg.scope, locationId }, true)];
       if (cfg.exportConfigId) return [withCfg({ type: "export_config", exportConfigId: cfg.exportConfigId, locationId }, true)];
       return [];
     })();
@@ -1027,12 +1140,39 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
   const [activeScopeIdx, setActiveScopeIdx] = useState(0);
   // When set, the per-source config modal is open for that source index (null = closed).
   const [editingScopeIdx, setEditingScopeIdx] = useState(null);
+  // "View details" modal — keeps the connection card minimal (only sync status stays on the card).
+  const [showDetails, setShowDetails] = useState(false);
+  // "View all" modals for the needs-attention and removed-in-store lists (sections show the first few).
+  const [showAllAttention, setShowAllAttention] = useState(false);
+  const [showAllRemoved, setShowAllRemoved] = useState(false);
+  // Unsaved-changes leave guard: the href the user tried to navigate to (null = no prompt open).
+  const [leaveTarget, setLeaveTarget] = useState(null);
+  const leavingRef = useRef(false); // set right before a confirmed navigation, to silence beforeunload
+  // Briefly wiggles the "Save changes" bar to point the user at it (e.g. when they click a disabled Sync).
+  const [saveShake, setSaveShake] = useState(false);
+  useEffect(() => {
+    if (!showDetails && !showAllAttention && !showAllRemoved && !leaveTarget) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [showDetails, showAllAttention, showAllRemoved, leaveTarget]);
+  // Snapshot of the live config taken when the Configure modal opens, so Cancel reverts only the
+  // edits made inside that modal (toggles apply to `config` live as you flip them).
+  const scopeSnapshot = useRef(null);
+  useEffect(() => {
+    if (editingScopeIdx !== null) scopeSnapshot.current = config;
+  }, [editingScopeIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync-activity data. Real once a live connection exists (fetched from /activity); the MOCK_*
   // set is only the demo fallback.
   const [syncJobs, setSyncJobs] = useState(isDemo ? MOCK_SYNC_JOBS : []);
   const [counts, setCounts] = useState(isDemo ? MOCK_COUNTS : { synced: 0, pending: 0, error: 0 });
   const [unmatched, setUnmatched] = useState(isDemo ? MOCK_UNMATCHED : []);
+  // Handed-off products the merchant deleted in Shopify — surfaced as a warning, never recreated
+  // unless the partner clicks "Recreate on next sync". Grouped by parent product.
+  const [deletedInStore, setDeletedInStore] = useState(isDemo ? MOCK_DELETED_IN_STORE : []);
+  // parentCodes whose recreate request is currently in flight (button spinner / disable).
+  const [recreating, setRecreating] = useState([]);
   // Run-history modal (the panel itself shows only the latest few runs) + per-run detail modal.
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyJobs, setHistoryJobs] = useState(null);
@@ -1088,6 +1228,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       setSyncJobs(data.jobs ?? []);
       setCounts(data.counts ?? { synced: 0, pending: 0, error: 0 });
       setUnmatched(data.unmatched ?? []);
+      setDeletedInStore(data.deletedInStore ?? []);
       return data;
     } catch {
       return null;
@@ -1150,7 +1291,14 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
         if (!cancelled && aliveRef.current) setDetailLoaded(true);
       }
     })();
-    loadActivity();
+    // Resume the "Syncing…" state if a run is still in flight after a reload, and poll it to the end.
+    loadActivity().then((activity) => {
+      if (cancelled || !aliveRef.current) return;
+      if (activity?.jobs?.some((j) => j.status === "running")) {
+        setIsSyncing(true);
+        pollActiveSync().finally(() => { if (aliveRef.current) setIsSyncing(false); });
+      }
+    });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1165,6 +1313,44 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
   }, [editingScopeIdx]);
 
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
+
+  // Warn before leaving with unsaved changes: a native prompt for tab close / refresh, and a custom
+  // modal that intercepts in-app link clicks (navbar, "Create source", etc.) so changes aren't lost.
+  useEffect(() => {
+    if (!isDirty) return;
+    const onBeforeUnload = (e) => { if (leavingRef.current) return; e.preventDefault(); e.returnValue = ""; };
+    const onClick = (e) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target.closest?.("a");
+      if (!a) return;
+      const href = a.getAttribute("href");
+      if (!href || href.startsWith("#") || a.target === "_blank" || a.hasAttribute("download")) return;
+      const url = new URL(href, window.location.href);
+      if (url.origin !== window.location.origin) return; // external links leave the app regardless
+      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+      e.preventDefault();
+      setLeaveTarget(url.pathname + url.search);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [isDirty]);
+
+  // Ctrl/Cmd+S saves the current config (and suppresses the browser's "save page" dialog here).
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        if (isDirty && !saving) saveConfig();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty, saving]);
 
   /* ----- per-source config: the panels edit the SELECTED source ----- */
   // Each source carries its OWN full push config. The rich panels below stay bound to top-level
@@ -1181,6 +1367,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
   /* ----- config mutators (all route through setConfig -> mark dirty) ----- */
   const setCfg = (patch) => setConfig((c) => mirrorActive({ ...c, ...patch }));
   const toggleFlag = (key) => setConfig((c) => mirrorActive({ ...c, [key]: !c[key] }));
+  const setAllSyncFlags = (val) => setConfig((c) => mirrorActive({ ...c, ...Object.fromEntries(SYNC_FLAGS.map((f) => [f.key, val])) }));
   // Picking a mode richer than stock-only opts THIS source up to the full push, so default every
   // sync field ON. Only fires when leaving stock_only — switching between the two rich modes
   // preserves whatever the partner has toggled.
@@ -1188,7 +1375,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
     setConfig((c) =>
       mirrorActive(
         v !== "stock_only" && c.ownership === "stock_only"
-          ? { ...c, ownership: v, syncStock: true, syncNewProducts: true, syncPrices: true, syncDescriptions: true, syncImages: true, syncTags: true }
+          ? { ...c, ownership: v, syncStock: true, syncNewProducts: true, syncPrices: true, syncDescriptions: true, syncImages: true, syncTags: true, publicationIds: (c.publicationIds?.length ? c.publicationIds : publications.map((p) => p.id)) }
           : { ...c, ownership: v }
       )
     );
@@ -1215,13 +1402,14 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       return { ...c, ...mirror };
     });
   };
-  // A brand-new source starts at safe stock-only defaults (independent of the others).
+  // A brand-new source starts at the recommended "Create, then hand off" mode with everything
+  // turned on (all sync fields + every sales channel) — the plug-&-play default.
   const newScopeDefaults = () => ({
     locationId: locations[0]?.id ?? null,
-    ownership: "stock_only", syncStock: true, syncNewProducts: false, syncPrices: false,
-    syncDescriptions: false, syncImages: false, syncTags: true,
+    ownership: "create_then_handoff", syncStock: true, syncNewProducts: true, syncPrices: true,
+    syncDescriptions: true, syncImages: true, syncTags: true,
     priceVatMode: "inclusive", futureDatedGuard: true, variantOptionName: "",
-    pricelistPriority: buildPricelistPriority(pricelists, []), publicationIds: [],
+    pricelistPriority: buildPricelistPriority(pricelists, []), publicationIds: publications.map((p) => p.id),
   });
   const addScope = () => {
     const first = exportOptions[0]
@@ -1231,6 +1419,36 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
     setScopes(next);
     selectScope(next.length - 1);
   };
+  // Add one specific Patrik export as a new source — used when returning from "Create source".
+  // If an empty/sourceless placeholder scope exists, fill THAT one (with fresh defaults) instead of
+  // appending a duplicate — otherwise you'd be left with an empty "Select a source…" row beside it.
+  const addScopeForExport = (exportConfigId) => {
+    const fresh = { type: "export_config", exportConfigId, ...newScopeDefaults() };
+    const emptyIdx = sourceScopes.findIndex((s) => !s.exportConfigId && !s.feedId);
+    if (emptyIdx >= 0) {
+      setScopes(sourceScopes.map((s, i) => (i === emptyIdx ? fresh : s)));
+      selectScope(emptyIdx);
+      return;
+    }
+    const next = [...sourceScopes, fresh];
+    setScopes(next);
+    selectScope(next.length - 1);
+  };
+  // On return from "Create source" (?addSource=<id>): auto-add that export as a source on this store.
+  // Wait for the live /detail load first — it re-seeds `config` on arrival and would otherwise wipe
+  // an early-added scope (the "appears then disappears" bug). Consumed once so switching stores
+  // won't re-add it.
+  useEffect(() => {
+    if (!addSourceId || !detailLoaded) return;
+    const known = exportOptions.some((x) => x._id === addSourceId);
+    const already = sourceScopes.some((s) => s.type === "export_config" && s.exportConfigId === addSourceId);
+    if (known && !already) {
+      addScopeForExport(addSourceId);
+      onNotice?.({ tone: "success", text: "Source added — review its settings, then Save." });
+    }
+    onAddSourceConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addSourceId, detailLoaded]);
   const setScopeSource = (i, val) => {
     const sep = val.indexOf(":");
     const kind = val.slice(0, sep);
@@ -1401,6 +1619,61 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
     if (aliveRef.current) setIsSyncing(false);
   };
 
+  // Polls /activity until no run is still "running", then settles the connection's last-sync status.
+  // Used to RESUME the "Syncing…" state when the page is reloaded while a sync is mid-flight.
+  const pollActiveSync = async () => {
+    for (let i = 0; i < 80 && aliveRef.current; i++) {
+      await sleep(2000);
+      const activity = await loadActivity();
+      if (!aliveRef.current) return;
+      if (!activity?.jobs?.some((j) => j.status === "running")) {
+        const latest = activity?.jobs?.[0];
+        if (latest) {
+          const lastSyncStatus = latest.status === "failed" ? "failed" : "done";
+          setConnection((c) => ({ ...c, lastSyncAt: latest.time, lastSyncStatus }));
+          onPatch(myKey, { lastSyncAt: latest.time, lastSyncStatus });
+        }
+        return;
+      }
+    }
+  };
+
+  // Queue (cancel=false) or un-queue (cancel=true) a removed-in-store handoff product for
+  // recreation on the NEXT sync. Doesn't sync now — queuing just clears the "won't recreate" hold
+  // so the next run stands the product back up; cancelling is the undo (stays tombstoned).
+  const requestRecreate = async (parentCode, cancel = false) => {
+    if (!parentCode || recreating.includes(parentCode)) return;
+    const okMsg = cancel
+      ? `Recreation of ${parentCode} cancelled.`
+      : `${parentCode} will be recreated on the next sync.`;
+
+    if (isDemo) {
+      setDeletedInStore((list) => list.map((d) => (d.parentCode === parentCode ? { ...d, recreateRequested: !cancel } : d)));
+      onNotice({ tone: "success", text: okMsg });
+      return;
+    }
+
+    setRecreating((r) => [...r, parentCode]);
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/recreate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentCodes: [parentCode], cancel }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        onNotice({ tone: "error", text: data.error || "Could not update the product." });
+        return;
+      }
+      if (aliveRef.current) setDeletedInStore(data.deletedInStore ?? []);
+      onNotice({ tone: "success", text: okMsg });
+    } catch {
+      onNotice({ tone: "error", text: "Could not reach the server to update the product." });
+    } finally {
+      if (aliveRef.current) setRecreating((r) => r.filter((p) => p !== parentCode));
+    }
+  };
+
   const refreshActivity = async () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -1477,6 +1750,19 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
     setSaving(false);
   };
   const discard = () => setConfig(savedConfig);
+  // Leave-guard actions: navigate to the stashed target (the leavingRef silences the native prompt).
+  const go = (target) => { leavingRef.current = true; setLeaveTarget(null); if (target) window.location.href = target; };
+  const discardAndLeave = () => { setConfig(savedConfig); go(leaveTarget); };
+  const saveAndLeave = async () => { await saveConfig(); go(leaveTarget); };
+  // Configure modal: Cancel reverts to the snapshot taken on open; Save persists and closes.
+  const cancelEditScope = () => {
+    if (scopeSnapshot.current) setConfig(scopeSnapshot.current);
+    setEditingScopeIdx(null);
+  };
+  const saveEditScope = async () => {
+    await saveConfig();
+    setEditingScopeIdx(null);
+  };
 
   const statusMeta = statusMetaFor(connection.status);
   const savedLocationName = locations.find((l) => l.id === savedConfig.shopifyLocationId)?.name || "—";
@@ -1484,6 +1770,80 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
   const attentionCount = unmatched.length;
   const stockOnly = config.ownership === "stock_only";
   const scopes = connection.scopes || [];
+
+  // Renders the needs-attention list — one clean, dense row design for desktop + mobile.
+  // Reused by the section (first few) and the "View all" modal (everything).
+  const TONE_DOT = { red: "bg-red-400", amber: "bg-amber-400", cyan: "bg-cyan-400", green: "bg-green-400", neutral: "bg-neutral-500" };
+  const TONE_TXT = { red: "text-red-400/90", amber: "text-amber-400/90", cyan: "text-cyan-400/90", green: "text-green-400/90", neutral: "text-neutral-400" };
+  const renderAttentionList = (list) => (
+    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-700/50">
+      {list.map((r) => (
+        <div key={r.sku} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-800/30">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[r.tone] || TONE_DOT.neutral}`} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-mono text-sm text-neutral-200">{r.sku}</span>
+              {r.parentCode && <span className="truncate text-xs text-neutral-500">{r.parentCode}</span>}
+            </div>
+            <p className={`mt-0.5 text-xs ${TONE_TXT[r.tone] || TONE_TXT.neutral}`}>{r.reason}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Renders the removed-in-store list (parent + variants + Recreate action) for a given slice —
+  // reused by the section (first few) and its "View all" modal (everything).
+  const renderRemovedList = (list) => (
+    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-700/50">
+      {list.map((d) => {
+        const busy = recreating.includes(d.parentCode);
+        return (
+          <div key={d.parentCode} className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-neutral-800/30 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-mono text-sm text-neutral-200">{d.parentCode || "—"}</span>
+                <span className="text-xs text-neutral-500">{d.skus?.length || 0} {(d.skus?.length || 0) === 1 ? "variant" : "variants"}</span>
+              </div>
+              <p className="mt-0.5 text-xs text-amber-400/90">
+                Removed in Shopify{d.deletedInStoreAt ? ` ${relTime(d.deletedInStoreAt)}` : ""}
+                {d.deletedInStoreAt && <span className="text-neutral-600"> · </span>}
+                {d.deletedInStoreAt && <span className="text-neutral-500" title={fmtDateTime(d.deletedInStoreAt)}>{fmtDateTime(d.deletedInStoreAt)}</span>}
+              </p>
+            </div>
+            {d.recreateRequested ? (
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs font-medium text-green-400">
+                  <CheckIcon className="h-3.5 w-3.5" />
+                  Queued for next sync
+                </span>
+                <button
+                  type="button"
+                  onClick={() => requestRecreate(d.parentCode, true)}
+                  disabled={busy}
+                  title="Cancel — keep it deleted"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-700/50 bg-neutral-800/60 px-3 py-2 text-xs font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy ? <SpinnerIcon className="h-3.5 w-3.5" /> : <UndoIcon className="h-3.5 w-3.5" />}
+                  Undo
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => requestRecreate(d.parentCode)}
+                disabled={busy}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-sm font-medium text-amber-300 transition-all hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
+                Recreate on next sync
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   /* ====================================================================== */
   return (
@@ -1511,69 +1871,59 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       )}
 
       {/* ---------------------- Connection summary --------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+      {/* Minimal by design — only the live sync status stays here; the rest (install date,
+          locations per source, granted scopes) lives behind "View details". */}
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <PingDot tone={statusMeta.tone} />
-              <h2 className="truncate text-xl font-semibold text-white">{connection.shopDomain}</h2>
+              <a
+                href={`https://${connection.shopDomain}/admin`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open in Shopify admin"
+                className="group inline-flex min-w-0 max-w-full items-center gap-1.5"
+              >
+                <span className="truncate font-[family-name:var(--font-montserrat)] text-xl font-semibold leading-none text-white transition-colors group-hover:text-[#01a0be]">
+                  {connection.shopDomain}
+                </span>
+                <svg className="h-4 w-4 shrink-0 text-neutral-500 transition-colors group-hover:text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+              </a>
               <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
             </div>
 
-            <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-4">
-              <div>
-                <dt className="text-neutral-500">Installed</dt>
-                <dd className="mt-0.5 text-neutral-200">{fmtDate(connection.installedAt)}</dd>
-              </div>
-              <div>
-                <dt className="text-neutral-500">Last sync</dt>
-                <dd className="mt-0.5 text-neutral-200">{fmtDateTime(connection.lastSyncAt)}</dd>
-              </div>
-              <div>
-                <dt className="text-neutral-500">Sync status</dt>
-                <dd className="mt-1">
-                  <StatusBadge tone={JOB_STATUS_TONE[connection.lastSyncStatus] || "neutral"}>
-                    {connection.lastSyncStatus || "—"}
-                  </StatusBadge>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-neutral-500">Location</dt>
-                <dd className="mt-0.5 truncate text-neutral-200">{savedLocationName}</dd>
-              </div>
-            </dl>
-
-            {scopes.length > 0 && (
-              <div className="mt-5">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Granted scopes</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {scopes.map((s) => (
-                    <StatusBadge key={s} tone="cyan">{s}</StatusBadge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-5">
-              {attentionCount > 0 ? (
-                <a href="#needs-attention" className="inline-flex items-center gap-2 text-sm font-medium text-amber-400 hover:text-amber-300">
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <span className="inline-flex items-center gap-2 text-neutral-400">
+                <span className="text-neutral-500">Last sync</span>
+                <span className="text-neutral-200" title={fmtDateTime(connection.lastSyncAt)}>{relTime(connection.lastSyncAt)}</span>
+                <StatusBadge tone={JOB_STATUS_TONE[connection.lastSyncStatus] || "neutral"}>
+                  {connection.lastSyncStatus || "—"}
+                </StatusBadge>
+              </span>
+              {attentionCount > 0 && (
+                <a href="#needs-attention" className="inline-flex items-center gap-2 font-medium text-amber-400 hover:text-amber-300">
                   <WarningIcon className="h-4 w-4" />
                   {attentionCount} {attentionCount === 1 ? "item needs" : "items need"} attention
                 </a>
-              ) : (
-                <span className="inline-flex items-center gap-2 text-sm font-medium text-green-400">
-                  <CheckIcon className="h-4 w-4" />
-                  All systems healthy
-                </span>
               )}
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 lg:flex lg:shrink-0 lg:items-center">
             <button
-              onClick={syncNow}
+              type="button"
+              onClick={() => setShowDetails(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-800/60 px-4 py-3 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+              View details
+            </button>
+            <button
+              onClick={() => { if (isDirty) { setSaveShake(true); return; } syncNow(); }}
               disabled={isSyncing}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50"
+              title={isDirty ? "Save your changes before syncing" : undefined}
+              className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50 ${isDirty ? "cursor-not-allowed opacity-50 hover:bg-[#01a0be]" : ""}`}
             >
               {isSyncing ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
               {isSyncing ? "Syncing…" : "Sync now"}
@@ -1582,15 +1932,91 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
         </div>
       </section>
 
+      {/* ---------------------- Connection details modal --------------------- */}
+      {showDetails && (
+        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setShowDetails(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-5 py-4 sm:px-6">
+              <h2 className="mb-0 truncate text-base font-semibold leading-none text-white">Connection details</h2>
+              <button type="button" onClick={() => setShowDetails(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                <div className="col-span-2">
+                  <dt className="text-neutral-500">Store</dt>
+                  <dd className="mt-0.5 truncate text-neutral-200">{connection.shopDomain}</dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Status</dt>
+                  <dd className="mt-1"><StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge></dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Sync status</dt>
+                  <dd className="mt-1"><StatusBadge tone={JOB_STATUS_TONE[connection.lastSyncStatus] || "neutral"}>{connection.lastSyncStatus || "—"}</StatusBadge></dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Installed</dt>
+                  <dd className="mt-0.5 text-neutral-200">{fmtDate(connection.installedAt)}</dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-500">Last sync</dt>
+                  <dd className="mt-0.5 text-neutral-200">{fmtDateTime(connection.lastSyncAt)}</dd>
+                </div>
+              </dl>
+
+              {/* Locations — one row per configured source (supports many) */}
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Locations</p>
+                {sourceScopes.length > 0 ? (
+                  <ul className="space-y-1.5">
+                    {sourceScopes.map((s, i) => {
+                      const name = s.type === "own_source"
+                        ? (feedOptions.find((f) => f.feedId === s.feedId)?.brand || "Feed")
+                        : (exportOptions.find((x) => x._id === s.exportConfigId)?.name || "Export");
+                      const locName = locations.find((l) => l.id === s.locationId)?.name || "—";
+                      return (
+                        <li key={i} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2 text-sm">
+                          <span className="min-w-0 truncate text-neutral-300">{name}</span>
+                          <span className="shrink-0 text-neutral-400">{locName}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-neutral-400">{savedLocationName}</p>
+                )}
+              </div>
+
+              {/* Granted scopes */}
+              {scopes.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Granted scopes</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {scopes.map((s) => <StatusBadge key={s} tone="cyan">{s}</StatusBadge>)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex shrink-0 justify-end border-t border-neutral-800 px-5 py-3.5 sm:px-6">
+              <button onClick={() => setShowDetails(false)} className="rounded-lg bg-[#01a0be] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --------------------- Sources & locations --------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
         <SectionHeading title="Sources & locations" desc="Each source — a Patrik export or one of your own brand feeds — pushes to its own Shopify location, with its own settings. Pick a source to configure it below." />
 
         {(exportOptions.length === 0 && feedOptions.length === 0) ? (
           <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-6 text-center">
             <p className="text-sm text-neutral-300">No products to sync yet.</p>
             <p className="mt-1 text-xs text-neutral-500">
-              Create a <a href="/export" className="text-[#01a0be] hover:underline">Shopify export</a> or register an{" "}
+              Create a <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}`} className="text-[#01a0be] hover:underline">Shopify export</a> or register an{" "}
               <a href="/integrations/own-sources" className="text-[#01a0be] hover:underline">Own Source feed</a> to choose what syncs.
             </p>
           </div>
@@ -1666,7 +2092,10 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
                 <PlusIcon className="h-4 w-4" />
                 Add source
               </button>
-              <a href="/export" className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">New export</a>
+              <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}`} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
+                <PlusIcon className="h-3.5 w-3.5" />
+                Create source
+              </a>
               <a href="/integrations/own-sources" className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">Manage feeds</a>
             </div>
           </div>
@@ -1675,31 +2104,31 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
 
       {/* ---------- Per-source config modal (Ownership / What-to-sync / Pricing / Channels) ---------- */}
       {editingScopeIdx !== null && activeScope && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6" onClick={() => setEditingScopeIdx(null)}>
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={cancelEditScope}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-2xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
             {/* header */}
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
               <div className="min-w-0">
-                <h2 className="truncate text-base font-semibold text-white">
+                <h2 className="mb-0 truncate text-base font-semibold leading-tight text-white">
                   Configure {activeScope.type === "own_source"
                     ? (feedOptions.find((f) => f.feedId === activeScope.feedId)?.brand || "feed")
                     : (exportOptions.find((x) => x._id === activeScope.exportConfigId)?.name || "source")}
                 </h2>
-                <p className="mt-0.5 text-xs text-neutral-500">Applies to this source only · close, then Save</p>
+                <p className="mt-1 text-xs text-neutral-500">Settings for this source only · close, then <span className="text-neutral-400">Save</span> on the page</p>
               </div>
-              <button type="button" onClick={() => setEditingScopeIdx(null)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+              <button type="button" onClick={cancelEditScope} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             {/* scrollable body — sections are light groups (the modal itself is the card) */}
-            <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain px-6 py-6">
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5 sm:space-y-8 sm:px-6 sm:py-6">
 
       {/* ------------------------ Ownership mode ----------------------- */}
       <section>
         <SectionHeading
-          title="Ownership mode"
-          desc="How assertively the portal writes to products once they exist in this store."
+          title="How much should we manage?"
+          desc="Choose how much the portal keeps in sync once a product is in your store."
         />
         <fieldset className="space-y-2.5">
           <legend className="sr-only">Ownership mode</legend>
@@ -1718,6 +2147,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
+                    <svg className={`h-4 w-4 shrink-0 ${selected ? "text-[#01a0be]" : "text-neutral-500"}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d={m.icon} /></svg>
                     <span className="text-sm font-semibold text-white">{m.title}</span>
                     {m.recommended && <StatusBadge tone="cyan">Recommended</StatusBadge>}
                   </span>
@@ -1734,9 +2164,23 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
         </fieldset>
       </section>
 
+      {/* When Stock-only is selected, none of the config below applies — hide it entirely.
+          (The Ownership card already explains stock-only just syncs inventory quantities.) */}
+      {!stockOnly && (
+      <>
       {/* ------------------------ What to sync ------------------------- */}
       <section className="border-t border-neutral-800 pt-8">
-        <SectionHeading title="What to sync" desc="Pick the data the portal is allowed to push to this store." />
+        <SectionHeading
+          title="What to sync"
+          desc="Pick the data the portal is allowed to push to this store."
+          right={
+            <div className="flex shrink-0 items-center gap-1 text-xs">
+              <button type="button" onClick={() => setAllSyncFlags(true)} className="rounded-md px-2 py-1 font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white">All</button>
+              <span className="text-neutral-700">/</span>
+              <button type="button" onClick={() => setAllSyncFlags(false)} className="rounded-md px-2 py-1 font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white">None</button>
+            </div>
+          }
+        />
         {stockOnly && (
           <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
             <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
@@ -1766,8 +2210,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       {/* ----------------------- Variant option name ------------------- */}
       <section className="border-t border-neutral-800 pt-8">
         <SectionHeading
-          title="Variant option"
-          desc="The Shopify option name this source's variants live under — e.g. Size, Sail Size, Volume. Used when the portal creates a product. In Portal authoritative ownership, existing listings with a different option name are renamed to match on every sync (only when a name is set here or on the export — the bare Size default never renames your store)."
+          title="What are your sizes called?"
+          desc="The label your variants appear under in Shopify — e.g. Size, Sail Size, Volume. Used when the portal creates a product."
         />
         {stockOnly && (
           <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
@@ -1942,12 +2386,12 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
 
           {/* VAT mode */}
           <div className="mt-8">
-            <p className="mb-1 text-sm font-medium text-neutral-300">VAT handling</p>
-            <p className="mb-3 text-xs text-neutral-500">Pricelists carry their own VAT (e.g. 22% vs 0%) — choose how the price reaches Shopify.</p>
+            <p className="mb-1 text-sm font-medium text-neutral-300">Tax (VAT)</p>
+            <p className="mb-3 text-xs text-neutral-500">Your pricelists include VAT (e.g. 22%). Choose whether the price sent to Shopify already includes tax.</p>
             <div className="inline-flex w-full gap-1 rounded-xl border border-neutral-700/50 bg-neutral-900/60 p-1 sm:w-auto">
               {[
-                { v: "inclusive", label: "VAT inclusive" },
-                { v: "exclusive", label: "VAT exclusive" },
+                { v: "inclusive", label: "Includes VAT" },
+                { v: "exclusive", label: "Excludes VAT" },
               ].map((opt) => (
                 <button
                   key={opt.v}
@@ -1969,9 +2413,9 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
           <div className="mt-6">
             <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
               <span className="min-w-0">
-                <span className="text-sm font-medium text-white">Future-dated price guard</span>
+                <span className="text-sm font-medium text-white">Ignore prices that haven&apos;t started yet</span>
                 <span className="mt-1 block text-xs text-neutral-500">
-                  Only apply prices whose <span className="font-mono text-neutral-400">valid_from</span> date has already passed (valid_from ≤ now).
+                  Only use a price once its start date has arrived — upcoming pricelists are skipped until then.
                 </span>
               </span>
               <ToggleSwitch checked={config.futureDatedGuard} onChange={() => toggleFlag("futureDatedGuard")} ariaLabel="Future-dated price guard" />
@@ -2024,23 +2468,29 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
               ))}
             </ul>
             <p className="mt-3 text-xs text-neutral-500">
-              New products are published to these channels. In <span className="font-medium text-neutral-300">Portal authoritative</span> mode, existing products are kept in sync too (channels added or removed on the next sync). In <span className="font-medium text-neutral-300">Create, then hand off</span>, only newly-created products are published.
+              New products are published to these channels. In <span className="font-medium text-neutral-300">Keep everything in sync</span> mode, existing products are kept in step too (channels added or removed on the next sync). In <span className="font-medium text-neutral-300">Create, then leave it to you</span>, only newly-created products are published.
             </p>
           </>
         )}
       </section>
+      </>
+      )}
             </div>{/* /scrollable body */}
 
             {/* footer */}
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
-              <button type="button" onClick={() => setEditingScopeIdx(null)} className="rounded-lg bg-[#01a0be] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">Done</button>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-800 bg-neutral-900/40 px-4 py-3 sm:px-6 sm:py-4">
+              <button type="button" onClick={cancelEditScope} className="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/60 px-5 py-2.5 text-sm font-semibold text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white sm:flex-none sm:py-2">Cancel</button>
+              <button type="button" onClick={saveEditScope} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:py-2">
+                {saving ? <SpinnerIcon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
+                {saving ? "Saving…" : "Save changes"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* --------------------------- Sync activity --------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
         <SectionHeading
           title="Sync activity"
           desc="The most recent push jobs and the overall state of your mapped catalog."
@@ -2153,8 +2603,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
 
       {/* ----------------------- Run history modal --------------------- */}
       {historyOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6" onClick={() => setHistoryOpen(false)}>
-          <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setHistoryOpen(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[85vh] sm:max-w-3xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold text-white">Sync history</h2>
@@ -2201,8 +2651,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
 
       {/* ------------------------ Run detail modal --------------------- */}
       {detailJob && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6" onClick={() => setDetailJob(null)}>
-          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setDetailJob(null)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[85vh] sm:max-w-2xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
               <div className="flex min-w-0 items-center gap-2.5">
                 <h2 className="text-base font-semibold text-white">Run details</h2>
@@ -2306,9 +2756,59 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
         </div>
       )}
 
+      {/* --------------------- Removed in store ------------------------ */}
+      {/* Handed-off products the merchant deleted in Shopify. We deliberately do NOT recreate them
+          (that's the whole point of "create, then hand off") — the partner opts each one back in. */}
+      {deletedInStore.length > 0 && (
+        <section id="removed-in-store" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+          <SectionHeading
+            icon={<WarningIcon className="h-5 w-5 text-amber-400" />}
+            title="Removed in store"
+            desc="These products were created by the portal and then deleted in Shopify. They won't be recreated automatically — choose “Recreate on next sync” to bring one back."
+            right={<StatusBadge tone="amber">{deletedInStore.length}</StatusBadge>}
+          />
+
+          {renderRemovedList(deletedInStore.slice(0, 5))}
+
+          {deletedInStore.length > 5 && (
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <p className="text-xs text-neutral-500">Showing the first 5 of {deletedInStore.length}</p>
+              <button
+                type="button"
+                onClick={() => setShowAllRemoved(true)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+              >
+                View all
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ----------------- Removed-in-store "view all" modal ----------------- */}
+      {showAllRemoved && (
+        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setShowAllRemoved(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <WarningIcon className="h-5 w-5 shrink-0 text-amber-400" />
+                <h2 className="mb-0 truncate text-base font-semibold leading-none text-white">Removed in store</h2>
+                <StatusBadge tone="amber">{deletedInStore.length}</StatusBadge>
+              </div>
+              <button type="button" onClick={() => setShowAllRemoved(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+              {renderRemovedList(deletedInStore)}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --------------------- Needs attention ------------------------- */}
       {attentionCount > 0 && (
-        <section id="needs-attention" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+        <section id="needs-attention" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
           <SectionHeading
             icon={<WarningIcon className="h-5 w-5 text-amber-400" />}
             title="Needs attention"
@@ -2316,54 +2816,78 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
             right={<StatusBadge tone="red">{attentionCount}</StatusBadge>}
           />
 
-          {/* desktop table */}
-          <div className="hidden overflow-x-auto rounded-xl border border-neutral-700/50 md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
-                  <th className="px-4 py-3 font-medium">SKU</th>
-                  <th className="px-4 py-3 font-medium">Parent code</th>
-                  <th className="px-4 py-3 font-medium">Reason</th>
-                  <th className="px-4 py-3 text-right font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-800">
-                {unmatched.map((r) => (
-                  <tr key={r.sku} className="hover:bg-neutral-800/30">
-                    <td className="px-4 py-3 font-mono text-neutral-200">{r.sku}</td>
-                    <td className="px-4 py-3 text-neutral-500">{r.parentCode}</td>
-                    <td className="px-4 py-3"><StatusBadge tone={r.tone}>{r.reason}</StatusBadge></td>
-                    <td className="px-4 py-3 text-right">
-                      <button className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
-                        Resolve
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {renderAttentionList(unmatched.slice(0, 5))}
 
-          {/* mobile cards */}
-          <div className="space-y-3 md:hidden">
-            {unmatched.map((r) => (
-              <div key={r.sku} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-mono text-sm text-neutral-200">{r.sku}</span>
-                  <StatusBadge tone={r.tone}>{r.reason}</StatusBadge>
-                </div>
-                <p className="mt-1 text-xs text-neutral-500">{r.parentCode}</p>
-                <button className="mt-3 w-full rounded-lg border border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
-                  Resolve
-                </button>
-              </div>
-            ))}
-          </div>
+          {attentionCount > 5 && (
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <p className="text-xs text-neutral-500">
+                Showing the first 5 of {attentionCount} items
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAllAttention(true)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+              >
+                View all items
+              </button>
+            </div>
+          )}
         </section>
       )}
 
+      {/* ----------------- Needs-attention "view all" modal ----------------- */}
+      {showAllAttention && (
+        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setShowAllAttention(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <WarningIcon className="h-5 w-5 shrink-0 text-amber-400" />
+                <h2 className="mb-0 truncate text-base font-semibold leading-none text-white">Needs attention</h2>
+                <StatusBadge tone="red">{attentionCount}</StatusBadge>
+              </div>
+              <button type="button" onClick={() => setShowAllAttention(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+              {renderAttentionList(unmatched)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- Unsaved-changes leave guard modal ---------------- */}
+      {leaveTarget && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setLeaveTarget(null)}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 pt-6 pb-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400">
+                  <WarningIcon className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-white">Unsaved changes</h2>
+                  <p className="mt-1.5 text-sm leading-relaxed text-neutral-400">
+                    You have unsaved changes to{" "}
+                    <span className="font-medium text-neutral-200">{shopLabel(connection.shopDomain)}</span>. Save them before you leave?
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4 sm:flex-row sm:justify-end">
+              <button onClick={() => setLeaveTarget(null)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white">Stay</button>
+              <button onClick={discardAndLeave} className="whitespace-nowrap rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-2.5 text-sm font-semibold text-neutral-300 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300">Don&apos;t save</button>
+              <button onClick={saveAndLeave} disabled={saving} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#01a0be] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50">
+                {saving ? <SpinnerIcon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
+                {saving ? "Saving…" : "Save & leave"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ------------------------ Danger zone -------------------------- */}
-      <section className="rounded-2xl border border-red-500/30 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+      <section className="rounded-2xl border border-red-500/30 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-white">Disconnect store</h2>
@@ -2416,7 +2940,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
               <button
                 onClick={saveConfig}
                 disabled={saving}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+                onAnimationEnd={() => setSaveShake(false)}
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none ${saveShake ? "animate-shake ring-2 ring-[#01a0be] ring-offset-2 ring-offset-black" : ""}`}
               >
                 {saving ? <SpinnerIcon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
                 {saving ? "Saving…" : "Save changes"}
