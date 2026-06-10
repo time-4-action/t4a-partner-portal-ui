@@ -62,8 +62,12 @@ const getDisplayPrice = (pricelist = []) => {
  * @returns {JSX.Element} Product details with variant selector and image gallery
  */
 export default function ProductVariants({ product }) {
+  const hasVariants = (product.child_products?.length || 0) > 0;
+  // No-variant products: the PARENT itself is the sellable item — its own code (SKU), ean_code,
+  // stock_amount and pricelist are used (data model §No-variant products). So fall back to the
+  // parent as the "selected variant" when there are no child_products.
   const [selectedVariant, setSelectedVariant] = useState(
-    product.child_products?.[0] || null
+    product.child_products?.[0] || product
   );
 
   const displayPrice = useMemo(
@@ -89,8 +93,9 @@ export default function ProductVariants({ product }) {
     // Start with the selected variant's images
     const variantImages = selectedVariant?.images || [];
 
-    // Add parent product's images, excluding the first one (used as thumbnail elsewhere)
-    const parentImages = (product.images || []).slice(1);
+    // Then ALL parent product images — so a variant with no image of its own still shows the
+    // parent gallery (previously the first parent image was dropped, leaving such variants blank).
+    const parentImages = product.images || [];
 
     // Add images from all other child products for comprehensive view
     const allChildImages = (product.child_products || []).flatMap(p => p.images || []);
@@ -118,9 +123,12 @@ export default function ProductVariants({ product }) {
         <h1 className="text-3xl font-bold tracking-wider mb-2">
           {product.product_name}
         </h1>
-        <p className="text-lg text-neutral-300 mb-4">
-          {selectedVariant?.product_name}
-        </p>
+        {/* Subtitle only when it's a real variant (avoids repeating the parent name). */}
+        {hasVariants && (
+          <p className="text-lg text-neutral-300 mb-4">
+            {selectedVariant?.product_name}
+          </p>
+        )}
 
         <div
           className="text-neutral-300 prose prose-invert"

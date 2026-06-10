@@ -42,10 +42,20 @@ const ProductImageGallery = ({ images, altText }) => {
     setCurrentIndex(0);
   }, [images]);
 
-  // Provide placeholder if no images available
-  const safeImages = (!images || images.length === 0)
-    ? [{ url: "https://via.placeholder.com/800" }]
-    : images;
+  // No images at all (neither variant nor parent) → show the same tasteful placeholder as the
+  // product list, not a broken external placeholder service.
+  const hasImages = Array.isArray(images) && images.length > 0;
+  if (!hasImages) {
+    return (
+      <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-neutral-800 shadow-lg">
+        <svg className="h-16 w-16 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    );
+  }
+
+  const safeImages = images;
 
   /**
    * Navigates to the previous image in the gallery.
