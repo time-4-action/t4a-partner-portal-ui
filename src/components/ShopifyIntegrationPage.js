@@ -231,6 +231,7 @@ const RUN_COUNT_LABELS = [
   ["createdVariants", "Variants created"],
   ["pricesPushed", "Prices pushed"],
   ["contentPushed", "Content pushed"],
+  ["optionsRenamed", "Options renamed"],
   ["imagesPushed", "Images added"],
   ["variantImagesLinked", "Variant images linked"],
   ["publishedProducts", "Published"],
@@ -969,6 +970,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       syncTags: cfg.syncTags ?? true,
       priceVatMode: cfg.priceVatMode ?? "inclusive",
       futureDatedGuard: cfg.futureDatedGuard ?? true,
+      variantOptionName: cfg.variantOptionName ?? "",
     };
     // Builds one source's full, panel-ready config (rich pricelistPriority, validated channels).
     const withCfg = (s, inheritBase) => {
@@ -979,6 +981,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
         ownership: pick("ownership"), syncStock: pick("syncStock"), syncNewProducts: pick("syncNewProducts"),
         syncPrices: pick("syncPrices"), syncDescriptions: pick("syncDescriptions"), syncImages: pick("syncImages"),
         syncTags: pick("syncTags"), priceVatMode: pick("priceVatMode"), futureDatedGuard: pick("futureDatedGuard"),
+        variantOptionName: pick("variantOptionName") ?? "",
         pricelistPriority: buildPricelistPriority(pricelists, s.pricelistPriority ?? (inheritBase ? cfg.pricelistPriority : undefined)),
         publicationIds: validPubs(s.publicationIds ?? (inheritBase ? cfg.publicationIds : [])),
         aiExportId: s.aiExportId,
@@ -999,6 +1002,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       ownership: active.ownership, syncStock: active.syncStock, syncNewProducts: active.syncNewProducts,
       syncPrices: active.syncPrices, syncDescriptions: active.syncDescriptions, syncImages: active.syncImages,
       syncTags: active.syncTags, priceVatMode: active.priceVatMode, futureDatedGuard: active.futureDatedGuard,
+      variantOptionName: active.variantOptionName ?? "",
       pricelistPriority: active.pricelistPriority,
       publicationIds: active.publicationIds,
       exportConfigId: cfg.exportConfigId ?? exportOptions[0]?._id ?? null,
@@ -1169,7 +1173,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
   const sourceScopes = config.scopes || [];
   const activeIdx = Math.min(activeScopeIdx, Math.max(0, sourceScopes.length - 1));
   const activeScope = sourceScopes[activeIdx] || null;
-  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "futureDatedGuard", "pricelistPriority", "publicationIds"];
+  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "futureDatedGuard", "pricelistPriority", "publicationIds", "variantOptionName"];
   const pickMirror = (c) => Object.fromEntries(MIRROR_KEYS.map((k) => [k, c[k]]));
   // After any change to a mirrored field, copy the whole set into the active scope.
   const mirrorActive = (c) => ({ ...c, scopes: (c.scopes || []).map((s, i) => (i === activeIdx ? { ...s, ...pickMirror(c) } : s)) });
@@ -1189,6 +1193,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
       )
     );
   const setVatMode = (v) => setConfig((c) => mirrorActive({ ...c, priceVatMode: v }));
+  const setVariantOptionName = (v) => setConfig((c) => mirrorActive({ ...c, variantOptionName: v }));
   const togglePublication = (id) =>
     setConfig((c) => {
       const ids = c.publicationIds || [];
@@ -1215,7 +1220,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
     locationId: locations[0]?.id ?? null,
     ownership: "stock_only", syncStock: true, syncNewProducts: false, syncPrices: false,
     syncDescriptions: false, syncImages: false, syncTags: true,
-    priceVatMode: "inclusive", futureDatedGuard: true,
+    priceVatMode: "inclusive", futureDatedGuard: true, variantOptionName: "",
     pricelistPriority: buildPricelistPriority(pricelists, []), publicationIds: [],
   });
   const addScope = () => {
@@ -1415,7 +1420,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
     setSaving(true);
     try {
       const { pricelistPriority, priceVatMode, futureDatedGuard, syncStock, syncNewProducts,
-        syncPrices, syncDescriptions, syncImages, ownership, scopes, publicationIds } = config;
+        syncPrices, syncDescriptions, syncImages, ownership, scopes, publicationIds, variantOptionName } = config;
       // Each source pushes with its OWN full config to its own location. Persist the cleaned
       // scopes (incl. per-source ownership / toggles / pricing / channels) and mirror the first
       // source's location onto the connection-level field (back-compat / summary line).
@@ -1434,6 +1439,9 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
           syncTags: s.syncTags ?? true,
           priceVatMode: s.priceVatMode ?? "inclusive",
           futureDatedGuard: s.futureDatedGuard ?? true,
+          // Always present (even "") so a source never inherits another source's option name
+          // through the connection-level fallback. "" = use the default (export setting / Size).
+          variantOptionName: (s.variantOptionName || "").trim(),
           pricelistPriority: (s.pricelistPriority || []).map((p, i) => ({ name: p.name, enabled: p.enabled !== false, priority: p.priority ?? i })),
           publicationIds: s.publicationIds || [],
           ...(s.aiExportId ? { aiExportId: s.aiExportId } : {}),
@@ -1452,7 +1460,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
         body: JSON.stringify({
           shopifyLocationId,
           config: { pricelistPriority: minimalPricelistPriority, priceVatMode, futureDatedGuard,
-            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncImages, ownership, scopes: cleanScopes, publicationIds },
+            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncImages, ownership, scopes: cleanScopes, publicationIds,
+            variantOptionName: (variantOptionName || "").trim() },
         }),
       });
       if (res.ok) {
@@ -1751,6 +1760,49 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
               </li>
             ))}
           </ul>
+        </fieldset>
+      </section>
+
+      {/* ----------------------- Variant option name ------------------- */}
+      <section className="border-t border-neutral-800 pt-8">
+        <SectionHeading
+          title="Variant option"
+          desc="The Shopify option name this source's variants live under — e.g. Size, Sail Size, Volume. Used when the portal creates a product. In Portal authoritative ownership, existing listings with a different option name are renamed to match on every sync (only when a name is set here or on the export — the bare Size default never renames your store)."
+        />
+        {stockOnly && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+            <span><span className="font-medium text-neutral-200">Stock only</span> ownership never creates products — the option name doesn&apos;t apply. Switch ownership mode to use it.</span>
+          </div>
+        )}
+        <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
+          {(() => {
+            const srcExport = activeScope?.type === "own_source"
+              ? null
+              : exportOptions.find((x) => x._id === activeScope?.exportConfigId);
+            const exportDefault = (srcExport?.option1Name || "").trim();
+            const effectiveDefault = exportDefault || "Size";
+            return (
+              <>
+                <label className="mb-1 block text-xs font-medium text-neutral-400">Option name</label>
+                <input
+                  type="text"
+                  value={config.variantOptionName || ""}
+                  onChange={(e) => setVariantOptionName(e.target.value)}
+                  placeholder={effectiveDefault}
+                  maxLength={255}
+                  className="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2.5 text-sm text-white placeholder-neutral-500 focus:border-[#01a0be] focus:outline-none"
+                />
+                <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                  {activeScope?.type === "own_source"
+                    ? <>Leave blank to use <span className="font-medium text-neutral-300">Size</span>.</>
+                    : exportDefault
+                      ? <>Leave blank to use <span className="font-medium text-neutral-300">{exportDefault}</span> — the Variant Option set on the <span className="font-medium text-neutral-300">{srcExport?.name || "export"}</span> export.</>
+                      : <>Leave blank to use <span className="font-medium text-neutral-300">Size</span>. Tip: set a Variant Option on the export itself and it becomes this source&apos;s default.</>}
+                </p>
+              </>
+            );
+          })()}
         </fieldset>
       </section>
 
