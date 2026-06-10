@@ -361,8 +361,34 @@ function countConfigFilters(config) {
  * @param {string} props.apiUrl - Backend API URL for saved exports
  * @returns {JSX.Element} Export configuration UI
  */
-// Client-side filter application for preview — mirrors backend applyFilters, backwards-compatible
-function applyFiltersLocal(products, filters) {
+// Resolves the single price to use for a variant via the config's pricelist priority.
+// MUST stay byte-for-byte equivalent to getPriceFromPriority in the API
+// (t4a-partner-portal-api/src/services/customExport.service.js) so the preview's
+// price-range filter selects the exact same products the export/sync do.
+function resolvePriorityPrice(variant, pricelistPriority = []) {
+    if (!variant?.pricelist || variant.pricelist.length === 0) {
+        return { price: 0, vat: 0, name: '' };
+    }
+    const sorted = (pricelistPriority || [])
+        .filter(p => p.enabled)
+        .sort((a, b) => a.priority - b.priority);
+    for (const pl of sorted) {
+        const found = variant.pricelist.find(p => p.name === pl.name);
+        if (found && found.price !== undefined) {
+            return { price: found.price, vat: found.vat || 0, name: found.name };
+        }
+    }
+    const first = variant.pricelist[0];
+    return { price: first?.price || 0, vat: first?.vat || 0, name: first?.name || '' };
+}
+
+// Single source of truth for the export/preview product set in the UI. This is a
+// faithful port of applyFilters in the API (customExport.service.js) — the same
+// function the real CSV export AND the Shopify sync use — so what the user sees in
+// the preview is exactly what gets exported/synced (1:1). When you touch one, touch
+// the other. `pricelistPriority` is required for the price filter to resolve the
+// same winning price the backend does.
+function applyFiltersLocal(products, filters, pricelistPriority = []) {
     if (!filters) return products;
     // Published-only is always enforced: drop unpublished parents, narrow
     // child_products to only published variants so all downstream checks see
@@ -371,29 +397,46 @@ function applyFiltersLocal(products, filters) {
         .filter(p => p.published)
         .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }));
     return input.filter(product => {
-        if (filters.search?.trim()) {
+        // Search — mirror backend fields exactly: parent name/code/token/ean +
+        // variant code/ean/name (NOT short_description — backend never searches it).
+        if (filters.search && filters.search.trim() !== '') {
             const s = filters.search.toLowerCase();
-            const match = product.product_name?.toLowerCase().includes(s) ||
+            const match =
+                product.product_name?.toLowerCase().includes(s) ||
                 product.code?.toLowerCase().includes(s) ||
-                product.child_products?.some(v => v.code?.toLowerCase().includes(s) || v.ean_code?.toLowerCase().includes(s));
+                product.token?.toLowerCase().includes(s) ||
+                product.ean_code?.toLowerCase().includes(s) ||
+                (product.child_products || []).some(v =>
+                    v.code?.toLowerCase().includes(s) ||
+                    v.ean_code?.toLowerCase().includes(s) ||
+                    v.product_name?.toLowerCase().includes(s));
             if (!match) return false;
         }
+        // Stock status — mirror backend: sum of variant stock (or parent when no variants).
         if (filters.stockStatus !== 'all') {
             const variants = product.child_products || [];
-            const hasStock = variants.length > 0
-                ? variants.some(v => v.stock_amount > 0)
-                : (product.stock_amount || 0) > 0;
-            if (filters.stockStatus === 'in_stock' && !hasStock) return false;
-            if (filters.stockStatus === 'out_of_stock' && hasStock) return false;
+            const totalStock = variants.length > 0
+                ? variants.reduce((sum, v) => sum + (v.stock_amount || 0), 0)
+                : (product.stock_amount || 0);
+            if (filters.stockStatus === 'in_stock' && totalStock <= 0) return false;
+            if (filters.stockStatus === 'out_of_stock' && totalStock > 0) return false;
         }
-        if (filters.minPrice || filters.maxPrice) {
+        // Price — priority-resolved single price, mirror backend. Note: a product
+        // with no resolvable price PASSES (backend only excludes when a price exists
+        // and falls outside the range), so we do NOT drop price-less products here.
+        const minP = filters.minPrice ?? '';
+        const maxP = filters.maxPrice ?? '';
+        if (minP !== '' || maxP !== '') {
             const variants = product.child_products || [];
             const prices = variants.length > 0
-                ? variants.flatMap(v => v.pricelist?.map(p => p.price) || []).filter(p => p > 0)
-                : (product.pricelist?.map(p => p.price) || []).filter(p => p > 0);
-            if (!prices.length) return false;
-            if (filters.minPrice && Math.max(...prices) < parseFloat(filters.minPrice)) return false;
-            if (filters.maxPrice && Math.min(...prices) > parseFloat(filters.maxPrice)) return false;
+                ? variants.map(v => resolvePriorityPrice(v, pricelistPriority).price).filter(p => p > 0)
+                : [resolvePriorityPrice(product, pricelistPriority).price].filter(p => p > 0);
+            if (prices.length > 0) {
+                const maxPrice = Math.max(...prices);
+                const minPrice = Math.min(...prices);
+                if (minP !== '' && maxPrice < parseFloat(minP)) return false;
+                if (maxP !== '' && minPrice > parseFloat(maxP)) return false;
+            }
         }
         const categories = Array.isArray(filters.category) ? filters.category : (filters.category && filters.category !== 'all' ? [filters.category] : []);
         if (categories.length > 0 && !categories.some(cat => product.categories?.includes(cat))) return false;
@@ -409,13 +452,17 @@ function applyFiltersLocal(products, filters) {
             if (!hasAi) return false;
         }
         if (filters.imageFilter && filters.imageFilter !== 'all') {
-            const hasImg = (product.images || []).length > 0 || product.child_products?.some(v => (v.images || []).length > 0);
-            if (filters.imageFilter === 'with_images' && !hasImg) return false;
-            if (filters.imageFilter === 'without_images' && hasImg) return false;
+            const parentImages = product.images || [];
+            const childImages = (product.child_products || []).flatMap(v => v.images || []);
+            const hasImages = parentImages.length > 0 || childImages.length > 0;
+            if (filters.imageFilter === 'with_images' && !hasImages) return false;
+            if (filters.imageFilter === 'without_images' && hasImages) return false;
         }
         if (filters.showNew && !product.new) return false;
         if (filters.showRecommended && !product.recomended) return false;
+        // Close-out exclusion — mirror backend: by product name AND by image URL.
         if (filters.excludeCloseOut && product.product_name?.toUpperCase().includes('CLOSE OUT')) return false;
+        if (filters.excludeCloseOut && product.images?.some(img => img?.toLowerCase().includes('close-out'))) return false;
         return true;
     });
 }
@@ -729,87 +776,20 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         return { price: first.price || 0, vat: first.vat || 0, name: first.name || "" };
     }, [pricelistPriority]);
 
-    // Filter products based on criteria
-    const filteredProducts = useMemo(() => {
-        // Published-only is always enforced. Narrow the input first so row
-        // generation, totals, and the preview all see only exportable items.
-        const input = initialProducts
-            .filter(p => p.published)
-            .map(p => ({ ...p, child_products: (p.child_products || []).filter(v => v.published) }));
-        return input.filter((product) => {
-            if (filters.search) {
-                const searchLower = filters.search.toLowerCase();
-                const nameMatch = product.product_name?.toLowerCase().includes(searchLower);
-                const codeMatch = product.code?.toLowerCase().includes(searchLower);
-                const descMatch = product.short_description?.toLowerCase().includes(searchLower);
-                const skuMatch = product.child_products?.some(
-                    (v) => v.code?.toLowerCase().includes(searchLower) ||
-                        v.ean_code?.toLowerCase().includes(searchLower)
-                );
-                if (!nameMatch && !codeMatch && !descMatch && !skuMatch) return false;
-            }
-
-            if (filters.stockStatus !== "all") {
-                const variants = product.child_products || [];
-                const hasStock = variants.length > 0
-                    ? variants.some((v) => v.stock_amount > 0)
-                    : (product.stock_amount || 0) > 0;
-                if (filters.stockStatus === "in_stock" && !hasStock) return false;
-                if (filters.stockStatus === "out_of_stock" && hasStock) return false;
-            }
-
-            if (filters.minPrice || filters.maxPrice) {
-                const variants = product.child_products || [];
-                const prices = variants.length > 0
-                    ? variants.map((v) => getPriceFromPriority(v).price).filter((p) => p > 0)
-                    : [getPriceFromPriority(product).price].filter((p) => p > 0);
-
-                if (prices.length === 0) return false;
-                const minProductPrice = Math.min(...prices);
-                const maxProductPrice = Math.max(...prices);
-
-                if (filters.minPrice && maxProductPrice < parseFloat(filters.minPrice)) return false;
-                if (filters.maxPrice && minProductPrice > parseFloat(filters.maxPrice)) return false;
-            }
-
-            if (filters.category.length > 0) {
-                if (!filters.category.some(cat => product.categories?.includes(cat))) return false;
-            }
-
-            if (filters.aiExportId !== "all") {
-                const hasExport = product.ai_categories?.some((c) => c.exportId === filters.aiExportId);
-                if (!hasExport) return false;
-            }
-
-            if (filters.aiCategory.length > 0) {
-                const hasAiCategory = filters.aiCategory.some(prefix =>
-                    product.ai_categories?.some(
-                        (c) => (c.categoryName === prefix || c.categoryName?.startsWith(prefix + " / ")) &&
-                            (filters.aiExportId === "all" || c.exportId === filters.aiExportId)
-                    )
-                );
-                if (!hasAiCategory) return false;
-            }
-
-            if (filters.imageFilter && filters.imageFilter !== "all") {
-                const parentImages = product.images || [];
-                const childImages = (product.child_products || []).flatMap((v) => v.images || []);
-                const hasImages = parentImages.length > 0 || childImages.length > 0;
-                if (filters.imageFilter === "with_images" && !hasImages) return false;
-                if (filters.imageFilter === "without_images" && hasImages) return false;
-            }
-
-            if (filters.showNew && !product.new) return false;
-            if (filters.showRecommended && !product.recomended) return false;
-            if (filters.excludeCloseOut && product.product_name?.toUpperCase().includes('CLOSE OUT')) return false;
-
-            return true;
-        });
-    }, [initialProducts, filters, getPriceFromPriority]);
+    // Filter products based on criteria. Delegates to applyFiltersLocal — the single
+    // UI port of the backend applyFilters — so the live count/totals/preview and the
+    // real export/Shopify sync select the IDENTICAL product set (1:1).
+    const filteredProducts = useMemo(
+        () => applyFiltersLocal(initialProducts, filters, pricelistPriority),
+        [initialProducts, filters, pricelistPriority]
+    );
 
     // Products to show in the preview panel
     const previewBaseProducts = useMemo(() => {
-        if (previewConfig) return applyFiltersLocal(initialProducts, previewConfig.filters);
+        // A saved-config preview must resolve prices with THAT config's pricelist
+        // priority (not the live editor's), so its price filter matches what the
+        // sync would do for that config.
+        if (previewConfig) return applyFiltersLocal(initialProducts, previewConfig.filters, previewConfig.pricelistPriority || []);
         return filteredProducts;
     }, [previewConfig, filteredProducts, initialProducts]);
 
