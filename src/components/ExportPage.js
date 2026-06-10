@@ -22,7 +22,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import ProductDetailModal from "./ProductDetailModal";
 
 /**
@@ -480,6 +480,24 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     const [aiLeafMode, setAiLeafMode] = useState({ ai_tags: false, ai_category_names: false });
     const [inventoryLocationName, setInventoryLocationName] = useState('');
     const [option1Name, setOption1Name] = useState('');
+    const [showHelp, setShowHelp] = useState(false); // "What is this?" help modal
+    // True when the builder was opened from the Shopify integration ("create a Shopify export"):
+    // locked to the Shopify format, starts on Filters (no Format step), returns to Shopify on save.
+    const [fromIntegration, setFromIntegration] = useState(false);
+    const returnShop = useRef("");
+    // Step order for the configurator. From the integration the Format step is dropped (always Shopify).
+    const stepsFor = (preset) => {
+        const base = preset === "inventory" ? ["format", "filters", "export"] : ["format", "filters", "fields", "export"];
+        return fromIntegration ? base.filter((s) => s !== "format") : base;
+    };
+
+    // Lock background scroll while the help modal is open.
+    useEffect(() => {
+        if (!showHelp) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, [showHelp]);
 
     /**
      * Extracts and memoizes all unique pricelists from products.
@@ -1315,8 +1333,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             }
 
             setSavedExports((prev) => [result.data, ...prev]);
+            if (fromIntegration) {
+                // Created from the Shopify integration → return there with the new export id so the
+                // Shopify page auto-adds it as a source on the store you came from.
+                window.location.href = `/integrations/shopify?addSource=${result.data._id}${returnShop.current ? `&shop=${encodeURIComponent(returnShop.current)}` : ""}`;
+                return;
+            }
             setCurrentConfigId(result.data._id);
             setShowSaveModal(false);
+            setActiveTab("saved"); // close the configurator too — back to the saved-exports list
             setExportStatus("Export saved!");
             setTimeout(() => setExportStatus(""), 3000);
         } catch (error) {
@@ -1374,6 +1399,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 e._id === currentConfigId ? (result.data || { ...e, ...exportConfig }) : e
             ));
             setShowSaveModal(false);
+            setActiveTab("saved"); // close the configurator too — back to the saved-exports list
             setExportStatus("Export updated!");
             setTimeout(() => setExportStatus(""), 3000);
         } catch (error) {
@@ -1490,6 +1516,31 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         setOption1Name("");
         setExportStep("format");
         setActiveTab("configure");
+    };
+
+    // Deep-link from the Shopify integration ("Create export"): open the builder locked to the
+    // Shopify format and drop straight onto Filters. We read window.location (not useSearchParams)
+    // to avoid the Suspense build requirement, then strip the params so a refresh doesn't replay.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("source") !== "shopify") return;
+        setFromIntegration(true);
+        returnShop.current = params.get("shop") || "";
+        startNewExport();
+        setExportStep("filters");
+        const url = new URL(window.location.href);
+        ["source", "shop"].forEach((k) => url.searchParams.delete(k));
+        window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Closing the builder: from the integration, go back to Shopify instead of the saved list.
+    const closeConfigurator = () => {
+        if (fromIntegration) {
+            window.location.href = `/integrations/shopify${returnShop.current ? `?shop=${encodeURIComponent(returnShop.current)}` : ""}`;
+            return;
+        }
+        setActiveTab("saved");
     };
 
     // Delete export - DELETE /nextapi/export/custom-export/:id
@@ -1711,59 +1762,169 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     return (
         <div className="min-h-screen">
             {/* ----------------------------- Header ----------------------------- */}
-            {/* Compact header — small icon + title + badge on one line, matching the Shopify / Own Sources pages. */}
-            <header className="mb-6 flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
-                    <svg className="h-5 w-5 text-[#3fd0ea]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                </div>
-                <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-xl font-bold tracking-tight text-white">Export</h1>
-                        <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
-                            Products
-                        </span>
+            {/* Compact header — icon + title + badge on one line, Help button on the right. */}
+            <header className="mb-6 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
+                        <svg className="h-5 w-5 text-[#3fd0ea]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
                     </div>
-                    <p className="truncate text-xs text-neutral-500">
-                        Build, save and share custom product exports — Shopify CSV, inventory, or your own field set.
-                    </p>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h1 className="mb-0 text-xl font-bold leading-none tracking-tight text-white">Export</h1>
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+                                Products
+                            </span>
+                        </div>
+                        <p className="mt-1.5 hidden text-xs leading-relaxed text-neutral-500 sm:block">
+                            Build, save and share custom product exports — Shopify CSV, inventory, or your own field set.
+                        </p>
+                    </div>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => setShowHelp(true)}
+                    aria-label="Open guide"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
+                >
+                    <svg className="h-4 w-4 text-[#01a0be]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+                    Guide
+                </button>
             </header>
+
+            {/* ── Help modal — "What is this page?" ── */}
+            {showHelp && (
+                <div
+                    className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6"
+                    onClick={() => setShowHelp(false)}
+                >
+                    <div
+                        className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl sm:border"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-5 py-4 sm:px-6">
+                            <h2 className="mb-0 text-base font-semibold leading-none text-white">What is the Export page?</h2>
+                            <button
+                                onClick={() => setShowHelp(false)}
+                                aria-label="Close"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6 sm:px-6">
+                            {/* Lead */}
+                            <p className="text-[15px] leading-relaxed text-neutral-200">
+                                It turns the live Patrik catalog into a{" "}
+                                <span className="font-semibold text-white">downloadable file</span> — or a{" "}
+                                <span className="font-semibold text-white">live link</span> — that you can use anywhere.
+                                Build it once, then download or re-share it whenever you need.
+                            </p>
+
+                            {/* What you can do with it */}
+                            <div>
+                                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">What you can do with it</h3>
+                                <div className="space-y-2.5">
+                                    {[
+                                        ["Import into a webshop", "Get a ready-made Shopify product CSV — variants, prices, images and tags included."],
+                                        ["Update your stock", "Export just inventory levels for a Shopify location for a quick re-stock."],
+                                        ["Feed another system", "Hand a clean product file (CSV, JSON or XML) to an ERP, marketplace or spreadsheet."],
+                                    ].map(([title, desc]) => (
+                                        <div key={title} className="flex gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3.5">
+                                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#01a0be]/15 text-[#01a0be]">
+                                                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                            </span>
+                                            <p className="text-[15px] leading-snug text-neutral-300">
+                                                <span className="font-semibold text-white">{title}.</span> {desc}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* How it works */}
+                            <div>
+                                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">How it works — 3 steps</h3>
+                                <ol className="space-y-3">
+                                    {[
+                                        ["Choose a format", "Shopify, Inventory, Simple or Detailed — each comes with sensible columns."],
+                                        ["Filter & pick fields", "Narrow which products to include (stock, price, category…) and tick exactly the columns you want."],
+                                        ["Download or save", "Grab it as CSV / JSON / XML, or save it and create an API key so another system pulls it automatically."],
+                                    ].map(([title, desc], i) => (
+                                        <li key={title} className="flex gap-3">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 font-orbitron text-sm font-bold text-[#01a0be]">{i + 1}</span>
+                                            <p className="pt-0.5 text-[15px] leading-snug text-neutral-300">
+                                                <span className="font-semibold text-white">{title}.</span> {desc}
+                                            </p>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+
+                            {/* Tip */}
+                            <div className="flex gap-3 rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] p-4">
+                                <svg className="h-5 w-5 shrink-0 text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                                <p className="text-[15px] leading-snug text-neutral-300">
+                                    <span className="font-semibold text-white">Syncing to Shopify?</span> Create a{" "}
+                                    <span className="font-medium text-[#01a0be]">Shopify</span> export here first — it defines exactly which products and fields get pushed to your store. The{" "}
+                                    <span className="font-medium text-[#01a0be]">Shopify sync</span> integration then keeps your store up to date based on it.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex shrink-0 justify-end border-t border-neutral-800 px-5 py-3.5 sm:px-6">
+                            <button
+                                onClick={() => setShowHelp(false)}
+                                className="rounded-lg bg-[#01a0be] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]"
+                            >
+                                Got it
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Configurator modal — create a new export or edit a saved one ── */}
             {activeTab === "configure" && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6">
-                    <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl">
+                <div className="fixed inset-0 z-50 flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6">
+                    <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-950 shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-6xl sm:rounded-2xl sm:border">
                         {/* Modal header */}
-                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
-                            <div className="min-w-0">
-                                <h2 className="truncate text-base font-semibold text-white">
-                                    {currentConfigId
-                                        ? `Edit ${savedExports.find(e => e._id === currentConfigId)?.name || exportName || "export"}`
-                                        : "New export"}
-                                </h2>
-                                <p className="mt-0.5 truncate text-xs text-neutral-500">Pick a format, filter products, choose fields — then download or save.</p>
+                        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-neutral-800 px-4 py-3 sm:px-6 sm:py-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10 sm:hidden">
+                                    <svg className="h-4 w-4 text-[#3fd0ea]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="mb-0 truncate text-base font-semibold leading-tight text-white">
+                                        {currentConfigId
+                                            ? `Edit ${savedExports.find(e => e._id === currentConfigId)?.name || exportName || "export"}`
+                                            : "New export"}
+                                    </h2>
+                                    <p className="mt-0.5 hidden truncate text-xs text-neutral-500 sm:block">Pick a format, filter products, choose fields — then download or save.</p>
+                                </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
                                 <button
                                     onClick={() => { setPreviewConfig(null); setPreviewSearch(''); setShowPreview(true); }}
-                                    className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                    aria-label="Preview products"
+                                    className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white sm:px-3 sm:py-1.5"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
-                                    Preview
+                                    <span className="hidden sm:inline">Preview</span>
                                     <span className="rounded-md bg-neutral-700/60 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-neutral-400">
                                         {filteredProducts.length}
                                     </span>
                                 </button>
                                 <button
-                                    onClick={() => setActiveTab("saved")}
+                                    onClick={closeConfigurator}
                                     aria-label="Close"
-                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white sm:h-8 sm:w-8"
                                 >
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
@@ -1771,12 +1932,12 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         </div>
 
                         {/* Modal body — the full step-by-step configurator */}
-                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
-                <div className="space-y-6">
+                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+                <div className="space-y-5 sm:space-y-6">
                     {/* Step Indicator */}
                     {(() => {
                         const isInventory = selectedPreset === 'inventory';
-                        const stepsOrder = isInventory ? ['format', 'filters', 'export'] : ['format', 'filters', 'fields', 'export'];
+                        const stepsOrder = stepsFor(selectedPreset);
                         const currentIdx = stepsOrder.indexOf(exportStep);
                         const activeFilterCount = [
                             filters.search, filters.stockStatus !== 'all' && filters.stockStatus,
@@ -1799,8 +1960,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
                             },
                             {
-                                id: 'fields', label: 'Fields',
-                                sub: selectedFields.length > 0 ? `${selectedFields.length} of ${currentPreset.fields.length} selected` : 'None selected',
+                                id: 'fields', label: selectedPreset === 'shopify' ? 'Variant Option' : 'Fields',
+                                sub: selectedPreset === 'shopify'
+                                    ? (option1Name ? `Option name: ${option1Name}` : 'Default: Variant')
+                                    : (selectedFields.length > 0 ? `${selectedFields.length} of ${currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]).length} selected` : 'None selected'),
                                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
                             },
                             {
@@ -1810,8 +1973,35 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             },
                         ];
                         const STEP_META = ALL_STEPS.filter(s => stepsOrder.includes(s.id));
+                        const currentStep = STEP_META[currentIdx] || STEP_META[0];
                         return (
-                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl overflow-hidden">
+                            <div>
+                                {/* Mobile progress — clear "where am I" header */}
+                                <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 sm:hidden">
+                                    <div className="mb-3 flex items-center justify-between gap-2">
+                                        <span className="font-orbitron text-xs font-bold tracking-wide text-[#01a0be]">Step {currentIdx + 1} / {stepsOrder.length}</span>
+                                        <span className="truncate text-[11px] text-neutral-500">{currentStep.sub}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#01a0be] text-white shadow-lg shadow-cyan-500/25">
+                                            {currentStep.icon}
+                                        </div>
+                                        <p className="text-sm font-semibold text-white">{currentStep.label}</p>
+                                    </div>
+                                    <div className="mt-3.5 flex gap-1.5">
+                                        {stepsOrder.map((id, i) => (
+                                            <button
+                                                key={id}
+                                                onClick={() => setExportStep(id)}
+                                                aria-label={`Go to step ${i + 1}`}
+                                                className={`h-1.5 flex-1 rounded-full transition-colors ${i < currentIdx ? 'bg-[#01a0be]/50' : i === currentIdx ? 'bg-[#01a0be]' : 'bg-neutral-700'}`}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Desktop stepper */}
+                                <div className="hidden overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60 sm:block">
                                 <div className="flex divide-x divide-neutral-800">
                                     {STEP_META.map(({ id, label, sub, icon }, i) => {
                                         const thisIdx = stepsOrder.indexOf(id);
@@ -1848,6 +2038,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         );
                                     })}
                                 </div>
+                                </div>
                             </div>
                         );
                     })()}
@@ -1856,14 +2047,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     {exportStep === 'format' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Preset Cards */}
-                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-6 border border-neutral-800">
-                                <h2 className="text-sm font-semibold text-neutral-300 uppercase tracking-wider mb-5">Export Format</h2>
+                            <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 backdrop-blur-sm sm:p-6">
+                                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-neutral-300 sm:mb-5">Export Format</h2>
                                 <div className="grid grid-cols-2 gap-3">
                                     {Object.entries(EXPORT_PRESETS).map(([key, preset]) => (
                                         <button
                                             key={key}
                                             onClick={() => handlePresetChange(key)}
-                                            className={`flex flex-col items-start gap-3 p-5 rounded-2xl border transition-all duration-200 text-left ${selectedPreset === key
+                                            className={`flex flex-col items-start gap-3 rounded-2xl border p-4 text-left transition-all duration-200 sm:p-5 ${selectedPreset === key
                                                 ? 'bg-[#01a0be]/10 border-[#01a0be]/50 shadow-lg shadow-[#01a0be]/10'
                                                 : 'bg-neutral-800/50 border-neutral-700/40 hover:bg-neutral-700/50 hover:border-neutral-600/60'
                                             }`}
@@ -1873,7 +2064,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             </div>
                                             <div>
                                                 <div className={`font-semibold text-sm ${selectedPreset === key ? 'text-white' : 'text-neutral-300'}`}>{preset.name}</div>
-                                                <div className="text-xs text-neutral-500 mt-0.5 leading-relaxed">{preset.description}</div>
+                                                <div className="mt-0.5 hidden text-xs leading-relaxed text-neutral-500 sm:block">{preset.description}</div>
                                             </div>
                                             {selectedPreset === key && (
                                                 <span className="text-xs text-cyan-400 font-medium">Selected ✓</span>
@@ -2039,8 +2230,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             {/* Unified filter card */}
                             <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
                                 {/* Header */}
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
-                                    <div className="flex items-center gap-3">
+                                <div className="flex items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                                    <div className="flex min-w-0 items-center gap-2.5">
                                         <h2 className="text-sm font-semibold text-white">Filters</h2>
                                         {(() => {
                                             const n = [
@@ -2053,20 +2244,20 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 filters.showNew, filters.showRecommended, filters.excludeCloseOut,
                                             ].filter(Boolean).length;
                                             return n > 0 ? (
-                                                <span className="text-xs bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium">{n} active</span>
+                                                <span className="shrink-0 rounded-full border border-cyan-500/20 bg-cyan-500/15 px-2 py-0.5 text-xs font-medium text-cyan-400">{n} active</span>
                                             ) : null;
                                         })()}
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <span className="text-xs tabular-nums">
+                                    <div className="flex shrink-0 items-center gap-4">
+                                        <span className="hidden text-xs tabular-nums sm:inline">
                                             <span className="text-white font-semibold">{filteredProducts.length}</span>
                                             <span className="text-neutral-600"> / {initialProducts.length} products</span>
                                         </span>
-                                        <button onClick={clearFilters} className="text-xs text-neutral-500 hover:text-red-400 transition-colors font-medium">Reset all</button>
+                                        <button onClick={clearFilters} className="text-xs font-medium text-neutral-500 transition-colors hover:text-red-400">Reset all</button>
                                     </div>
                                 </div>
 
-                                <div className="p-5 space-y-5">
+                                <div className="space-y-5 p-4 sm:p-5">
                                     {/* Stock + Images */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
@@ -2123,16 +2314,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         </div>
                                         <div className="space-y-2">
                                             <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Tags</p>
-                                            <div className="flex gap-1.5">
+                                            <div className="grid grid-cols-3 gap-1.5">
                                                 {[
                                                     { key: "showNew", label: "New", icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" },
                                                     { key: "showRecommended", label: "Recommended", icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" },
                                                     { key: "excludeCloseOut", label: "Excl. Close Out", icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" },
                                                 ].map(({ key, label, icon }) => (
                                                     <button key={key} onClick={() => setFilters(prev => ({ ...prev, [key]: !prev[key] }))}
-                                                        className={`flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all flex-1 justify-center ${filters[key] ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
+                                                        className={`flex flex-col items-center justify-center gap-1.5 px-1 py-3 rounded-xl text-center text-[11px] font-medium leading-tight transition-all ${filters[key] ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
                                                         <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} /></svg>
-                                                        <span className="truncate">{label}</span>
+                                                        <span className="whitespace-nowrap">{label}</span>
                                                     </button>
                                                 ))}
                                             </div>
@@ -2145,13 +2336,13 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         {/* Custom Categories Tree — full width */}
                         {availableAiExports.length > 0 && (
                             <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                                <div className="px-6 py-4 border-b border-neutral-800">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
+                                <div className="border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex min-w-0 items-center gap-2.5">
                                             <svg className="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                                             </svg>
-                                            <h2 className="text-sm font-semibold text-white">Custom Categories</h2>
+                                            <h2 className="truncate text-sm font-semibold text-white">Custom Categories</h2>
                                             {filters.aiCategory.length > 0 && (
                                                 <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
                                                     {filters.aiCategory.length === 1
@@ -2274,8 +2465,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         {/* Product Category chips — dynamic, only categories still present after other filters */}
                         {availableCategories.length > 0 && (
                             <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
-                                    <div className="flex items-center gap-3">
+                                <div className="flex items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                                    <div className="flex min-w-0 items-center gap-2.5">
                                         <svg className="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                         </svg>
@@ -2327,30 +2518,32 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             Only the Variant Option Name (below) stays editable. */}
                         {selectedPreset !== 'shopify' && (
                         <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                            <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-800">
-                                <div>
-                                    <h2 className="text-sm font-semibold text-white">Select Fields</h2>
-                                    <p className="text-xs text-neutral-500 mt-0.5">Choose which columns to include in your export</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <span className="text-xs text-neutral-500">{selectedFields.length} / {currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]).length} selected</span>
-                                    <div className="flex gap-3">
+                            <div className="border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-5">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <h2 className="text-sm font-semibold text-white">Select Fields</h2>
+                                        <p className="mt-0.5 hidden text-xs text-neutral-500 sm:block">Choose which columns to include in your export</p>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+                                        <span className="whitespace-nowrap text-xs text-neutral-500">
+                                            <span className="font-medium text-neutral-300">{selectedFields.length}</span> / {currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]).length}
+                                        </span>
                                         <button
                                             onClick={() => setSelectedFields(currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]))}
-                                            className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
+                                            className="whitespace-nowrap text-xs font-medium text-cyan-400 transition-colors hover:text-cyan-300"
                                         >
                                             Select all
                                         </button>
                                         <button
                                             onClick={() => setSelectedFields([])}
-                                            className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+                                            className="text-xs text-neutral-500 transition-colors hover:text-neutral-300"
                                         >
                                             Clear
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="p-6">
+                            <div className="p-4 sm:p-6">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                                     {currentPreset.fields.filter(f => !AI_FIELD_KEYS.has(f.key) || (availableAiExports.length > 0 && filters.aiExportId !== "all")).map((field) => {
                                         const isSelected = field.group
@@ -2360,7 +2553,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         <div key={field.key} className="relative group/field">
                                             <button
                                                 onClick={() => toggleField(field)}
-                                                className={`w-full flex items-center gap-2 px-3 py-2.5 pr-8 rounded-xl text-sm transition-all ${isSelected
+                                                className={`w-full flex items-center gap-2 px-3 py-2.5 pr-3 sm:pr-8 rounded-xl text-sm transition-all ${isSelected
                                                         ? "bg-[#01a0be]/15 border border-[#01a0be]/50 text-white"
                                                         : "bg-neutral-800/50 border border-neutral-700/30 text-neutral-400 hover:text-white hover:border-neutral-600"
                                                     }`}
@@ -2377,7 +2570,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             {/* Info button */}
                                             <button
                                                 onClick={e => { e.stopPropagation(); setFieldInfoModal(field); }}
-                                                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md flex items-center justify-center text-neutral-700 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all opacity-0 group-hover/field:opacity-100"
+                                                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md hidden sm:flex items-center justify-center text-neutral-700 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all opacity-0 group-hover/field:opacity-100"
                                                 title="Field details"
                                             >
                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -2392,19 +2585,19 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                         {/* Option1 Name customization — shown when option1 fields are selected */}
                         {selectedFields.includes('option1_name') && (
-                            <div className="mt-4 bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                                <div className="px-6 py-4 border-b border-neutral-800">
+                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
+                                <div className="border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
                                     <div className="flex items-center gap-2">
-                                        <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                         </svg>
                                         <h2 className="text-sm font-semibold text-white">Variant Option Name</h2>
                                     </div>
-                                    <p className="text-xs text-neutral-500 mt-1.5">
+                                    <p className="text-xs text-neutral-500 mt-1.5 leading-relaxed">
                                         This is Shopify&apos;s <span className="text-neutral-400 font-medium">Option1 Name</span> — the label for the attribute that tells your variants apart (e.g. <span className="text-neutral-400">Size</span>, <span className="text-neutral-400">Length</span>, <span className="text-neutral-400">Color</span>). Shopify pairs it with each variant&apos;s own value (its size or model), so one product reads like <span className="text-neutral-400">Size: 77</span>. It applies to every product in this export.
                                     </p>
                                 </div>
-                                <div className="p-5">
+                                <div className="p-4 sm:p-5">
                                     <input
                                         type="text"
                                         value={option1Name}
@@ -2450,12 +2643,13 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 </div>
                             </div>
 
-                            {/* Download */}
+                            {/* Download — hidden when creating a source from the Shopify integration */}
+                            {!fromIntegration && (
                             <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
-                                    <div>
+                                <div className="flex items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                                    <div className="min-w-0">
                                         <h2 className="text-sm font-semibold text-white">Download</h2>
-                                        <p className="text-xs text-neutral-500 mt-0.5">{filteredProducts.length} products · {totalRows} rows{selectedPreset === 'inventory' ? ` · ${inventoryLocationName || 'No location'}` : ` · ${selectedFields.length} fields`}</p>
+                                        <p className="truncate text-xs text-neutral-500 mt-0.5">{filteredProducts.length} products · {totalRows} rows{selectedPreset === 'inventory' ? ` · ${inventoryLocationName || 'No location'}` : ` · ${selectedFields.length} fields`}</p>
                                     </div>
                                     {exportStatus && (
                                         <span className={`text-sm font-medium px-3 py-1.5 rounded-lg ${exportStatus.includes("!") ? "bg-green-500/15 text-green-400" : "bg-amber-500/15 text-amber-400"}`}>
@@ -2489,243 +2683,27 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 </div>
                                                 <div className="text-center">
                                                     <div className="font-semibold">{meta.label}</div>
-                                                    <div className="text-xs opacity-60 mt-0.5">{fmt === 'csv' ? 'Spreadsheet' : fmt === 'json' ? 'Structured data' : 'Markup'}</div>
+                                                    <div className="mt-0.5 hidden text-xs opacity-60 sm:block">{fmt === 'csv' ? 'Spreadsheet' : fmt === 'json' ? 'Structured data' : 'Markup'}</div>
                                                 </div>
                                             </button>
                                         );
                                     })}
                                 </div>
                             </div>
-
-                            {/* Preview */}
-                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-6 border border-neutral-800">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-lg font-semibold text-white">Preview</h2>
-                                    {filters.aiExportId !== "all" && filters.aiCategory.length > 0 && (
-                                        <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                                            <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                            </svg>
-                                            {filters.aiCategory.length === 1 ? filters.aiCategory[0].split(" / ").map((part, i, arr) => (
-                                                <span key={i} className="flex items-center gap-1">
-                                                    {i > 0 && <span className="text-neutral-700">›</span>}
-                                                    <span className={i === arr.length - 1 ? "text-purple-300 font-medium" : "text-neutral-600"}>{part}</span>
-                                                </span>
-                                            )) : <span className="text-purple-300 font-medium">{filters.aiCategory.length} categories</span>}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Sub-category breakdown — clickable chips when a parent node is selected */}
-                                {filters.aiExportId !== "all" && (() => {
-                                    const prefix = filters.aiCategory.length === 1 ? filters.aiCategory[0] : null;
-                                    const prefixDepth = prefix ? prefix.split(" / ").length : 0;
-                                    const subCounts = new Map();
-
-                                    filteredProducts.forEach(p => {
-                                        const cat = p.ai_categories?.find(c => c.exportId === filters.aiExportId);
-                                        if (!cat?.categoryName) return;
-                                        let bucketPath;
-                                        if (!prefix) {
-                                            bucketPath = cat.categoryName.split(" / ")[0];
-                                        } else if (cat.categoryName === prefix) {
-                                            bucketPath = prefix;
-                                        } else if (cat.categoryName.startsWith(prefix + " / ")) {
-                                            const parts = cat.categoryName.split(" / ");
-                                            bucketPath = parts.slice(0, prefixDepth + 1).join(" / ");
-                                        } else {
-                                            return;
-                                        }
-                                        subCounts.set(bucketPath, (subCounts.get(bucketPath) || 0) + 1);
-                                    });
-
-                                    if (subCounts.size <= 1) return null;
-
-                                    const sorted = Array.from(subCounts.entries()).sort((a, b) => b[1] - a[1]);
-                                    return (
-                                        <div className="flex flex-wrap gap-1.5 mb-4">
-                                            {sorted.map(([path, count]) => {
-                                                const label = path.split(" / ").pop();
-                                                const isActive = filters.aiCategory.includes(path);
-                                                const isParentExact = prefix && path === prefix;
-                                                return (
-                                                    <button
-                                                        key={path}
-                                                        onClick={() => setFilters(prev => ({
-                                                            ...prev,
-                                                            aiCategory: isActive ? prev.aiCategory.filter(p => p !== path) : [...prev.aiCategory, path]
-                                                        }))}
-                                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                                                            isActive
-                                                                ? "bg-purple-500/20 border-purple-500/30 text-purple-300"
-                                                                : "bg-neutral-800/60 border-neutral-700/40 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700/60 hover:border-neutral-600/50"
-                                                        }`}
-                                                    >
-                                                        {isParentExact && <span className="text-neutral-600">·</span>}
-                                                        <span>{label}</span>
-                                                        <span className={`tabular-nums ${isActive ? "text-purple-400/70" : "text-neutral-600"}`}>{count}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                })()}
-
-                                <div className="overflow-x-auto rounded-xl border border-neutral-800">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="bg-neutral-800/80">
-                                                {/* AI Category column — shown when an export is selected */}
-                                                {filters.aiExportId !== "all" && (
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-purple-400/70 uppercase tracking-wider whitespace-nowrap">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                                            </svg>
-                                                            Category
-                                                        </div>
-                                                    </th>
-                                                )}
-                                                {currentPreset.fields
-                                                    .filter((f) => selectedFields.includes(f.key))
-                                                    .slice(0, filters.aiExportId !== "all" ? 4 : 5)
-                                                    .map((field) => (
-                                                        <th key={field.key} className="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider whitespace-nowrap">
-                                                            {field.label}
-                                                        </th>
-                                                    ))}
-                                                {selectedFields.length > (filters.aiExportId !== "all" ? 4 : 5) && (
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500">
-                                                        +{selectedFields.length - (filters.aiExportId !== "all" ? 4 : 5)} more
-                                                    </th>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-neutral-700/50">
-                                            {filteredProducts.slice(0, previewLimit).map((product, idx) => {
-                                                const variant = product.child_products?.[0] || {};
-                                                const priceInfo = getPriceFromPriority(variant);
-                                                const aiCat = filters.aiExportId !== "all"
-                                                    ? product.ai_categories?.find(c => c.exportId === filters.aiExportId)
-                                                    : null;
-                                                return (
-                                                    <tr key={product._id || idx} className="hover:bg-neutral-700/20">
-                                                        {/* AI Category breadcrumb cell */}
-                                                        {filters.aiExportId !== "all" && (
-                                                            <td className="px-4 py-3 whitespace-nowrap max-w-[200px]">
-                                                                {aiCat?.categoryName ? (() => {
-                                                                    const parts = aiCat.categoryName.split(" / ").map(p => p.trim());
-                                                                    const selectedPrefix = Array.isArray(filters.aiCategory) && filters.aiCategory.length === 1
-                                                                        ? filters.aiCategory[0]
-                                                                        : (!Array.isArray(filters.aiCategory) && filters.aiCategory && filters.aiCategory !== "all" ? filters.aiCategory : null);
-                                                                    const prefixParts = selectedPrefix ? selectedPrefix.split(" / ").map(p => p.trim()) : [];
-                                                                    const deeperParts = parts.slice(prefixParts.length);
-
-                                                                    if (!selectedPrefix) {
-                                                                        // Show full path, leaf highlighted
-                                                                        return (
-                                                                            <div className="flex items-center gap-0.5 flex-wrap">
-                                                                                {parts.map((p, i) => (
-                                                                                    <span key={i} className="flex items-center gap-0.5">
-                                                                                        {i > 0 && <span className="text-neutral-700 text-xs">›</span>}
-                                                                                        <span className={`text-xs ${i === parts.length - 1 ? "text-neutral-200" : "text-neutral-500"}`}>{p}</span>
-                                                                                    </span>
-                                                                                ))}
-                                                                            </div>
-                                                                        );
-                                                                    }
-
-                                                                    if (deeperParts.length === 0) {
-                                                                        // Product is exactly at the selected node
-                                                                        return <span className="text-xs text-purple-300 font-medium">{parts[parts.length - 1]}</span>;
-                                                                    }
-
-                                                                    // Prefix dimmed, deeper path highlighted
-                                                                    return (
-                                                                        <div className="flex items-center gap-0.5 flex-wrap">
-                                                                            {prefixParts.map((p, i) => (
-                                                                                <span key={`pre-${i}`} className="flex items-center gap-0.5">
-                                                                                    {i > 0 && <span className="text-neutral-800 text-xs">›</span>}
-                                                                                    <span className="text-xs text-neutral-700">{p}</span>
-                                                                                </span>
-                                                                            ))}
-                                                                            {deeperParts.map((p, i) => (
-                                                                                <span key={`deep-${i}`} className="flex items-center gap-0.5">
-                                                                                    <span className="text-neutral-600 text-xs">›</span>
-                                                                                    <span className={`text-xs ${i === deeperParts.length - 1 ? "text-purple-300 font-semibold" : "text-neutral-400"}`}>{p}</span>
-                                                                                </span>
-                                                                            ))}
-                                                                        </div>
-                                                                    );
-                                                                })() : (
-                                                                    <span className="text-neutral-700 text-xs">—</span>
-                                                                )}
-                                                            </td>
-                                                        )}
-                                                        {currentPreset.fields
-                                                            .filter((f) => selectedFields.includes(f.key))
-                                                            .slice(0, filters.aiExportId !== "all" ? 4 : 5)
-                                                            .map((field) => {
-                                                                let value = getFieldValue(field.key, product, variant, 0, product.images?.[0] || "", priceInfo, false, false);
-                                                                if (typeof value === "number") value = value.toString();
-                                                                if (value && value.length > 30) value = value.slice(0, 30) + "...";
-                                                                return (
-                                                                    <td key={field.key} className="px-4 py-3 text-neutral-300 whitespace-nowrap">
-                                                                        {value || <span className="text-neutral-600">—</span>}
-                                                                    </td>
-                                                                );
-                                                            })}
-                                                        {selectedFields.length > (filters.aiExportId !== "all" ? 4 : 5) && (
-                                                            <td className="px-4 py-3 text-neutral-600">...</td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                            {filteredProducts.length === 0 && (
-                                                <tr>
-                                                    <td colSpan={Math.min(selectedFields.length + (filters.aiExportId !== "all" ? 1 : 0), 6) || 1} className="px-4 py-12 text-center text-neutral-500">
-                                                        No products match your filters
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {filteredProducts.length > previewLimit && (
-                                    <div className="flex items-center justify-between mt-4">
-                                        <p className="text-sm text-neutral-500">
-                                            Showing {Math.min(previewLimit, filteredProducts.length)} of {filteredProducts.length} products
-                                        </p>
-                                        <button
-                                            onClick={() => setPreviewLimit((prev) => prev + 10)}
-                                            className="flex items-center gap-2 text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
-                                        >
-                                            Load more
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                )}
-                                {filteredProducts.length > 0 && filteredProducts.length <= previewLimit && (
-                                    <p className="text-sm text-neutral-500 mt-3">
-                                        Showing all {filteredProducts.length} products
-                                    </p>
-                                )}
-                            </div>
+                            )}
                         </div>
                     )}
 
-                    {/* Bottom Navigation */}
-                    <div className="flex items-center justify-between pt-4 border-t border-neutral-800/60">
+                    {/* Bottom Navigation — sticky so it's always reachable, full-width on mobile */}
+                    <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex items-center justify-between gap-3 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:-mb-5 sm:px-6 sm:py-4">
                         <button
                             onClick={() => {
-                                const steps = selectedPreset === 'inventory' ? ['format', 'filters', 'export'] : ['format', 'filters', 'fields', 'export'];
+                                const steps = stepsFor(selectedPreset);
                                 const idx = steps.indexOf(exportStep);
                                 if (idx > 0) setExportStep(steps[idx - 1]);
                             }}
-                            disabled={exportStep === 'format'}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-0 disabled:pointer-events-none bg-neutral-800/80 hover:bg-neutral-700/80 text-neutral-300 hover:text-white border border-neutral-800"
+                            disabled={exportStep === stepsFor(selectedPreset)[0]}
+                            className="flex shrink-0 items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-800/80 px-4 py-2.5 text-sm font-medium text-neutral-300 transition-all hover:bg-neutral-700/80 hover:text-white disabled:pointer-events-none disabled:opacity-0"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -2736,24 +2714,24 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         {exportStep !== 'export' ? (
                             <button
                                 onClick={() => {
-                                    const steps = selectedPreset === 'inventory' ? ['format', 'filters', 'export'] : ['format', 'filters', 'fields', 'export'];
+                                    const steps = stepsFor(selectedPreset);
                                     const idx = steps.indexOf(exportStep);
                                     if (idx < steps.length - 1) setExportStep(steps[idx + 1]);
                                 }}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-[#01a0be] hover:bg-[#0bb6d4] text-white shadow-md shadow-cyan-500/20"
+                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-cyan-500/20 transition-all hover:bg-[#0bb6d4] sm:flex-none"
                             >
                                 {exportStep === 'format' && 'Set Filters'}
                                 {exportStep === 'filters' && selectedPreset === 'inventory' ? 'Review & Export' : ''}
-                                {exportStep === 'filters' && selectedPreset !== 'inventory' ? 'Choose Fields' : ''}
+                                {exportStep === 'filters' && selectedPreset !== 'inventory' ? (selectedPreset === 'shopify' ? 'Variant Option' : 'Choose Fields') : ''}
                                 {exportStep === 'fields' && 'Review & Export'}
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </button>
                         ) : (
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-1 items-center justify-end gap-2 sm:flex-none">
                                 {currentConfigId && (
-                                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#01a0be]/25 bg-[#01a0be]/10 px-2.5 py-1.5 text-xs font-medium text-[#01a0be]">
+                                    <span className="hidden items-center gap-1.5 rounded-lg border border-[#01a0be]/25 bg-[#01a0be]/10 px-2.5 py-1.5 text-xs font-medium text-[#01a0be] sm:inline-flex">
                                         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
@@ -2772,7 +2750,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <button
                                     onClick={() => setShowSaveModal(true)}
                                     disabled={selectedPreset !== 'inventory' && selectedFields.length === 0}
-                                    className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-800/50 disabled:cursor-not-allowed border border-neutral-700 hover:border-neutral-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all text-sm"
+                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:border-neutral-600 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-800/50 sm:flex-none"
                                 >
                                     <SaveIcon /> Save Config
                                 </button>
@@ -2788,28 +2766,25 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             {/* ── Saved exports — the page body ── */}
                 <div className="space-y-6">
                     {/* Header Bar */}
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                            <h2 className="text-xl font-semibold text-white">Saved exports</h2>
-                            <p className="text-sm text-neutral-400 mt-1">Open an export for details, downloads and sharing — or create a new one.</p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <h2 className="text-lg font-semibold text-white">Saved exports</h2>
+                        <div className="flex w-full items-center gap-2 sm:w-auto">
                             {exportStatus && (
-                                <span className={`text-sm font-medium ${exportStatus.includes("!") ? "text-green-400" : "text-amber-400"}`}>
+                                <span className={`mr-auto text-sm font-medium sm:mr-0 ${exportStatus.includes("!") ? "text-green-400" : "text-amber-400"}`}>
                                     {exportStatus}
                                 </span>
                             )}
                             <button
                                 onClick={loadSavedExports}
                                 disabled={isLoadingExports}
-                                className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:py-1.5"
                             >
                                 <RefreshIcon />
                                 {isLoadingExports ? "Loading..." : "Refresh"}
                             </button>
                             <button
                                 onClick={startNewExport}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#0bb6d4]"
+                                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#0bb6d4] sm:flex-none sm:py-1.5"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2827,8 +2802,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
                         </div>
                     ) : savedExports.length === 0 ? (
-                        <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 py-20 px-8">
-                            <div className="flex flex-col items-center justify-center text-center max-w-sm mx-auto">
+                        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 px-6 py-12 backdrop-blur-sm sm:py-16">
+                            <div className="mx-auto flex max-w-sm flex-col items-center justify-center text-center">
                                 <div className="relative mb-6">
                                     <div className="w-20 h-20 bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl flex items-center justify-center border border-neutral-800 shadow-xl">
                                         <svg className="w-9 h-9 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2856,7 +2831,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         </div>
                     ) : (
                         /* Minimal list — one row per export, details & actions live in the modal */
-                        <div className="overflow-hidden rounded-2xl border border-neutral-800">
+                        <div className="overflow-x-auto rounded-2xl border border-neutral-800">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-neutral-800 bg-neutral-900/60 text-left text-xs uppercase tracking-wider text-neutral-500">
@@ -2909,18 +2884,20 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); loadExportConfig(config); }}
                                                             title="Edit this export in the configurator"
-                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                                            aria-label="Edit"
+                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white sm:px-3"
                                                         >
                                                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                             </svg>
-                                                            Edit
+                                                            <span className="hidden sm:inline">Edit</span>
                                                         </button>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); setDetailConfig(config); }}
-                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                                            aria-label="Details"
+                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white sm:px-3"
                                                         >
-                                                            Details
+                                                            <span className="hidden sm:inline">Details</span>
                                                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                                             </svg>
