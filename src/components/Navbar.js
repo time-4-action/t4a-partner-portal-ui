@@ -141,6 +141,13 @@ function getNavLinks(user) {
           icon: "shopify",
           badge: "Alpha",
         },
+        {
+          href: "/integrations/own-sources",
+          label: "Own sources",
+          description: "Push your own brand feeds",
+          icon: "integrations",
+          badge: "Alpha",
+        },
       ],
     });
   } else {

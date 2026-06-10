@@ -26,7 +26,8 @@
 
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Children, isValidElement, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 
 // Client-only "now" snapshot (server = 0, client = a single cached timestamp) — lets us
 // flag future-dated pricelists without a hydration mismatch, a setState-in-effect, or an
@@ -122,6 +123,7 @@ const SYNC_FLAGS = [
   { key: "syncNewProducts", label: "New products", desc: "Create products that don't exist in your store yet." },
   { key: "syncPrices", label: "Prices", desc: "Keep variant prices in step with your pricelists." },
   { key: "syncDescriptions", label: "Descriptions", desc: "Sync titles, copy and product fields." },
+  { key: "syncTags", label: "Tags", desc: "Push tags — for Patrik sources these come from its AI categorization." },
   { key: "syncImages", label: "Images", desc: "Push product and variant images.", slow: true },
 ];
 
@@ -380,19 +382,186 @@ function ToggleSwitch({ checked, onChange, ariaLabel }) {
   );
 }
 
+/**
+ * Themed dropdown that keeps the native-<select> API (accepts <option> children and fires
+ * onChange({ target: { value } })) but renders a fully-styled, theme-matched menu instead of
+ * the OS's grey native popup. Accessible: real listbox semantics, click-outside + Escape to
+ * close, and arrow / Home / End / Enter keyboard navigation.
+ */
 function Select({ value, onChange, ariaLabel, disabled, children }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1); // keyboard-highlighted index
+  const [rect, setRect] = useState(null); // button viewport rect → fixed-positioned menu
+  const rootRef = useRef(null);
+  const btnRef = useRef(null);
+  const listRef = useRef(null);
+  const listId = useId();
+
+  // Flatten <option> children into plain descriptors so we can render our own rows.
+  const options = Children.toArray(children)
+    .filter(isValidElement)
+    .map((el) => ({
+      value: el.props.value ?? "",
+      label: typeof el.props.children === "string" ? el.props.children : String(el.props.children ?? ""),
+      disabled: !!el.props.disabled,
+    }));
+
+  const selected = options.find((o) => String(o.value) === String(value ?? ""));
+  const isPlaceholder = !selected || selected.value === "";
+
+  // While open: close on outside click (the menu is portaled to <body>, so check both refs),
+  // and keep the menu pinned to the button as the page scrolls or resizes.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      const inRoot = rootRef.current?.contains(e.target);
+      const inList = listRef.current?.contains(e.target);
+      if (!inRoot && !inList) setOpen(false);
+    };
+    const sync = () => {
+      if (btnRef.current) setRect(btnRef.current.getBoundingClientRect());
+    };
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("scroll", sync, true);
+    window.addEventListener("resize", sync);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("scroll", sync, true);
+      window.removeEventListener("resize", sync);
+    };
+  }, [open]);
+
+  // Open the menu, highlighting the current selection (or the first selectable row).
+  const openMenu = () => {
+    const cur = options.findIndex((o) => String(o.value) === String(value ?? ""));
+    setActive(cur >= 0 ? cur : options.findIndex((o) => !o.disabled));
+    if (btnRef.current) setRect(btnRef.current.getBoundingClientRect());
+    setOpen(true);
+  };
+
+  const commit = (opt) => {
+    if (opt.disabled) return;
+    onChange?.({ target: { value: opt.value } });
+    setOpen(false);
+  };
+
+  const step = (dir) => {
+    setActive((cur) => {
+      let i = cur;
+      for (let n = 0; n < options.length; n++) {
+        i = (i + dir + options.length) % options.length;
+        if (!options[i].disabled) return i;
+      }
+      return cur;
+    });
+  };
+
+  const onKeyDown = (e) => {
+    if (disabled) return;
+    if (!open) {
+      if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(e.key)) {
+        e.preventDefault();
+        openMenu();
+      }
+      return;
+    }
+    switch (e.key) {
+      case "Escape":
+        e.preventDefault();
+        setOpen(false);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        step(1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        step(-1);
+        break;
+      case "Home":
+        e.preventDefault();
+        setActive(options.findIndex((o) => !o.disabled));
+        break;
+      case "End":
+        e.preventDefault();
+        setActive(options.map((o) => !o.disabled).lastIndexOf(true));
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        if (options[active]) commit(options[active]);
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
-    <div className="relative">
-      <select
-        value={value ?? ""}
-        onChange={onChange}
+    <div ref={rootRef} className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
         aria-label={ariaLabel}
         disabled={disabled}
-        className="w-full appearance-none rounded-xl border border-neutral-700 bg-neutral-900/60 backdrop-blur-sm px-4 py-3.5 pr-10 text-sm text-white focus:border-[#01a0be]/50 focus:outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        onClick={() => !disabled && (open ? setOpen(false) : openMenu())}
+        onKeyDown={onKeyDown}
+        className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-neutral-900/60 px-4 py-3.5 text-left text-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+          open ? "border-[#01a0be]/60 ring-1 ring-[#01a0be]/20" : "border-neutral-700 hover:border-neutral-600"
+        }`}
       >
-        {children}
-      </select>
-      <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+        <span className={`truncate ${isPlaceholder ? "text-neutral-500" : "text-white"}`}>
+          {selected ? selected.label : options[0]?.label ?? ""}
+        </span>
+        <ChevronDownIcon
+          className={`h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-200 ${open ? "rotate-180 text-[#01a0be]" : ""}`}
+        />
+      </button>
+
+      {open && rect && typeof document !== "undefined" && createPortal(
+        <ul
+          id={listId}
+          ref={listRef}
+          role="listbox"
+          aria-label={ariaLabel}
+          style={{
+            position: "fixed",
+            top: rect.bottom + 8,
+            left: rect.left,
+            width: rect.width,
+          }}
+          className="animate-dropdown z-[999] max-h-64 overflow-auto rounded-xl border border-neutral-700 bg-neutral-900/95 p-1 shadow-2xl shadow-black/50 backdrop-blur-xl"
+        >
+          {options.map((o, i) => {
+            const isSel = String(o.value) === String(value ?? "");
+            const isActive = i === active;
+            return (
+              <li
+                key={`${o.value}-${i}`}
+                role="option"
+                aria-selected={isSel}
+                aria-disabled={o.disabled || undefined}
+                onClick={() => commit(o)}
+                onMouseEnter={() => !o.disabled && setActive(i)}
+                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                  o.disabled
+                    ? "cursor-default text-neutral-600"
+                    : isActive
+                      ? "bg-[#01a0be]/15 text-white"
+                      : "text-neutral-300"
+                }`}
+              >
+                <span className="truncate">{o.label}</span>
+                {isSel && !o.disabled && <CheckIcon className="h-4 w-4 shrink-0 text-[#01a0be]" />}
+              </li>
+            );
+          })}
+        </ul>,
+        document.body
+      )}
     </div>
   );
 }
@@ -426,6 +595,9 @@ export default function ShopifyIntegrationPage({
   // Distinct catalogue pricelists [{ name, vat, valid_from }] (GET /shopify/pricelists). Drives
   // each store's pricing-panel priority list with REAL names — replaces the old mock template.
   initialPricelists = [],
+  // The user's Own Source feeds (GET /external/sources) — offered as an alternative push scope
+  // ("Own source" vs a Patrik export config) in each store's Products-to-sync selector.
+  initialFeeds = [],
 }) {
   const isDemo = initialConnections === null;
   const seedConnections = isDemo ? [MOCK_CONNECTION, MOCK_CONNECTION_2] : initialConnections;
@@ -504,12 +676,14 @@ export default function ShopifyIntegrationPage({
     setConnections((list) => list.map((c) => (connKey(c) === key ? { ...c, ...patch } : c)));
 
   // Drop a disconnected store and re-point the selection (or fall back to the connect screen).
-  const handleDisconnected = (key) => {
+  // `notice` is overridable so a lazily-detected uninstall (vs an explicit disconnect) can
+  // explain itself differently.
+  const handleDisconnected = (key, notice = { tone: "success", text: "Store disconnected." }) => {
     const next = connections.filter((c) => connKey(c) !== key);
     setConnections(next);
     if (next.length === 0) setAdding(true);
     else if (key === selectedKey) setSelectedKey(connKey(next[0]));
-    setNotice({ tone: "success", text: "Store disconnected." });
+    setNotice(notice);
   };
 
   const selectStore = (key) => {
@@ -529,28 +703,22 @@ export default function ShopifyIntegrationPage({
   return (
     <div className="pb-40 sm:pb-32">
       {/* ----------------------------- Header ----------------------------- */}
-      <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-          {/* Brand mark — official Shopify logo on a glassy tile lit by a soft green halo */}
-          <div className="relative shrink-0">
-            <div aria-hidden="true" className="absolute -inset-3 rounded-[1.75rem] bg-[#95BF47]/20 blur-2xl" />
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20 sm:h-[4.5rem] sm:w-[4.5rem]">
-              <ShopifyLogo className="h-9 w-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)] sm:h-10 sm:w-10" />
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-[#01a0be]">
-              <BagIcon className="h-3.5 w-3.5" />
+      {/* Compact header — small icon + title + badge on one line, matching the Export / Own Sources pages. */}
+      <header className="mb-6 flex min-w-0 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#95BF47]/30 bg-[#95BF47]/10">
+          <ShopifyLogo className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-white">Shopify</h1>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
+              <BagIcon className="h-3 w-3" />
               Integration
-            </div>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              <span className="bg-gradient-to-r from-[#95BF47] via-[#5fae46] to-[#01a0be] bg-clip-text text-transparent">Shopify</span>
-            </h1>
-            <p className="mt-3 max-w-2xl text-neutral-400">
-              One-way push of stock, products, prices and images from the portal straight to your Shopify stores.
-            </p>
+            </span>
           </div>
+          <p className="truncate text-xs text-neutral-500">
+            One-way push of stock, products, prices and images from the portal straight to your Shopify stores.
+          </p>
         </div>
       </header>
 
@@ -570,7 +738,7 @@ export default function ShopifyIntegrationPage({
                   aria-current={active ? "page" : undefined}
                   className={`group relative flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all ${
                     active
-                      ? "bg-gradient-to-br from-neutral-800 to-neutral-800/30 shadow-lg ring-1 ring-[#01a0be]/40"
+                      ? "bg-gradient-to-br from-neutral-800 to-neutral-800/30 shadow-lg"
                       : "hover:bg-neutral-800/50"
                   }`}
                 >
@@ -656,6 +824,7 @@ export default function ShopifyIntegrationPage({
           key={selectedKey}
           connection={selected}
           exportOptions={initialExports}
+          feedOptions={initialFeeds}
           pricelists={initialPricelists}
           onNotice={setNotice}
           onDisconnected={handleDisconnected}
@@ -932,7 +1101,7 @@ function ConnectStore({ canCancel, onCancel, onNotice, initialDomain = "" }) {
 /*  ConnectionPanel — full management UI for ONE connected store               */
 /* -------------------------------------------------------------------------- */
 
-function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, onNotice, onDisconnected, onPatch }) {
+function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions = [], pricelists, onNotice, onDisconnected, onPatch }) {
   const isDemo = !initialConn._id;
   const myKey = connKey(initialConn);
 
@@ -945,13 +1114,57 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
     const locationId = validate
       ? (locs.some((l) => l.id === storedLoc) ? storedLoc : (locs[0]?.id ?? (isDemo ? storedLoc : null)))
       : storedLoc;
+    const validLoc = (id) => (validate ? (locs.some((l) => l.id === id) ? id : (locs[0]?.id ?? null)) : (id ?? locationId));
+    const validPubs = (ids) => (ids || []).filter((id) => (validate ? pubs.some((p) => p.id === id) : true));
+
+    // Connection-level config doubles as the default for a source that doesn't set its own (so a
+    // legacy single-scope connection migrates its ownership/toggles/pricing into its one source).
+    const base = {
+      ownership: cfg.ownership ?? "stock_only",
+      syncStock: cfg.syncStock ?? true,
+      syncNewProducts: cfg.syncNewProducts ?? false,
+      syncPrices: cfg.syncPrices ?? false,
+      syncDescriptions: cfg.syncDescriptions ?? false,
+      syncImages: cfg.syncImages ?? false,
+      syncTags: cfg.syncTags ?? true,
+      priceVatMode: cfg.priceVatMode ?? "inclusive",
+      futureDatedGuard: cfg.futureDatedGuard ?? true,
+    };
+    // Builds one source's full, panel-ready config (rich pricelistPriority, validated channels).
+    const withCfg = (s, inheritBase) => {
+      const pick = (k) => (s[k] !== undefined ? s[k] : (inheritBase ? base[k] : base[k]));
+      return {
+        type: s.type, exportConfigId: s.exportConfigId, feedId: s.feedId,
+        locationId: validLoc(s.locationId ?? locationId),
+        ownership: pick("ownership"), syncStock: pick("syncStock"), syncNewProducts: pick("syncNewProducts"),
+        syncPrices: pick("syncPrices"), syncDescriptions: pick("syncDescriptions"), syncImages: pick("syncImages"),
+        syncTags: pick("syncTags"), priceVatMode: pick("priceVatMode"), futureDatedGuard: pick("futureDatedGuard"),
+        pricelistPriority: buildPricelistPriority(pricelists, s.pricelistPriority ?? (inheritBase ? cfg.pricelistPriority : undefined)),
+        publicationIds: validPubs(s.publicationIds ?? (inheritBase ? cfg.publicationIds : [])),
+        aiExportId: s.aiExportId,
+      };
+    };
+    const scopes = (() => {
+      if (Array.isArray(cfg.scopes) && cfg.scopes.length) return cfg.scopes.map((s) => withCfg(s, false));
+      if (cfg.scope) return [withCfg({ ...cfg.scope, locationId }, true)];
+      if (cfg.exportConfigId) return [withCfg({ type: "export_config", exportConfigId: cfg.exportConfigId, locationId }, true)];
+      return [];
+    })();
+
+    // Top-level fields are the MIRROR of the active (first) source — the rich panels read these.
+    const active = scopes[0] || { ...base, pricelistPriority: buildPricelistPriority(pricelists, cfg.pricelistPriority), publicationIds: validPubs(cfg.publicationIds) };
     return {
       ...MOCK_CONNECTION.config,
       ...cfg,
-      pricelistPriority: buildPricelistPriority(pricelists, cfg.pricelistPriority),
+      ownership: active.ownership, syncStock: active.syncStock, syncNewProducts: active.syncNewProducts,
+      syncPrices: active.syncPrices, syncDescriptions: active.syncDescriptions, syncImages: active.syncImages,
+      syncTags: active.syncTags, priceVatMode: active.priceVatMode, futureDatedGuard: active.futureDatedGuard,
+      pricelistPriority: active.pricelistPriority,
+      publicationIds: active.publicationIds,
       exportConfigId: cfg.exportConfigId ?? exportOptions[0]?._id ?? null,
-      shopifyLocationId: locationId,
-      publicationIds: (cfg.publicationIds || []).filter((id) => (validate ? pubs.some((p) => p.id === id) : true)),
+      scope: cfg.scope ?? (cfg.exportConfigId ? { type: "export_config", exportConfigId: cfg.exportConfigId } : null),
+      scopes,
+      shopifyLocationId: active.locationId ?? locationId,
     };
   };
 
@@ -966,6 +1179,10 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
 
   const [config, setConfig] = useState(() => makeConfig(initialConn, isDemo ? MOCK_LOCATIONS : [], [], isDemo));
   const [savedConfig, setSavedConfig] = useState(() => makeConfig(initialConn, isDemo ? MOCK_LOCATIONS : [], [], isDemo));
+  // Which source row the config panels (ownership / what-to-sync / pricing / channels) are editing.
+  const [activeScopeIdx, setActiveScopeIdx] = useState(0);
+  // When set, the per-source config modal is open for that source index (null = closed).
+  const [editingScopeIdx, setEditingScopeIdx] = useState(null);
 
   // Sync-activity data. Real once a live connection exists (fetched from /activity); the MOCK_*
   // set is only the demo fallback.
@@ -997,9 +1214,16 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
     }, ms);
     timers.current.push(id);
   };
-  useEffect(() => () => {
-    aliveRef.current = false;
-    timers.current.forEach(clearTimeout);
+  // Reset on (re)mount, not just initialization. Under React Strict Mode (on by default in Next
+  // dev) a component is mounted → unmounted → remounted on the same fiber, so the unmount cleanup
+  // sets this false; without re-setting it true on the remount it would stay false forever and the
+  // /detail fetch below would skip setDetailLoaded(true) → stuck on "Loading locations…".
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      timers.current.forEach(clearTimeout);
+    };
   }, []);
 
   // Pulls the live sync-activity (recent runs + counts + needs-attention) for a real
@@ -1031,6 +1255,15 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
         const res = await fetch(`/nextapi/export/shopify/connection/${initialConn._id}/detail`, { cache: "no-store" });
         const data = await res.json().catch(() => ({}));
         if (cancelled || !aliveRef.current) return;
+        // The server detected the app was uninstalled in Shopify (token revoked) and marked the
+        // connection accordingly — drop it from the switcher rather than showing a dead store.
+        if (data.uninstalled) {
+          onDisconnected?.(myKey, {
+            tone: "error",
+            text: `${shopLabel(initialConn.shopDomain)} was uninstalled in Shopify — removed from your stores.`,
+          });
+          return;
+        }
         const locs = data.locations ?? [];
         const pubs = data.publications ?? [];
         const conn = data.connection ? { ...initialConn, ...data.connection } : initialConn;
@@ -1053,29 +1286,97 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Lock the page behind the per-source config modal so the wheel can't scroll the background
+  // when the modal's own scroll area reaches its edge (works with `overscroll-contain` below).
+  useEffect(() => {
+    if (editingScopeIdx === null) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [editingScopeIdx]);
+
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
 
+  /* ----- per-source config: the panels edit the SELECTED source ----- */
+  // Each source carries its OWN full push config. The rich panels below stay bound to top-level
+  // `config` (a mirror of the active source); every mutation is written straight back into the
+  // selected scope via `mirrorActive`, and selecting a source loads its config into the mirror.
+  const sourceScopes = config.scopes || [];
+  const activeIdx = Math.min(activeScopeIdx, Math.max(0, sourceScopes.length - 1));
+  const activeScope = sourceScopes[activeIdx] || null;
+  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "futureDatedGuard", "pricelistPriority", "publicationIds"];
+  const pickMirror = (c) => Object.fromEntries(MIRROR_KEYS.map((k) => [k, c[k]]));
+  // After any change to a mirrored field, copy the whole set into the active scope.
+  const mirrorActive = (c) => ({ ...c, scopes: (c.scopes || []).map((s, i) => (i === activeIdx ? { ...s, ...pickMirror(c) } : s)) });
+
   /* ----- config mutators (all route through setConfig -> mark dirty) ----- */
-  const setCfg = (patch) => setConfig((c) => ({ ...c, ...patch }));
-  const toggleFlag = (key) => setConfig((c) => ({ ...c, [key]: !c[key] }));
-  // Picking a mode richer than stock-only opts the store up to the full push, so default every
+  const setCfg = (patch) => setConfig((c) => mirrorActive({ ...c, ...patch }));
+  const toggleFlag = (key) => setConfig((c) => mirrorActive({ ...c, [key]: !c[key] }));
+  // Picking a mode richer than stock-only opts THIS source up to the full push, so default every
   // sync field ON. Only fires when leaving stock_only — switching between the two rich modes
   // preserves whatever the partner has toggled.
   const setOwnership = (v) =>
     setConfig((c) =>
-      v !== "stock_only" && c.ownership === "stock_only"
-        ? { ...c, ownership: v, syncStock: true, syncNewProducts: true, syncPrices: true, syncDescriptions: true, syncImages: true }
-        : { ...c, ownership: v }
+      mirrorActive(
+        v !== "stock_only" && c.ownership === "stock_only"
+          ? { ...c, ownership: v, syncStock: true, syncNewProducts: true, syncPrices: true, syncDescriptions: true, syncImages: true, syncTags: true }
+          : { ...c, ownership: v }
+      )
     );
-  const setVatMode = (v) => setConfig((c) => ({ ...c, priceVatMode: v }));
+  const setVatMode = (v) => setConfig((c) => mirrorActive({ ...c, priceVatMode: v }));
   const togglePublication = (id) =>
     setConfig((c) => {
       const ids = c.publicationIds || [];
-      return { ...c, publicationIds: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] };
+      return mirrorActive({ ...c, publicationIds: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] });
     });
 
+  /* ----- multi-source scopes (each source → its own location + full config) ----- */
+  const setScopes = (next) => setConfig((c) => ({ ...c, scopes: next, shopifyLocationId: next[0]?.locationId ?? c.shopifyLocationId }));
+  // Loads a scope's stored config into the mirror so the panels show THAT source's settings.
+  const selectScope = (idx) => {
+    setActiveScopeIdx(idx);
+    setConfig((c) => {
+      const s = (c.scopes || [])[idx];
+      if (!s) return c;
+      const mirror = {};
+      for (const k of MIRROR_KEYS) if (s[k] !== undefined) mirror[k] = s[k];
+      mirror.pricelistPriority = buildPricelistPriority(pricelists, s.pricelistPriority);
+      mirror.publicationIds = s.publicationIds || [];
+      return { ...c, ...mirror };
+    });
+  };
+  // A brand-new source starts at safe stock-only defaults (independent of the others).
+  const newScopeDefaults = () => ({
+    locationId: locations[0]?.id ?? null,
+    ownership: "stock_only", syncStock: true, syncNewProducts: false, syncPrices: false,
+    syncDescriptions: false, syncImages: false, syncTags: true,
+    priceVatMode: "inclusive", futureDatedGuard: true,
+    pricelistPriority: buildPricelistPriority(pricelists, []), publicationIds: [],
+  });
+  const addScope = () => {
+    const first = exportOptions[0]
+      ? { type: "export_config", exportConfigId: exportOptions[0]._id }
+      : (feedOptions[0] ? { type: "own_source", feedId: feedOptions[0].feedId } : { type: "export_config" });
+    const next = [...sourceScopes, { ...first, ...newScopeDefaults() }];
+    setScopes(next);
+    selectScope(next.length - 1);
+  };
+  const setScopeSource = (i, val) => {
+    const sep = val.indexOf(":");
+    const kind = val.slice(0, sep);
+    const id = val.slice(sep + 1);
+    setScopes(sourceScopes.map((s, idx) => idx !== i ? s
+      : (kind === "feed" ? { ...s, type: "own_source", feedId: id, exportConfigId: undefined } : { ...s, type: "export_config", exportConfigId: id, feedId: undefined })));
+  };
+  const setScopeLocation = (i, locId) => setScopes(sourceScopes.map((s, idx) => idx === i ? { ...s, locationId: locId } : s));
+  const removeScope = (i) => {
+    const next = sourceScopes.filter((_, idx) => idx !== i);
+    setScopes(next);
+    if (activeIdx >= next.length) selectScope(Math.max(0, next.length - 1));
+  };
+
   const togglePricelist = (index) =>
-    setConfig((c) => ({
+    setConfig((c) => mirrorActive({
       ...c,
       pricelistPriority: c.pricelistPriority.map((p, i) => (i === index ? { ...p, enabled: !p.enabled } : p)),
     }));
@@ -1112,7 +1413,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
           const arr = [...c.pricelistPriority];
           const [moved] = arr.splice(from, 1);
           arr.splice(to, 0, moved);
-          return { ...c, pricelistPriority: arr };
+          return mirrorActive({ ...c, pricelistPriority: arr });
         });
       }
     };
@@ -1129,6 +1430,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
+    // mirrorActive/activeIdx are captured fresh per drag session (effect re-runs on `dragging`).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging]);
 
   /* ----- commands ----- */
@@ -1245,7 +1548,30 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
     setSaving(true);
     try {
       const { pricelistPriority, priceVatMode, futureDatedGuard, syncStock, syncNewProducts,
-        syncPrices, syncDescriptions, syncImages, ownership, exportConfigId, shopifyLocationId, publicationIds } = config;
+        syncPrices, syncDescriptions, syncImages, ownership, scopes, publicationIds } = config;
+      // Each source pushes with its OWN full config to its own location. Persist the cleaned
+      // scopes (incl. per-source ownership / toggles / pricing / channels) and mirror the first
+      // source's location onto the connection-level field (back-compat / summary line).
+      const cleanScopes = (scopes || [])
+        .filter((s) => s.locationId && (s.type === "own_source" ? s.feedId : s.exportConfigId))
+        .map((s) => ({
+          type: s.type,
+          ...(s.type === "own_source" ? { feedId: s.feedId } : { exportConfigId: s.exportConfigId }),
+          locationId: s.locationId,
+          ownership: s.ownership ?? "stock_only",
+          syncStock: s.syncStock ?? true,
+          syncNewProducts: !!s.syncNewProducts,
+          syncPrices: !!s.syncPrices,
+          syncDescriptions: !!s.syncDescriptions,
+          syncImages: !!s.syncImages,
+          syncTags: s.syncTags ?? true,
+          priceVatMode: s.priceVatMode ?? "inclusive",
+          futureDatedGuard: s.futureDatedGuard ?? true,
+          pricelistPriority: (s.pricelistPriority || []).map((p, i) => ({ name: p.name, enabled: p.enabled !== false, priority: p.priority ?? i })),
+          publicationIds: s.publicationIds || [],
+          ...(s.aiExportId ? { aiExportId: s.aiExportId } : {}),
+        }));
+      const shopifyLocationId = cleanScopes[0]?.locationId ?? config.shopifyLocationId ?? null;
       // Persist only the resolution-relevant fields of each pricelist (name/enabled/priority);
       // vat + valid_from are display-only and re-derived from the live catalogue on load.
       const minimalPricelistPriority = pricelistPriority.map((p, i) => ({
@@ -1259,7 +1585,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
         body: JSON.stringify({
           shopifyLocationId,
           config: { pricelistPriority: minimalPricelistPriority, priceVatMode, futureDatedGuard,
-            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncImages, ownership, exportConfigId, publicationIds },
+            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncImages, ownership, scopes: cleanScopes, publicationIds },
         }),
       });
       if (res.ok) {
@@ -1380,56 +1706,156 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
         </div>
       </section>
 
-      {/* ------------------------ Ownership mode ----------------------- */}
+      {/* --------------------- Sources & locations --------------------- */}
       <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-        <SectionHeading
-          title="Ownership mode"
-          desc="Decide how assertively the portal writes to products once they exist in this store."
-        />
-        <fieldset>
-          <legend className="sr-only">Ownership mode</legend>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            {OWNERSHIP_MODES.map((m) => {
-              const selected = config.ownership === m.value;
+        <SectionHeading title="Sources & locations" desc="Each source — a Patrik export or one of your own brand feeds — pushes to its own Shopify location, with its own settings. Pick a source to configure it below." />
+
+        {(exportOptions.length === 0 && feedOptions.length === 0) ? (
+          <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-6 text-center">
+            <p className="text-sm text-neutral-300">No products to sync yet.</p>
+            <p className="mt-1 text-xs text-neutral-500">
+              Create a <a href="/export" className="text-[#01a0be] hover:underline">Shopify export</a> or register an{" "}
+              <a href="/integrations/own-sources" className="text-[#01a0be] hover:underline">Own Source feed</a> to choose what syncs.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {sourceScopes.length === 0 && (
+              <p className="rounded-lg border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-4 text-center text-sm text-neutral-400">
+                No sources yet. Add one below.
+              </p>
+            )}
+            {sourceScopes.map((s, i) => {
+              const srcVal = s.type === "own_source" ? `feed:${s.feedId || ""}` : `export:${s.exportConfigId || ""}`;
+              const name = s.type === "own_source"
+                ? (feedOptions.find((f) => f.feedId === s.feedId)?.brand || "Feed")
+                : (exportOptions.find((x) => x._id === s.exportConfigId)?.name || "Export");
+              const modeLabel = (OWNERSHIP_MODES.find((m) => m.value === s.ownership)?.title) || "Stock only";
+              const locName = locations.find((l) => l.id === s.locationId)?.name;
+              const openEditor = () => { selectScope(i); setEditingScopeIdx(i); };
               return (
-                <label
-                  key={m.value}
-                  className={`group relative flex cursor-pointer flex-col rounded-xl border bg-neutral-800/50 p-5 transition-all ${
-                    selected
-                      ? "border-[#01a0be] shadow-[0_0_40px_rgba(1,160,190,0.1)]"
-                      : "border-neutral-700/50 hover:border-[#01a0be]/50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`ownership-${myKey}`}
-                    value={m.value}
-                    checked={selected}
-                    onChange={() => setOwnership(m.value)}
-                    className="sr-only"
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-white">{m.title}</span>
-                      {m.recommended && <StatusBadge tone="cyan">Recommended</StatusBadge>}
-                    </span>
-                    {selected && <CheckIcon className="h-5 w-5 text-[#01a0be]" />}
+                <div key={i} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-400">Source</label>
+                      <Select ariaLabel="Source" value={srcVal} onChange={(e) => setScopeSource(i, e.target.value)}>
+                        <option value="" disabled>Select a source…</option>
+                        {exportOptions.map((x) => <option key={`e${x._id}`} value={`export:${x._id}`}>{`Patrik · ${x.name}`}</option>)}
+                        {feedOptions.map((f) => <option key={`f${f.feedId}`} value={`feed:${f.feedId}`}>{`Feed · ${f.brand}${f.status === "paused" ? " (paused)" : ""}`}</option>)}
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-400">Shopify location</label>
+                      <Select ariaLabel="Shopify location" value={s.locationId || ""} disabled={!detailLoaded} onChange={(e) => setScopeLocation(i, e.target.value)}>
+                        {!detailLoaded && <option value="">Loading locations…</option>}
+                        {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={openEditor}
+                        className="inline-flex h-[50px] items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 text-sm font-medium text-neutral-200 transition-colors hover:border-[#01a0be]/50 hover:text-white"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                        Configure
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeScope(i)}
+                        aria-label="Remove source"
+                        title="Remove source"
+                        className="inline-flex h-[50px] w-[50px] items-center justify-center rounded-lg border border-neutral-700/60 bg-neutral-800/40 text-neutral-500 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                      >
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 0v12a1 1 0 001 1h6a1 1 0 001-1V7M10 11v6M14 11v6" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">{m.desc}</p>
-                  {m.warn && selected && (
-                    <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-400">
-                      <span className="font-semibold">Heads up — </span>{m.warn}
-                    </p>
-                  )}
-                </label>
+                  {/* quick summary so each source's setup is legible at a glance */}
+                  <p className="mt-2 text-xs text-neutral-500">
+                    {modeLabel}{locName ? ` · ${locName}` : ""} · {[s.syncStock && "stock", s.syncPrices && "prices", s.syncDescriptions && "content", s.syncTags && "tags", s.syncImages && "images", s.syncNewProducts && "new"].filter(Boolean).join(", ") || "nothing selected"}
+                  </p>
+                </div>
               );
             })}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button type="button" onClick={addScope} className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">
+                <PlusIcon className="h-4 w-4" />
+                Add source
+              </button>
+              <a href="/export" className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">New export</a>
+              <a href="/integrations/own-sources" className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">Manage feeds</a>
+            </div>
           </div>
+        )}
+      </section>
+
+      {/* ---------- Per-source config modal (Ownership / What-to-sync / Pricing / Channels) ---------- */}
+      {editingScopeIdx !== null && activeScope && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6" onClick={() => setEditingScopeIdx(null)}>
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* header */}
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-semibold text-white">
+                  Configure {activeScope.type === "own_source"
+                    ? (feedOptions.find((f) => f.feedId === activeScope.feedId)?.brand || "feed")
+                    : (exportOptions.find((x) => x._id === activeScope.exportConfigId)?.name || "source")}
+                </h2>
+                <p className="mt-0.5 text-xs text-neutral-500">Applies to this source only · close, then Save</p>
+              </div>
+              <button type="button" onClick={() => setEditingScopeIdx(null)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* scrollable body — sections are light groups (the modal itself is the card) */}
+            <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain px-6 py-6">
+
+      {/* ------------------------ Ownership mode ----------------------- */}
+      <section>
+        <SectionHeading
+          title="Ownership mode"
+          desc="How assertively the portal writes to products once they exist in this store."
+        />
+        <fieldset className="space-y-2.5">
+          <legend className="sr-only">Ownership mode</legend>
+          {OWNERSHIP_MODES.map((m) => {
+            const selected = config.ownership === m.value;
+            return (
+              <label
+                key={m.value}
+                className={`flex cursor-pointer gap-3.5 rounded-xl border p-4 transition-colors ${
+                  selected ? "border-[#01a0be] bg-[#01a0be]/5" : "border-neutral-800 bg-neutral-900/40 hover:border-[#01a0be]/40"
+                }`}
+              >
+                <input type="radio" name={`ownership-${myKey}`} value={m.value} checked={selected} onChange={() => setOwnership(m.value)} className="sr-only" />
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${selected ? "border-[#01a0be]" : "border-neutral-600"}`}>
+                  {selected && <span className="h-2 w-2 rounded-full bg-[#01a0be]" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-white">{m.title}</span>
+                    {m.recommended && <StatusBadge tone="cyan">Recommended</StatusBadge>}
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-neutral-400">{m.desc}</span>
+                  {m.warn && selected && (
+                    <span className="mt-2.5 block rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-400">
+                      <span className="font-semibold">Heads up — </span>{m.warn}
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
         </fieldset>
       </section>
 
       {/* ------------------------ What to sync ------------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+      <section className="border-t border-neutral-800 pt-8">
         <SectionHeading title="What to sync" desc="Pick the data the portal is allowed to push to this store." />
         {stockOnly && (
           <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
@@ -1458,7 +1884,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
       </section>
 
       {/* ----------------------------- Pricing ------------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+      <section className="border-t border-neutral-800 pt-8">
         <SectionHeading
           title="Pricing"
           desc="Each variant carries several named pricelists — set which one wins and how VAT is handled."
@@ -1575,73 +2001,8 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
         </fieldset>
       </section>
 
-      {/* --------------------- Products & location --------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-        <SectionHeading title="Products & location" desc="Which products are in scope, and where their inventory lands." />
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <label className="block text-sm font-medium text-neutral-300">Products to sync</label>
-              <a
-                href="/export"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white"
-              >
-                <PlusIcon className="h-3.5 w-3.5" />
-                New export
-              </a>
-            </div>
-            {exportOptions.length > 0 ? (
-              <>
-                <Select
-                  ariaLabel="Products to sync"
-                  value={config.exportConfigId}
-                  onChange={(e) => setCfg({ exportConfigId: e.target.value })}
-                >
-                  <option value="" disabled>Select an export configuration…</option>
-                  {exportOptions.map((x) => (
-                    <option key={x._id} value={x._id}>{x.name}</option>
-                  ))}
-                </Select>
-                <p className="mt-2 text-xs text-neutral-500">Sync follows this export config&apos;s product filters and field rules.</p>
-              </>
-            ) : (
-              <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-5 text-center">
-                <p className="text-sm text-neutral-300">No Shopify export configurations yet.</p>
-                <p className="mt-1 text-xs text-neutral-500">
-                  Create one with the <span className="font-medium text-neutral-300">Shopify</span> preset to choose which products sync.
-                </p>
-                <a
-                  href="/export"
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#01a0be] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f]"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                  Create export configuration
-                </a>
-              </div>
-            )}
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-neutral-300">Shopify location</label>
-            <Select
-              ariaLabel="Shopify location"
-              value={config.shopifyLocationId}
-              disabled={!detailLoaded}
-              onChange={(e) => setCfg({ shopifyLocationId: e.target.value })}
-            >
-              {!detailLoaded && <option value="">Loading locations…</option>}
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </Select>
-            <p className="mt-2 text-xs text-neutral-500">
-              Inventory is pushed to this one location. Multi-location stores aren&apos;t supported yet.
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* --------------------------- Sales channels -------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+      <section className="border-t border-neutral-800 pt-8">
         <SectionHeading
           title="Sales channels"
           desc="Where newly-created products are published — e.g. Online Store, Point of Sale."
@@ -1689,6 +2050,15 @@ function ConnectionPanel({ connection: initialConn, exportOptions, pricelists, o
           </>
         )}
       </section>
+            </div>{/* /scrollable body */}
+
+            {/* footer */}
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+              <button type="button" onClick={() => setEditingScopeIdx(null)} className="rounded-lg bg-[#01a0be] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --------------------------- Sync activity --------------------- */}
       <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">

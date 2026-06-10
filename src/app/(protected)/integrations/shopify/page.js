@@ -39,6 +39,24 @@ async function getShopifyConnections() {
   }
 }
 
+// Fetch the user's Own Source feeds so the per-store scope selector can offer "Own source" as
+// an alternative to a Patrik export config (design §9.2). Empty on failure → the option group
+// simply doesn't appear.
+async function getOwnSources() {
+  try {
+    const { token } = await auth0.getAccessToken();
+    const res = await fetch(`${apiUrl}/external/sources`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.sources) ? data.sources : [];
+  } catch {
+    return [];
+  }
+}
+
 // Fetch the distinct pricelists in the catalogue so the pricing panel seeds from real names
 // (not mock). Empty on failure → the panel falls back to its demo template.
 async function getShopifyPricelists() {
@@ -76,10 +94,11 @@ export default async function ShopifyIntegrationRoute() {
     );
   }
 
-  const [shopifyExports, connections, pricelists] = await Promise.all([
+  const [shopifyExports, connections, pricelists, ownSources] = await Promise.all([
     getShopifyExportConfigs(),
     getShopifyConnections(),
     getShopifyPricelists(),
+    getOwnSources(),
   ]);
 
   return (
@@ -92,6 +111,7 @@ export default async function ShopifyIntegrationRoute() {
           // the fetch succeeded but the user has no stores yet → client shows the connect screen.
           initialConnections={connections}
           initialPricelists={pricelists ?? []}
+          initialFeeds={ownSources ?? []}
         />
       </div>
     </div>
