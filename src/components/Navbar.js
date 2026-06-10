@@ -84,10 +84,17 @@ function NavIcon({ name, className = "h-5 w-5" }) {
  * Small pill used to flag a nav item's status (e.g. "Alpha" for the
  * not-yet-wired Shopify integration). Amber to read as "experimental".
  */
+// Tier badges match the TierGate program chips: alpha = violet, beta = cyan.
+const BADGE_STYLES = {
+  alpha: "bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 ring-violet-400/30",
+  beta: "bg-gradient-to-r from-[#01a0be]/20 to-cyan-400/20 text-cyan-300 ring-cyan-400/30",
+};
+
 function NavBadge({ label, className = "" }) {
+  const style = BADGE_STYLES[String(label).toLowerCase()] || "bg-amber-400/15 text-amber-300 ring-amber-400/30";
   return (
     <span
-      className={`rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-400/30 ${className}`}
+      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${style} ${className}`}
     >
       {label}
     </span>

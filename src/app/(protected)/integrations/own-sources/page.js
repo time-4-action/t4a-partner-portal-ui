@@ -1,4 +1,6 @@
 import OwnSourcesPage from "@/components/OwnSourcesPage";
+import TierGate from "@/components/TierGate";
+import { FEATURE_TIERS, hasTierAccess } from "@/lib/featureTiers";
 import { auth0 } from "@/lib/auth0";
 
 const apiUrl = process.env.EXPORT_API_URL || "http://localhost:4000";
@@ -32,6 +34,18 @@ export default async function OwnSourcesRoute() {
             <h2 className="text-xl font-semibold text-white mb-2">Access Restricted</h2>
             <p className="text-neutral-400">You do not have access to the Own Sources feature. Contact your administrator to request access.</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Early-access gate: visible in the navbar for everyone; without the tier role the page
+  // shows the join-the-program screen instead of the feature.
+  if (!hasTierAccess(roles, FEATURE_TIERS.ownSources.tier)) {
+    return (
+      <div className="relative p-8 bg-transparent">
+        <div className="relative max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
+          <TierGate featureKey="ownSources" userEmail={session?.user?.email} userName={session?.user?.name} />
         </div>
       </div>
     );
