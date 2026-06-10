@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import ProductDetailModal from "./ProductDetailModal";
+import Select from "./ui/Select";
 
 /**
  * Own Sources — the self-serve area where a partner registers their OWN supplier feeds (other
@@ -14,6 +15,16 @@ import ProductDetailModal from "./ProductDetailModal";
  */
 
 const ACCENT = "#01a0be";
+const COMMON_TIMEZONES = [
+  "Europe/Ljubljana", "Europe/Vienna", "Europe/Berlin", "Europe/Zurich", "Europe/Rome",
+  "Europe/Paris", "Europe/Amsterdam", "Europe/Brussels", "Europe/Madrid", "Europe/Lisbon",
+  "Europe/London", "Europe/Dublin", "Europe/Prague", "Europe/Warsaw", "Europe/Budapest",
+  "Europe/Zagreb", "Europe/Belgrade", "Europe/Athens", "Europe/Helsinki", "Europe/Stockholm",
+  "Europe/Copenhagen", "Europe/Oslo", "Europe/Istanbul", "UTC",
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "Asia/Dubai", "Asia/Tokyo", "Asia/Shanghai", "Asia/Singapore", "Australia/Sydney",
+];
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const EMPTY_FORM = {
@@ -452,11 +463,11 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
               <div className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Frequency">
-                    <select className={inputCls} value={sched.frequency} onChange={(e) => setSchedule({ frequency: e.target.value })}>
+                    <Select ariaLabel="Frequency" value={sched.frequency} onChange={(e) => setSchedule({ frequency: e.target.value })}>
                       <option value="every_hours">Every N hours</option>
                       <option value="daily">Daily</option>
                       <option value="weekly">Weekly</option>
-                    </select>
+                    </Select>
                   </Field>
                   {sched.frequency === "every_hours" && <Field label="Every (hours)"><input type="number" min="1" className={inputCls} value={sched.everyHours} onChange={(e) => setSchedule({ everyHours: Number(e.target.value) })} /></Field>}
                   {sched.frequency !== "every_hours" && <Field label="Time of day"><input type="time" className={inputCls} value={sched.timeOfDay} onChange={(e) => setSchedule({ timeOfDay: e.target.value })} /></Field>}
@@ -464,12 +475,16 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
                 <div className="grid grid-cols-2 gap-3">
                   {sched.frequency === "weekly" && (
                     <Field label="Weekday">
-                      <select className={inputCls} value={sched.weekday} onChange={(e) => setSchedule({ weekday: Number(e.target.value) })}>
+                      <Select ariaLabel="Weekday" value={sched.weekday} onChange={(e) => setSchedule({ weekday: Number(e.target.value) })}>
                         {WEEKDAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                      </select>
+                      </Select>
                     </Field>
                   )}
-                  <Field label="Timezone"><input className={inputCls} value={sched.timezone} onChange={(e) => setSchedule({ timezone: e.target.value })} /></Field>
+                  <Field label="Timezone">
+                    <Select ariaLabel="Timezone" value={sched.timezone} onChange={(e) => setSchedule({ timezone: e.target.value })}>
+                      {[...new Set([sched.timezone, ...COMMON_TIMEZONES])].filter(Boolean).map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                    </Select>
+                  </Field>
                 </div>
               </div>
             )}
@@ -478,10 +493,10 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
           {/* Options */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Default status (missing in feed)">
-              <select className={inputCls} value={form.options.defaultStatus} onChange={(e) => setOptions({ defaultStatus: e.target.value })}>
+              <Select ariaLabel="Default status" value={form.options.defaultStatus} onChange={(e) => setOptions({ defaultStatus: e.target.value })}>
                 <option value="active">Active</option>
                 <option value="draft">Draft</option>
-              </select>
+              </Select>
             </Field>
             <Field label="Max staleness (hours)"><input type="number" min="1" className={inputCls} value={form.options.maxStalenessHours} onChange={(e) => setOptions({ maxStalenessHours: Number(e.target.value) })} /></Field>
           </div>

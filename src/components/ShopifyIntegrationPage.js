@@ -26,8 +26,8 @@
 
 "use client";
 
-import { Children, isValidElement, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import Select from "./ui/Select";
 
 // Client-only "now" snapshot (server = 0, client = a single cached timestamp) — lets us
 // flag future-dated pricelists without a hydration mismatch, a setState-in-effect, or an
@@ -299,11 +299,6 @@ const InfoIcon = (p) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
   </Svg>
 );
-const ChevronDownIcon = (p) => (
-  <Svg {...p}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-  </Svg>
-);
 const SaveIcon = (p) => (
   <Svg {...p}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h10.5Z" />
@@ -404,190 +399,6 @@ function ToggleSwitch({ checked, onChange, ariaLabel }) {
         className="w-10 h-6 rounded-full bg-neutral-700 transition-all duration-200 peer-checked:bg-gradient-to-r peer-checked:from-cyan-500 peer-checked:to-blue-500 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:duration-200 peer-checked:after:translate-x-[16px]"
       />
     </span>
-  );
-}
-
-/**
- * Themed dropdown that keeps the native-<select> API (accepts <option> children and fires
- * onChange({ target: { value } })) but renders a fully-styled, theme-matched menu instead of
- * the OS's grey native popup. Accessible: real listbox semantics, click-outside + Escape to
- * close, and arrow / Home / End / Enter keyboard navigation.
- */
-function Select({ value, onChange, ariaLabel, disabled, children }) {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1); // keyboard-highlighted index
-  const [rect, setRect] = useState(null); // button viewport rect → fixed-positioned menu
-  const rootRef = useRef(null);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-  const listId = useId();
-
-  // Flatten <option> children into plain descriptors so we can render our own rows.
-  const options = Children.toArray(children)
-    .filter(isValidElement)
-    .map((el) => ({
-      value: el.props.value ?? "",
-      label: typeof el.props.children === "string" ? el.props.children : String(el.props.children ?? ""),
-      disabled: !!el.props.disabled,
-    }));
-
-  const selected = options.find((o) => String(o.value) === String(value ?? ""));
-  const isPlaceholder = !selected || selected.value === "";
-
-  // While open: close on outside click (the menu is portaled to <body>, so check both refs),
-  // and keep the menu pinned to the button as the page scrolls or resizes.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      const inRoot = rootRef.current?.contains(e.target);
-      const inList = listRef.current?.contains(e.target);
-      if (!inRoot && !inList) setOpen(false);
-    };
-    const sync = () => {
-      if (btnRef.current) setRect(btnRef.current.getBoundingClientRect());
-    };
-    document.addEventListener("mousedown", onDown);
-    window.addEventListener("scroll", sync, true);
-    window.addEventListener("resize", sync);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      window.removeEventListener("scroll", sync, true);
-      window.removeEventListener("resize", sync);
-    };
-  }, [open]);
-
-  // Open the menu, highlighting the current selection (or the first selectable row).
-  const openMenu = () => {
-    const cur = options.findIndex((o) => String(o.value) === String(value ?? ""));
-    setActive(cur >= 0 ? cur : options.findIndex((o) => !o.disabled));
-    if (btnRef.current) setRect(btnRef.current.getBoundingClientRect());
-    setOpen(true);
-  };
-
-  const commit = (opt) => {
-    if (opt.disabled) return;
-    onChange?.({ target: { value: opt.value } });
-    setOpen(false);
-  };
-
-  const step = (dir) => {
-    setActive((cur) => {
-      let i = cur;
-      for (let n = 0; n < options.length; n++) {
-        i = (i + dir + options.length) % options.length;
-        if (!options[i].disabled) return i;
-      }
-      return cur;
-    });
-  };
-
-  const onKeyDown = (e) => {
-    if (disabled) return;
-    if (!open) {
-      if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(e.key)) {
-        e.preventDefault();
-        openMenu();
-      }
-      return;
-    }
-    switch (e.key) {
-      case "Escape":
-        e.preventDefault();
-        setOpen(false);
-        break;
-      case "ArrowDown":
-        e.preventDefault();
-        step(1);
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        step(-1);
-        break;
-      case "Home":
-        e.preventDefault();
-        setActive(options.findIndex((o) => !o.disabled));
-        break;
-      case "End":
-        e.preventDefault();
-        setActive(options.map((o) => !o.disabled).lastIndexOf(true));
-        break;
-      case "Enter":
-      case " ":
-        e.preventDefault();
-        if (options[active]) commit(options[active]);
-        break;
-      default:
-        break;
-    }
-  };
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        ref={btnRef}
-        type="button"
-        role="combobox"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-label={ariaLabel}
-        disabled={disabled}
-        onClick={() => !disabled && (open ? setOpen(false) : openMenu())}
-        onKeyDown={onKeyDown}
-        className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-neutral-900/60 px-4 py-3.5 text-left text-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-          open ? "border-[#01a0be]/60 ring-1 ring-[#01a0be]/20" : "border-neutral-700 hover:border-neutral-600"
-        }`}
-      >
-        <span className={`truncate ${isPlaceholder ? "text-neutral-500" : "text-white"}`}>
-          {selected ? selected.label : options[0]?.label ?? ""}
-        </span>
-        <ChevronDownIcon
-          className={`h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-200 ${open ? "rotate-180 text-[#01a0be]" : ""}`}
-        />
-      </button>
-
-      {open && rect && typeof document !== "undefined" && createPortal(
-        <ul
-          id={listId}
-          ref={listRef}
-          role="listbox"
-          aria-label={ariaLabel}
-          style={{
-            position: "fixed",
-            top: rect.bottom + 8,
-            left: rect.left,
-            width: rect.width,
-          }}
-          className="animate-dropdown z-[999] max-h-64 overflow-auto rounded-xl border border-neutral-700 bg-neutral-900/95 p-1 shadow-2xl shadow-black/50 backdrop-blur-xl"
-        >
-          {options.map((o, i) => {
-            const isSel = String(o.value) === String(value ?? "");
-            const isActive = i === active;
-            return (
-              <li
-                key={`${o.value}-${i}`}
-                role="option"
-                aria-selected={isSel}
-                aria-disabled={o.disabled || undefined}
-                onClick={() => commit(o)}
-                onMouseEnter={() => !o.disabled && setActive(i)}
-                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                  o.disabled
-                    ? "cursor-default text-neutral-600"
-                    : isActive
-                      ? "bg-[#01a0be]/15 text-white"
-                      : "text-neutral-300"
-                }`}
-              >
-                <span className="truncate">{o.label}</span>
-                {isSel && !o.disabled && <CheckIcon className="h-4 w-4 shrink-0 text-[#01a0be]" />}
-              </li>
-            );
-          })}
-        </ul>,
-        document.body
-      )}
-    </div>
   );
 }
 
