@@ -12,7 +12,7 @@
  *   - portal sign-in:    src/lib/auth0.js + src/proxy.js (Auth0 EU tenant, roles claim)
  *   - contact form:      src/app/nextapi/contact/route.js (Gmail SMTP)
  *   - export access:     api/src/services/customExport.service.js (owner/accessList/apiKeys keyHash)
- *   - AI categorization: api Google Gemini — product text only
+ *   - AI categorization: Anthropic Claude API — product text only
  *   - Shopify scopes:    api/src/services/shopify/shopifyConnection.service.js (DEFAULT_SCOPES)
  *   - token encryption:  api/src/services/shopify/crypto.service.js (AES-256-GCM)
  *   - deletion paths:    api shopifyController.js (disconnect, app/uninstalled, shop/redact)
@@ -217,7 +217,7 @@ export default function PrivacyPage() {
               its Shopify app, <span className="text-neutral-300">Time 4 Action Product Sync</span>,
               are operated by <span className="text-neutral-300">Time 4 Action d.o.o.</span>,
               Koprska ulica 74, 1000 Ljubljana, Slovenia. For any question or request about your
-              data, contact us at <ContactLink /> or through the portal&apos;s contact page.
+              data, contact us at <ContactLink />{" "}or through the portal&apos;s contact page.
             </p>
             <p>
               The portal is a business-to-business tool for approved partners. It distributes
@@ -285,7 +285,7 @@ export default function PrivacyPage() {
               mapping table, sync run history, and the portal account the store belongs to.
             </p>
             <p className="rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/5 px-4 py-3 text-neutral-300">
-              The app does <strong>not</strong> request access to — and therefore never collects,
+              The app does <strong>not</strong>{" "}request access to — and therefore never collects,
               stores or processes — your customers&apos; personal data, orders, or payment
               information.
             </p>
@@ -300,7 +300,7 @@ export default function PrivacyPage() {
             </p>
             <p>
               To organise the catalogue, product text (names, descriptions, categories) may be
-              processed by Google&apos;s Gemini AI service for automatic categorisation. No
+              processed by Anthropic&apos;s Claude AI service for automatic categorisation. No
               personal data — yours or anyone else&apos;s — is sent to AI services.
             </p>
           </Section>
@@ -333,8 +333,10 @@ export default function PrivacyPage() {
               </Li>
               <Li label="Auth0 (Okta)">portal sign-in, EU-hosted tenant.</Li>
               <Li label="Google">
-                Gmail delivers contact-form messages to our mailbox; Gemini processes product
-                catalogue text for categorisation (no personal data).
+                Gmail delivers contact-form messages to our mailbox.
+              </Li>
+              <Li label="Anthropic">
+                Claude processes product catalogue text for categorisation (no personal data).
               </Li>
               <Li label="Hetzner (EU)">
                 cloud infrastructure hosting the portal&apos;s servers and database.

@@ -125,7 +125,7 @@ function ExportFormModal({ open, initial, onClose, onSave }) {
             <div className="h-1 w-full bg-gradient-to-r from-[#01a0be] to-cyan-400" />
             <div className="p-6 space-y-5">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-white">{initial ? "Edit Export" : "New Export"}</h2>
+                    <h2 className="text-base font-semibold text-white">{initial ? "Edit Category Set" : "New Category Set"}</h2>
                     <button onClick={onClose} className={`${S.iconBtn} text-neutral-500 hover:text-white hover:bg-white/[0.06]`}><Ic.X /></button>
                 </div>
                 <div className="space-y-3">
@@ -141,7 +141,7 @@ function ExportFormModal({ open, initial, onClose, onSave }) {
                         className={`w-full flex items-center justify-between p-4 rounded-xl ring-1 transition-all ${form.aiCategorizationEnabled ? "ring-[#01a0be]/30 bg-[#01a0be]/[0.05]" : "ring-white/[0.06] bg-white/[0.02] hover:ring-white/[0.1]"}`}>
                         <div className="text-left">
                             <p className="text-sm font-medium text-white">AI Categorization</p>
-                            <p className="text-xs text-neutral-500 mt-0.5">Auto-categorize products via Gemini</p>
+                            <p className="text-xs text-neutral-500 mt-0.5">Auto-categorize products via Claude</p>
                         </div>
                         <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${form.aiCategorizationEnabled ? "bg-[#01a0be]" : "bg-neutral-700"}`}>
                             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${form.aiCategorizationEnabled ? "translate-x-4" : "translate-x-1"}`} />
@@ -153,7 +153,7 @@ function ExportFormModal({ open, initial, onClose, onSave }) {
                     <button onClick={onClose} className={S.btnGhost}>Cancel</button>
                     <button onClick={handleSubmit} disabled={saving} className={S.btnPrimary}>
                         {saving ? <Ic.Refresh spin /> : <Ic.Check />}
-                        {initial ? "Save Changes" : "Create Export"}
+                        {initial ? "Save Changes" : "Create Category Set"}
                     </button>
                 </div>
             </div>
@@ -471,7 +471,7 @@ function CategoriesTab({ exportId, toast }) {
 
     const clearAll = () => setConfirm({
         title: "Clear All Categories", danger: true, confirmLabel: "Delete All",
-        message: `Delete all ${categories.length} categories for this export?`,
+        message: `Delete all ${categories.length} categories for this category set?`,
         onConfirm: async () => {
             setConfirm(null);
             try {
@@ -531,7 +531,7 @@ function CategoriesTab({ exportId, toast }) {
                     ) : search && filtered.length === 0 ? (
                         <div className="py-16 flex flex-col items-center gap-3 text-neutral-600">
                             <Ic.Search />
-                            <p className="text-sm text-neutral-500">No match for <span className="text-neutral-300">"{search}"</span></p>
+                            <p className="text-sm text-neutral-500">No match for <span className="text-neutral-300">&quot;{search}&quot;</span></p>
                         </div>
                     ) : (
                         <div className="p-3 overflow-y-auto max-h-[520px]">
@@ -886,7 +886,7 @@ function PlaygroundTab({ exportId, toast }) {
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white mb-1">AI Categorization Playground</p>
                         <p className="text-xs text-neutral-500 leading-relaxed">
-                            Paste a JSON array of third-party products below and categorize them against this export's category set.
+                            Paste a JSON array of third-party products below and categorize them against this category set.
                             Nothing is saved — results are returned directly. Max 300 products per request.
                         </p>
                         <div className="flex items-center gap-3 mt-3">
@@ -959,7 +959,7 @@ function PlaygroundTab({ exportId, toast }) {
                         </div>
                         <div className="text-center">
                             <p className="text-sm font-medium text-white mb-1">AI is analyzing your products...</p>
-                            <p className="text-xs text-neutral-500">Processing with Gemini 2.5 Flash in batches of 30</p>
+                            <p className="text-xs text-neutral-500">Processing with Claude Haiku in batches of 30</p>
                         </div>
                         {/* Progress shimmer */}
                         <div className="w-full max-w-xs h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
@@ -1274,14 +1274,14 @@ function ExportSelector({ exports, selected, onSelect, onCreateEdit, onDelete })
                         )}
                     </div>
                 ) : (
-                    <span className="text-sm text-neutral-600">Select export…</span>
+                    <span className="text-sm text-neutral-600">Select category set…</span>
                 )}
                 <div className={`text-neutral-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}><Ic.Chevron /></div>
             </button>
 
             {selected && (
                 <button onClick={() => onCreateEdit(selected)}
-                    className={`${S.btnOutline} w-10 h-10 px-0 justify-center rounded-xl shrink-0`} title="Edit export">
+                    className={`${S.btnOutline} w-10 h-10 px-0 justify-center rounded-xl shrink-0`} title="Edit category set">
                     <Ic.Settings />
                 </button>
             )}
@@ -1294,7 +1294,7 @@ function ExportSelector({ exports, selected, onSelect, onCreateEdit, onDelete })
                 <div ref={menuRef} style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
                     className="z-[9980] bg-neutral-950 ring-1 ring-white/[0.1] rounded-2xl shadow-2xl shadow-black/60 overflow-hidden py-1.5">
                     {exports.length === 0 ? (
-                        <p className="px-4 py-6 text-sm text-neutral-600 text-center">No exports yet</p>
+                        <p className="px-4 py-6 text-sm text-neutral-600 text-center">No category sets yet</p>
                     ) : exports.map(exp => (
                         <div key={exp._id} className={`group flex items-center gap-2 px-2 mx-1.5 py-2 rounded-xl transition-colors cursor-pointer
                             ${selected?._id === exp._id ? "bg-[#01a0be]/8" : "hover:bg-white/[0.04]"}`}>
@@ -1342,16 +1342,16 @@ export default function CategoriesPage({ initialExports }) {
         if (isEdit) {
             setExports(p => p.map(e => e._id === saved._id ? saved : e));
             if (selected?._id === saved._id) setSelected(saved);
-            toast("Export updated", "success");
+            toast("Category set updated", "success");
         } else {
             setExports(p => [...p, saved]);
             setSelected(saved); setTab("categories");
-            toast("Export created", "success");
+            toast("Category set created", "success");
         }
     };
 
     const onDeleteExport = exp => setConfirm({
-        title: "Delete Export", danger: true, confirmLabel: "Delete",
+        title: "Delete Category Set", danger: true, confirmLabel: "Delete",
         message: `Delete "${exp.name}"? Categories and product assignments are kept.`,
         onConfirm: async () => {
             setConfirm(null);
@@ -1360,7 +1360,7 @@ export default function CategoriesPage({ initialExports }) {
                 if (!d.success) throw new Error(d.message);
                 setExports(p => p.filter(e => e._id !== exp._id));
                 if (selected?._id === exp._id) setSelected(null);
-                toast("Export deleted", "success");
+                toast("Category set deleted", "success");
             } catch (e) { toast(e.message, "error"); }
         }
     });
@@ -1406,11 +1406,11 @@ export default function CategoriesPage({ initialExports }) {
                             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2zM17 17h.01M17 13h-2a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2zM7 13H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2z" /></svg>
                         </div>
                         <div className="text-center">
-                            <p className="text-sm font-medium text-neutral-300">No export selected</p>
-                            <p className="text-xs text-neutral-600 mt-1">Pick one above or create a new export configuration</p>
+                            <p className="text-sm font-medium text-neutral-300">No category set selected</p>
+                            <p className="text-xs text-neutral-600 mt-1">Pick one above or create a new category set</p>
                         </div>
                         <button onClick={() => setExportForm({ open: true, initial: null })} className={S.btnPrimary}>
-                            <Ic.Plus />Create Export
+                            <Ic.Plus />Create Category Set
                         </button>
                     </div>
                 ) : (
