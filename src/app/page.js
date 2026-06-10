@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { auth0 } from "../lib/auth0";
+
+const apiUrl = process.env.EXPORT_API_URL || "http://localhost:4000";
 
 /* ── icons (Heroicons v2 outline) ─────────────────────────────────────────── */
 const ICONS = {
@@ -22,214 +25,270 @@ const ICONS = {
   ),
 };
 
-const CHECK = (
-  <svg className="h-3 w-3 text-[#01a0be]/60 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-  </svg>
-);
-
 const ARROW = (
   <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
   </svg>
 );
 
-/* ── feature definitions ──────────────────────────────────────────────────── */
-const BROWSE_FEATURES = [
-  {
-    href: "/product",
-    icon: "catalog",
-    title: "Product Catalog",
-    desc: "Browse the full Patrik International range with real-time inventory, pricing, and variant details.",
-    points: ["Live inventory counts", "Pricing & pricelists", "Variants & SKUs"],
-    cta: "View catalog",
-  },
-  {
-    href: "/export",
-    icon: "export",
-    title: "Product Exports",
-    desc: "Export product data in ready-to-use formats — or build a reusable custom export config.",
-    points: ["Shopify, CSV, JSON & XML", "Presets & custom configs", "API keys & shared access"],
-    cta: "Go to exports",
-  },
-  {
-    href: "/categories",
-    icon: "categories",
-    title: "AI Categories",
-    desc: "Organize the catalog with AI-assigned categories, scoped per export and carried through as Shopify tags.",
-    points: ["AI category management", "Per-export mapping", "Hierarchical tags"],
-    cta: "Manage categories",
-  },
-];
-
-const INTEGRATION_FEATURES = [
-  {
-    href: "/integrations/shopify",
-    icon: "shopify",
-    title: "Shopify Sync",
-    desc: "Push your catalog straight into your Shopify store and keep it current automatically — no exports, no manual imports.",
-    points: [
-      "Stock, prices, products, descriptions & images",
-      "Multiple stores per account",
-      "Automatic sync on every catalog update",
-    ],
-    cta: "Open Shopify",
-  },
-  {
-    href: "/integrations/own-sources",
-    icon: "ownSources",
-    title: "Own Sources",
-    desc: "Resell other brands too? Register their product feeds and push them through the very same Shopify sync.",
-    points: [
-      "Bring your own supplier feeds",
-      "Validate before you import",
-      "Scheduled, hands-off updates",
-    ],
-    cta: "Add a source",
-  },
-];
-
-/* ── card ─────────────────────────────────────────────────────────────────── */
-function FeatureCard({ href, icon, title, desc, points, cta }) {
+function Icon({ name, className = "h-5 w-5" }) {
   return (
-    <a
-      href={href}
-      className="group relative flex flex-col rounded-2xl border border-neutral-800 bg-neutral-900/60 backdrop-blur-sm p-7 transition-all duration-300 hover:border-[#01a0be]/50 hover:bg-neutral-900/80 hover:shadow-[0_0_40px_rgba(1,160,190,0.1)] overflow-hidden"
-    >
-      <div className="absolute top-0 right-0 w-40 h-40 bg-[#01a0be]/5 rounded-full -translate-y-10 translate-x-10 group-hover:bg-[#01a0be]/10 transition-colors duration-300 pointer-events-none" />
-
-      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#01a0be]/10 border border-[#01a0be]/20 transition-colors group-hover:bg-[#01a0be]/20 relative">
-        <svg className="h-6 w-6 text-[#01a0be]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          {ICONS[icon]}
-        </svg>
-      </div>
-
-      <div className="flex-1">
-        <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-[#01a0be] transition-colors">
-          {title}
-        </h3>
-        <p className="text-sm text-neutral-400 leading-relaxed">{desc}</p>
-        <ul className="mt-4 space-y-1.5">
-          {points.map((p) => (
-            <li key={p} className="flex items-center gap-2 text-xs text-neutral-500">
-              {CHECK}
-              {p}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="mt-6 flex items-center gap-2 text-sm font-medium text-[#01a0be]">
-        {cta}
-        {ARROW}
-      </div>
-    </a>
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      {ICONS[name]}
+    </svg>
   );
 }
 
-function SectionLabel({ children, hint }) {
+/* ── server data ──────────────────────────────────────────────────────────── */
+
+// Connected Shopify stores (lightweight; uninstalled already filtered by the backend).
+// Used only for a one-line status hint — null/empty just hides it.
+async function getConnections(token) {
+  try {
+    const res = await fetch(`${apiUrl}/shopify/connections`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.connections) ? data.connections : [];
+  } catch {
+    return [];
+  }
+}
+
+function relTime(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 45) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString();
+}
+
+/* ── pieces ───────────────────────────────────────────────────────────────── */
+
+// A single quiet line summarising connected stores. Cyan when healthy, amber when
+// a store needs reconnecting. Hidden entirely when nothing is connected.
+function StatusStrip({ stores }) {
+  const visible = stores.filter((s) => s.status !== "uninstalled");
+  if (visible.length === 0) return null;
+
+  const needs = visible.filter((s) => s.status === "error");
+  const ok = needs.length === 0;
+  const dot = ok ? "bg-[#01a0be]" : "bg-amber-400";
+
+  let label;
+  let href = "/integrations/shopify";
+  if (visible.length === 1) {
+    const s = visible[0];
+    href = `/integrations/shopify?shop=${encodeURIComponent(s.shopDomain)}`;
+    const last = relTime(s.lastSyncAt);
+    label = (
+      <>
+        <span className="font-medium text-neutral-200">{s.shopDomain}</span>
+        <span className="mx-1.5 text-neutral-600">·</span>
+        <span className={ok ? "text-neutral-400" : "text-amber-300"}>
+          {ok ? (last ? `synced ${last}` : "connected") : "reconnect needed"}
+        </span>
+      </>
+    );
+  } else {
+    label = (
+      <>
+        <span className="font-medium text-neutral-200">{visible.length} stores connected</span>
+        {!ok && (
+          <>
+            <span className="mx-1.5 text-neutral-600">·</span>
+            <span className="text-amber-300">{needs.length} need attention</span>
+          </>
+        )}
+      </>
+    );
+  }
+
   return (
-    <div className="mb-4 flex items-center gap-3">
-      <span className="font-[family-name:var(--font-montserrat)] text-xs font-semibold uppercase tracking-widest leading-none text-neutral-500">
-        {children}
+    <Link
+      href={href}
+      className="group mb-10 flex items-center gap-2.5 rounded-xl border border-neutral-800 bg-neutral-900/30 px-4 py-2.5 text-sm transition-colors hover:border-neutral-700 hover:bg-neutral-900/50"
+    >
+      <span className="relative flex h-2 w-2 shrink-0">
+        {ok && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${dot} opacity-70`} />}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${dot}`} />
       </span>
-      {hint && <span className="text-xs leading-none text-neutral-600">{hint}</span>}
-      <div className="h-px flex-1 bg-gradient-to-r from-neutral-800 to-transparent" />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="ml-auto shrink-0 pl-2 font-medium text-neutral-500 transition-colors group-hover:text-[#01a0be]">
+        Manage →
+      </span>
+    </Link>
+  );
+}
+
+// One of the two equal-weight primary actions (Sync / Export).
+function PrimaryTile({ href, icon, title, desc, cta }) {
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 transition-colors hover:border-[#01a0be]/40 hover:bg-neutral-900/60 sm:p-7"
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/10 text-[#01a0be]">
+        <Icon name={icon} className="h-5 w-5" />
+      </span>
+      <h2 className="mt-5 text-lg font-semibold text-white">{title}</h2>
+      <p className="mt-1.5 flex-1 text-sm leading-relaxed text-neutral-400">{desc}</p>
+      <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-[#01a0be]">
+        {cta}
+        {ARROW}
+      </span>
+    </Link>
+  );
+}
+
+// The authenticated home: a calm "pick your path" screen.
+function AuthedHome({ firstName, hasStores, stores }) {
+  return (
+    <div className="relative min-h-[calc(100vh-4rem)] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+      <div className="relative mx-auto w-full max-w-3xl">
+        <div className="animate-fade-in">
+          {/* Heading */}
+          <div className="mb-8">
+            <h1 className="font-orbitron text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              {firstName ? `Hi, ${firstName}` : "Welcome"}
+            </h1>
+            <p className="mt-3 text-base text-neutral-400">What would you like to do?</p>
+          </div>
+
+          <StatusStrip stores={stores} />
+
+          {/* Two equal primary paths */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <PrimaryTile
+              href="/integrations/shopify"
+              icon="shopify"
+              title="Sync to your store"
+              desc="Connect Shopify once and keep it stocked automatically — stock, prices, products and images."
+              cta={hasStores ? "Manage stores" : "Connect store"}
+            />
+            <PrimaryTile
+              href="/export"
+              icon="export"
+              title="Export your catalog"
+              desc="Download Shopify CSV, JSON or XML — or build a reusable export feed for any system."
+              cta="Open exports"
+            />
+          </div>
+
+          {/* Quiet secondary links */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-neutral-800/60 pt-6 text-sm text-neutral-500">
+            <Link href="/product" className="inline-flex items-center gap-1.5 transition-colors hover:text-[#01a0be]">
+              <Icon name="catalog" className="h-4 w-4" />
+              Browse catalog
+            </Link>
+            <Link href="/categories" className="inline-flex items-center gap-1.5 transition-colors hover:text-[#01a0be]">
+              <Icon name="categories" className="h-4 w-4" />
+              AI categories
+            </Link>
+            <Link href="/integrations/own-sources" className="inline-flex items-center gap-1.5 transition-colors hover:text-[#01a0be]">
+              <Icon name="ownSources" className="h-4 w-4" />
+              Own sources
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
+// No export role → just point them at the catalog.
+function BrowseOnlyHome({ firstName }) {
+  return (
+    <div className="relative flex min-h-[calc(100vh-4rem)] flex-col justify-center py-20">
+      <div className="relative mx-auto w-full max-w-2xl px-4 text-center sm:px-6 lg:px-8">
+        <div className="animate-fade-in">
+          <h1 className="font-orbitron text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            {firstName ? `Hi, ${firstName}` : "Welcome"}
+          </h1>
+          <p className="mt-3 text-base text-neutral-400">
+            Browse Patrik International&apos;s live catalog — real stock, pricing and variants.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <Link
+              href="/product"
+              className="group inline-flex items-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]"
+            >
+              <Icon name="catalog" className="h-5 w-5" />
+              Browse the catalog
+              {ARROW}
+            </Link>
+            <p className="text-sm text-neutral-500">
+              Need exports or store sync?{" "}
+              <Link href="/contact" className="font-medium text-neutral-300 transition-colors hover:text-[#01a0be]">
+                Request access
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── page ─────────────────────────────────────────────────────────────────── */
+
 async function HomePage() {
   const session = await auth0.getSession();
   const user = session?.user;
-  const roles = user?.["https://time-4-action.com/roles"] ?? [];
-  const canIntegrate = roles.includes("export");
 
   if (user) {
-    return (
-      <div className="relative min-h-[calc(100vh-4rem)] py-16">
-        <div className="relative mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-4 py-1.5 text-xs font-medium text-[#01a0be] tracking-widest uppercase mb-5">
-              Partner Portal
-            </div>
-            <h1 className="font-orbitron text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              Welcome back,{" "}
-              <span className="bg-gradient-to-r from-[#01a0be] to-cyan-300 bg-clip-text text-transparent">
-                {user.name?.split(" ")[0] ?? "Partner"}
-              </span>
-            </h1>
-            <p className="mt-4 text-base text-neutral-400 max-w-2xl">
-              Browse live product data from Patrik International, export it in any format, and sync it
-              straight to your store.
-            </p>
-          </div>
+    const roles = user["https://time-4-action.com/roles"] ?? [];
+    const firstName = user.name?.split(" ")[0];
 
-          {/* Live status strip */}
-          <div className="mb-10 flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-5 py-3 backdrop-blur-sm">
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#01a0be] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#01a0be]"></span>
-            </span>
-            <span className="text-sm text-neutral-400">Live data sync active — product catalog is up to date</span>
-          </div>
+    if (!roles.includes("export")) {
+      return <BrowseOnlyHome firstName={firstName} />;
+    }
 
-          {/* Browse & export */}
-          <section className="mb-12">
-            <SectionLabel>Browse &amp; export</SectionLabel>
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {BROWSE_FEATURES.map((f) => (
-                <FeatureCard key={f.href} {...f} />
-              ))}
-            </div>
-          </section>
+    let stores = [];
+    try {
+      const { token } = await auth0.getAccessToken();
+      stores = (await getConnections(token)).filter((c) => c.status !== "uninstalled");
+    } catch {
+      stores = [];
+    }
 
-          {/* Integrations */}
-          {canIntegrate && (
-            <section>
-              <SectionLabel hint="Connect your store">Integrations</SectionLabel>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {INTEGRATION_FEATURES.map((f) => (
-                  <FeatureCard key={f.href} {...f} />
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-      </div>
-    );
+    return <AuthedHome firstName={firstName} hasStores={stores.length > 0} stores={stores} />;
   }
 
-  // Public / logged-out view
+  // Public / logged-out view — one clean focal point.
   return (
     <div className="relative flex min-h-[calc(100vh-4rem)] flex-col justify-center px-6 py-16 lg:px-8">
-      <div className="relative mx-auto w-full max-w-4xl">
-        {/* Hero */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-4 py-1.5 text-xs font-medium text-[#01a0be] tracking-widest uppercase mb-8">
+      <div className="relative mx-auto w-full max-w-2xl text-center">
+        <div className="animate-fade-in">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-[#01a0be]">
             Patrik International
           </div>
 
-          <h1 className="font-orbitron text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Live Product Data.{" "}
-            <br className="hidden sm:block" />
+          <h1 className="mt-8 font-orbitron text-4xl font-bold tracking-tight text-white sm:text-5xl">
+            Live product data,{" "}
             <span className="bg-gradient-to-r from-[#01a0be] to-cyan-300 bg-clip-text text-transparent">
-              Built for Partners.
+              built for partners.
             </span>
           </h1>
 
-          <p className="mt-6 text-lg leading-8 text-neutral-400 max-w-2xl mx-auto">
-            This portal gives you direct access to{" "}
-            <span className="text-neutral-200 font-medium">Patrik International&apos;s</span> live
-            product catalog — real inventory, real pricing, and a one-click sync straight to your
-            Shopify store. No delays, no spreadsheets.
+          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-neutral-400">
+            Direct access to the live catalog — export it in any format, or sync it straight to your
+            store.
           </p>
 
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <a
               href="/auth/login"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] hover:shadow-[#01a0be]/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#01a0be]"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#01a0be]"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
@@ -238,70 +297,11 @@ async function HomePage() {
             </a>
             <a
               href="/contact"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-900/60 px-7 py-3.5 text-sm font-semibold text-neutral-300 transition-all hover:border-neutral-600 hover:text-white backdrop-blur-sm"
+              className="text-sm font-medium text-neutral-400 transition-colors hover:text-[#01a0be]"
             >
-              Request Access
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-              </svg>
+              Request access →
             </a>
           </div>
-        </div>
-
-        {/* Divider */}
-        <div className="h-px bg-gradient-to-r from-transparent via-neutral-700 to-transparent mb-14" />
-
-        {/* Feature highlights */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[
-            {
-              icon: (
-                <svg className="h-5 w-5 text-[#01a0be]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  {ICONS.catalog}
-                </svg>
-              ),
-              title: "Live Catalog",
-              desc: "Patrik International's full range with real-time stock, pricing, and variant data.",
-            },
-            {
-              icon: (
-                <svg className="h-5 w-5 text-[#01a0be]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  {ICONS.export}
-                </svg>
-              ),
-              title: "Ready-to-Use Exports",
-              desc: "Download product data in Shopify, CSV, JSON, and XML — formatted to import anywhere.",
-            },
-            {
-              icon: (
-                <svg className="h-5 w-5 text-[#01a0be]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  {ICONS.shopify}
-                </svg>
-              ),
-              title: "Direct Shopify Sync",
-              desc: "Connect your store and push stock, prices, products, and images automatically.",
-            },
-            {
-              icon: (
-                <svg className="h-5 w-5 text-[#01a0be]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  {ICONS.ownSources}
-                </svg>
-              ),
-              title: "Your Own Brands Too",
-              desc: "Register your other suppliers' feeds and sync them through the same pipeline.",
-            },
-          ].map((item) => (
-            <div
-              key={item.title}
-              className="flex flex-col gap-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 backdrop-blur-sm"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#01a0be]/10 border border-[#01a0be]/20">
-                {item.icon}
-              </div>
-              <h3 className="text-sm font-semibold text-white">{item.title}</h3>
-              <p className="text-xs text-neutral-500 leading-relaxed">{item.desc}</p>
-            </div>
-          ))}
         </div>
       </div>
     </div>
