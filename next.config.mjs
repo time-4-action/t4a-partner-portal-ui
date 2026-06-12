@@ -4,41 +4,12 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "docs.gravatar.com", // Added this
+        hostname: "**",
         pathname: "/**",
       },
       {
-        protocol: "https",
-        hostname: "imgs.pnvnet.si",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.patrikinternational.com",
-        pathname: "/assets/**",
-      },
-      {
-        protocol: "https",
-        hostname: "via.placeholder.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "s.gravatar.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "lh3.googleusercontent.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "encrypted-tbn0.gstatic.com",
-        port: "",
+        protocol: "http",
+        hostname: "**",
         pathname: "/**",
       },
     ],
