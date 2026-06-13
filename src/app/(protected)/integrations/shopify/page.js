@@ -60,9 +60,10 @@ async function getOwnSources() {
 }
 
 // Fetch the exports with AI categorization enabled — the per-source "AI categorization" picker
-// adds the chosen export's AI categories to the source's Shopify tags. Empty on failure → the
-// section simply doesn't render.
-async function getAiExports() {
+// adds the chosen export's AI categories to the source's Shopify tags. Filtered to those the
+// user's roles and user ID can access (same rule as the Export/Categories pages), since
+// `/exports` returns every export unscoped. Empty on failure → the section simply doesn't render.
+async function getAiExports(userRoles, userId) {
   try {
     const { token } = await auth0.getAccessToken();
     const res = await fetch(`${apiUrl}/exports`, {
@@ -71,7 +72,12 @@ async function getAiExports() {
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data?.data) ? data.data : [];
+    const all = Array.isArray(data?.data) ? data.data : [];
+    return all.filter((exp) => {
+      const roleOk = !exp.roles?.length || exp.roles.some((r) => userRoles.includes(r));
+      const userOk = !exp.users?.length || exp.users.includes(userId);
+      return roleOk && userOk;
+    });
   } catch {
     return [];
   }
@@ -97,6 +103,7 @@ async function getShopifyPricelists() {
 export default async function ShopifyIntegrationRoute() {
   const session = await auth0.getSession();
   const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
+  const userId = session?.user?.sub ?? null;
 
   if (!roles.includes("export")) {
     return (
@@ -131,7 +138,7 @@ export default async function ShopifyIntegrationRoute() {
     getShopifyConnections(),
     getShopifyPricelists(),
     getOwnSources(),
-    getAiExports(),
+    getAiExports(roles, userId),
   ]);
 
   return (
