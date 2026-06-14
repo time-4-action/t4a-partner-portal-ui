@@ -100,10 +100,17 @@ async function getShopifyPricelists() {
   }
 }
 
-export default async function ShopifyIntegrationRoute() {
+export default async function ShopifyIntegrationRoute({ searchParams }) {
   const session = await auth0.getSession();
   const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
   const userId = session?.user?.sub ?? null;
+
+  // A merchant who completed a Shopify install but lacks access arrives here (from the welcome
+  // page → sign-in) with ?shop&claim. In the non-alpha branch below we hand these to TierGate so it
+  // can do the clean break — uninstall the app + delete the pending record — and explain why.
+  const sp = (await searchParams) || {};
+  const claimShop = typeof sp.shop === "string" ? sp.shop : undefined;
+  const claimToken = typeof sp.claim === "string" ? sp.claim : undefined;
 
   if (!roles.includes("export")) {
     return (
@@ -127,7 +134,13 @@ export default async function ShopifyIntegrationRoute() {
     return (
       <div className="relative bg-transparent py-6 lg:py-8">
         <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-          <TierGate featureKey="shopify" userEmail={session?.user?.email} userName={session?.user?.name} />
+          <TierGate
+            featureKey="shopify"
+            userEmail={session?.user?.email}
+            userName={session?.user?.name}
+            declineShop={claimToken ? claimShop : undefined}
+            declineClaim={claimToken ? claimToken : undefined}
+          />
         </div>
       </div>
     );

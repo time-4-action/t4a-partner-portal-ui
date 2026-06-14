@@ -512,6 +512,10 @@ export default function ShopifyIntegrationPage({
   //     connected yet, `?connect=1` (open the connect form with the domain prefilled).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // A `?claim` means we returned from the welcome page after sign-in to bind a pending
+    // Shopify-initiated install — the dedicated claim effect below owns that (don't auto-launch
+    // OAuth via the resume path here).
+    if (params.get("claim")) return;
     const outcome = params.get("shopify");
     const shopParam = params.get("shop");        // full *.myshopify.com domain
     const wantConnect = params.get("connect") === "1";
@@ -555,6 +559,49 @@ export default function ShopifyIntegrationPage({
 
     if (msg) queueMicrotask(() => setNotice(msg));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Claim a pending Shopify-initiated install: the welcome page sends the signed-in (approved)
+  // partner back here with ?shop&claim. Bind it server-side, slot the now-active store into the
+  // switcher, then strip the params so a refresh doesn't replay the claim.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shopParam = params.get("shop");
+    const claim = params.get("claim");
+    if (!shopParam || !claim) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/nextapi/export/shopify/connection/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shop: shopParam, claimToken: claim }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.connection) throw new Error(data?.error || "claim failed");
+        if (cancelled) return;
+        const conn = data.connection;
+        setConnections((list) => {
+          const exists = list.some((c) => connKey(c) === connKey(conn));
+          return exists ? list.map((c) => (connKey(c) === connKey(conn) ? conn : c)) : [...list, conn];
+        });
+        setSelectedKey(connKey(conn));
+        setAdding(false);
+        setNotice({ tone: "success", text: "Store connected successfully." });
+      } catch {
+        if (!cancelled) {
+          setNotice({ tone: "error", text: "We couldn't finish connecting your store. Try \"Sync now\", or reconnect it." });
+        }
+      } finally {
+        if (!cancelled) {
+          const url = new URL(window.location.href);
+          ["shop", "claim"].forEach((k) => url.searchParams.delete(k));
+          window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Reflect a finished sync / status change up onto the matching switcher pill.
