@@ -6,6 +6,9 @@
  * submit it emails us through the existing `/nextapi/contact` nodemailer route (role + store are
  * folded into the message so no backend change is needed). A successful request is remembered in
  * localStorage (per `storageKey`) so the form doesn't beg twice on the same device.
+ *
+ * Layout is mobile-first: fields stack on small screens and pair up from `sm`. Inputs are 44px tall
+ * for comfortable touch targets.
  */
 
 import { useEffect, useState } from "react";
@@ -26,8 +29,9 @@ const CheckIcon = (props) => (
 );
 
 const inputCls =
-  "w-full rounded-xl border border-neutral-800 bg-neutral-950/60 px-3.5 py-2.5 text-sm text-neutral-100 placeholder-neutral-600 outline-none transition-colors focus:border-[#01a0be]/60 focus:ring-1 focus:ring-[#01a0be]/30";
-const labelCls = "mb-1.5 block text-xs font-medium text-neutral-400";
+  "h-11 w-full rounded-xl border border-neutral-800 bg-neutral-950/70 px-3.5 text-sm text-neutral-100 placeholder:text-neutral-600 outline-none transition focus:border-[#01a0be]/70 focus:ring-2 focus:ring-[#01a0be]/20";
+const labelCls = "mb-1.5 block text-[13px] font-medium text-neutral-300";
+const Req = () => <span className="text-[#01a0be]">*</span>;
 
 export default function RequestAccessForm({
   featureName = "Shopify Integration",
@@ -73,12 +77,7 @@ export default function RequestAccessForm({
       const res = await fetch("/nextapi/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          company: form.company,
-          email: form.email,
-          message,
-        }),
+        body: JSON.stringify({ name: form.name, company: form.company, email: form.email, message }),
       });
       if (!res.ok) throw new Error();
       if (storageKey) {
@@ -97,8 +96,8 @@ export default function RequestAccessForm({
         <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
         <div>
           <p className="text-sm font-medium text-emerald-200">Request sent</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-emerald-300/80">
-            Thanks — we&apos;ll review your details and be in touch by email once your access is enabled.
+          <p className="mt-0.5 text-[13px] leading-relaxed text-emerald-300/80">
+            Thanks — we&apos;ll review your details and email you once your access is enabled.
           </p>
         </div>
       </div>
@@ -106,23 +105,23 @@ export default function RequestAccessForm({
   }
 
   return (
-    <form onSubmit={submit} className="w-full space-y-4 text-left">
+    <form onSubmit={submit} noValidate className="w-full space-y-4 text-left">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className={labelCls}>Your name <span className="text-[#01a0be]">*</span></label>
+          <label className={labelCls}>Your name <Req /></label>
           <input className={inputCls} value={form.name} onChange={set("name")} placeholder="Jane Partner" autoComplete="name" />
         </div>
         <div>
-          <label className={labelCls}>Email <span className="text-[#01a0be]">*</span></label>
-          <input className={inputCls} type="email" value={form.email} onChange={set("email")} placeholder="jane@company.com" autoComplete="email" />
+          <label className={labelCls}>Email <Req /></label>
+          <input className={inputCls} type="email" inputMode="email" value={form.email} onChange={set("email")} placeholder="you@company.com" autoComplete="email" />
         </div>
         <div>
-          <label className={labelCls}>Company <span className="text-[#01a0be]">*</span></label>
+          <label className={labelCls}>Company <Req /></label>
           <input className={inputCls} value={form.company} onChange={set("company")} placeholder="Company Ltd" autoComplete="organization" />
         </div>
         <div>
           <label className={labelCls}>Your role</label>
-          <input className={inputCls} value={form.role} onChange={set("role")} placeholder="Owner / e-commerce manager" />
+          <input className={inputCls} value={form.role} onChange={set("role")} placeholder="Owner, manager…" />
         </div>
       </div>
       <div>
@@ -132,26 +131,27 @@ export default function RequestAccessForm({
       <div>
         <label className={labelCls}>About your business</label>
         <textarea
-          className={`${inputCls} min-h-[96px] resize-y`}
+          className={`${inputCls.replace("h-11", "min-h-[88px] py-2.5")} resize-y`}
+          rows={3}
           value={form.message}
           onChange={set("message")}
-          placeholder="What you sell, which Patrik brands you carry, and why you'd like the Shopify sync."
+          placeholder="What you sell and which Patrik brands you carry."
         />
       </div>
 
       {state === "error" && (
-        <p className="text-xs text-red-400">
-          Please fill in your name, email and company — then try again. If it keeps failing, use the contact page.
+        <p className="text-[13px] text-red-400">
+          Please add your name, email and company, then try again.
         </p>
       )}
 
       <button
         type="submit"
         disabled={state === "sending"}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#01a0be] to-violet-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:shadow-[#01a0be]/40 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#01a0be] to-violet-500 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition hover:shadow-[#01a0be]/40 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {state === "sending" ? <SpinnerIcon className="h-4 w-4" /> : null}
-        {state === "sending" ? "Sending request…" : "Request access"}
+        {state === "sending" && <SpinnerIcon className="h-4 w-4" />}
+        {state === "sending" ? "Sending…" : "Request access"}
       </button>
     </form>
   );
