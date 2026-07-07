@@ -84,11 +84,20 @@ function StatusStrip({ stores }) {
   const ok = needs.length === 0;
   const dot = ok ? "bg-[#01a0be]" : "bg-amber-400";
 
+  // A store connected with the customer's own app (Prerelease) lives ONLY on the prerelease page;
+  // linking it to /integrations/shopify would land on a page that filters it out and then
+  // auto-launches the shared OAuth. Route each store to the page that owns it.
+  const isPrereleaseStore = (s) => s.authMethod === "custom_oauth" || s.authMethod === "custom_app";
+  const pageFor = (s) => (isPrereleaseStore(s) ? "/integrations/shopify-prerelease" : "/integrations/shopify");
+
   let label;
-  let href = "/integrations/shopify";
+  // Multi-store aggregate link: prerelease page only if every store is prerelease, else the shared page.
+  let href = visible.length > 0 && visible.every(isPrereleaseStore)
+    ? "/integrations/shopify-prerelease"
+    : "/integrations/shopify";
   if (visible.length === 1) {
     const s = visible[0];
-    href = `/integrations/shopify?shop=${encodeURIComponent(s.shopDomain)}`;
+    href = `${pageFor(s)}?shop=${encodeURIComponent(s.shopDomain)}`;
     const last = relTime(s.lastSyncAt);
     label = (
       <>
@@ -152,6 +161,11 @@ function PrimaryTile({ href, icon, title, desc, cta }) {
 
 // The authenticated home: a calm "pick your path" screen.
 function AuthedHome({ firstName, hasStores, stores }) {
+  // If every connected store is a Prerelease (bring-your-own-app) store, the "Manage stores" tile
+  // should open the prerelease page (that's the page that owns them); otherwise the shared page.
+  const allPrerelease = (stores?.length ?? 0) > 0 &&
+    stores.every((s) => s.authMethod === "custom_oauth" || s.authMethod === "custom_app");
+  const shopifyHref = allPrerelease ? "/integrations/shopify-prerelease" : "/integrations/shopify";
   return (
     <div className="relative min-h-[calc(100vh-4rem)] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
       <div className="relative mx-auto w-full max-w-3xl">
@@ -169,7 +183,7 @@ function AuthedHome({ firstName, hasStores, stores }) {
           {/* Two equal primary paths */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <PrimaryTile
-              href="/integrations/shopify"
+              href={shopifyHref}
               icon="shopify"
               title="Sync to your store"
               desc="Connect Shopify once and keep it stocked automatically — stock, prices, products and images."
