@@ -51,6 +51,27 @@ const SCOPES = [
   "read_locations",
 ];
 
+// Admin API scopes a merchant must enable on their OWN custom app for the Prerelease flow. Mirror
+// of the backend DEFAULT_SCOPES — the publications pair powers the "Sales channels" publish step.
+const CUSTOM_APP_SCOPES = [
+  "read_products",
+  "write_products",
+  "read_inventory",
+  "write_inventory",
+  "read_locations",
+  "read_publications",
+  "write_publications",
+];
+
+// Fixed portal URLs the customer pastes into their Partner Dashboard app (same for everyone — they
+// point at OUR infrastructure). The redirect URL must EXACTLY equal the API's
+// {SHOPIFY_API_BASE_URL}/shopify/callback-custom. Overridable per-deployment via the `oauthConfig`
+// prop (the prerelease page passes it from env); these are the production defaults.
+const OAUTH_DEFAULTS = {
+  appUrl: "https://export.time-4-action.com/integrations/shopify-prerelease",
+  redirectUrl: "https://api.time-4-action.com/api/export/shopify/callback-custom",
+};
+
 const MOCK_CONNECTION = {
   shopDomain: "patrik-international.myshopify.com",
   status: "active", // "active" | "uninstalled" | "error"
@@ -344,6 +365,16 @@ const CheckIcon = (p) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
   </Svg>
 );
+const ClipboardIcon = (p) => (
+  <Svg {...p}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+  </Svg>
+);
+const BookIcon = (p) => (
+  <Svg {...p}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+  </Svg>
+);
 const UndoIcon = (p) => (
   <Svg {...p}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
@@ -459,6 +490,11 @@ function SectionHeading({ title, desc, icon, right }) {
 export default function ShopifyIntegrationPage({
   initialExports = [],
   ownerEmail,
+  // "standard" = the OAuth public-app page (/integrations/shopify). "prerelease" = the
+  // bring-your-own custom-app page (/integrations/shopify-prerelease): stores connect by pasting a
+  // custom-app Admin API token instead of running OAuth. Only the header badge + connect screen
+  // differ; the whole management experience below is shared.
+  variant = "standard",
   // Every store the user has connected (GET /shopify/connections). `null` means the fetch
   // failed → fall back to a two-store demo so the page still renders something rich. An empty
   // array means the user simply has no stores yet → show the connect screen.
@@ -472,8 +508,12 @@ export default function ShopifyIntegrationPage({
   // Exports with AI categorization enabled (GET /exports) — a Patrik source can pick one and
   // its AI categories are pushed as Shopify tags for that source.
   initialAiExports = [],
+  // Prerelease bring-your-own-OAuth-app only: the fixed App URL + Redirect URL the customer pastes
+  // into their Partner Dashboard app. Defaults to production URLs when not supplied.
+  oauthConfig = null,
 }) {
   const isDemo = initialConnections === null;
+  const isPrerelease = variant === "prerelease";
   const seedConnections = isDemo ? [MOCK_CONNECTION, MOCK_CONNECTION_2] : initialConnections;
 
   const [connections, setConnections] = useState(seedConnections);
@@ -532,7 +572,17 @@ export default function ShopifyIntegrationPage({
           : "Store connected successfully.",
       };
     } else if (outcome === "error") {
-      msg = { tone: "error", text: `Connection failed (${params.get("reason") || "unknown error"}).` };
+      const reason = params.get("reason") || "unknown error";
+      // Friendly text for the specific bring-your-own-app OAuth failure reasons; falls back to the
+      // raw code for anything else.
+      const REASON_TEXT = {
+        state_shop_mismatch: "The store you entered didn't match the store you approved on Shopify. Enter your permanent .myshopify.com name (Shopify admin → Settings → Domains), then connect again.",
+        state_expired: "That took too long, so the connection link expired. Please connect again.",
+        state_bad_signature: "The connection link couldn't be verified. Connect again; if it keeps happening, the API may have restarted mid-connect.",
+        state_missing: "Shopify didn't return the connection link. Please connect again.",
+        state_not_custom: "The install came back on the wrong callback. Check your app's Redirect URL is exactly the one from the guide (…/shopify/callback-custom).",
+      };
+      msg = { tone: "error", text: REASON_TEXT[reason] || `Connection failed (${reason}).` };
     }
 
     if (shopParam || wantConnect) {
@@ -541,6 +591,13 @@ export default function ShopifyIntegrationPage({
         // Already connected (or just finished connecting) → jump to that store.
         setSelectedKey(connKey(match));
         setAdding(false);
+      } else if (shopParam && isPrerelease) {
+        // PRERELEASE: connecting is portal-initiated with the customer's OWN app credentials. We must
+        // NEVER auto-launch the shared-app OAuth (ResumeConnect → /shopify/connect uses OUR public
+        // app). Opening the app from the Dev Dashboard lands here with ?shop — just prefill the
+        // connect form so the user pastes their own app's key/secret and connects.
+        setConnectPrefill(shopLabel(shopParam));
+        setAdding(true);
       } else if (shopParam) {
         // Opened from Shopify for a store that isn't connected → focused auto-resume (launches
         // OAuth). Also stash the prefill so cancelling drops to the manual form, store filled in.
@@ -646,13 +703,22 @@ export default function ShopifyIntegrationPage({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="mb-0 text-xl font-bold leading-none tracking-tight text-white">Shopify</h1>
-              <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-                <BagIcon className="h-3 w-3" />
-                Integration
-              </span>
+              {isPrerelease ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
+                  <BagIcon className="h-3 w-3" />
+                  Beta · Prerelease
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
+                  <BagIcon className="h-3 w-3" />
+                  Integration
+                </span>
+              )}
             </div>
             <p className="mt-1 hidden text-xs text-neutral-500 sm:block">
-              One-way push of stock, products, prices and images from the portal straight to your Shopify stores.
+              {isPrerelease
+                ? "Prerelease access — connect your store with your own custom app while our public app is in review."
+                : "One-way push of stock, products, prices and images from the portal straight to your Shopify stores."}
             </p>
           </div>
         </div>
@@ -809,6 +875,8 @@ export default function ShopifyIntegrationPage({
         />
       ) : showConnect ? (
         <ConnectStore
+          variant={variant}
+          oauthConfig={oauthConfig}
           canCancel={connections.length > 0}
           onCancel={() => setAdding(false)}
           onNotice={setNotice}
@@ -818,6 +886,7 @@ export default function ShopifyIntegrationPage({
         <ConnectionPanel
           key={selectedKey}
           connection={selected}
+          variant={variant}
           exportOptions={initialExports}
           feedOptions={initialFeeds}
           aiExportOptions={initialAiExports}
@@ -933,12 +1002,41 @@ function ResumeConnect({ shopDomain, onNotice, onCancel }) {
 /*  ConnectStore — enter a domain and start OAuth (first or additional store)  */
 /* -------------------------------------------------------------------------- */
 
-function ConnectStore({ canCancel, onCancel, onNotice, initialDomain = "" }) {
+function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onCancel, onNotice, initialDomain = "" }) {
+  const isPrerelease = variant === "prerelease";
   const [domainInput, setDomainInput] = useState(initialDomain);
   const [connecting, setConnecting] = useState(false);
+  // Prerelease bring-your-own-OAuth-app: the customer's app credentials.
+  const [clientIdInput, setClientIdInput] = useState("");
+  const [clientSecretInput, setClientSecretInput] = useState("");
 
   const domainClean = domainInput.trim().toLowerCase();
   const domainValid = /^[a-z0-9][a-z0-9-]*$/.test(domainClean);
+  const clientIdClean = clientIdInput.trim();
+  const clientSecretClean = clientSecretInput.trim();
+  const oauth = oauthConfig || OAUTH_DEFAULTS;
+
+  // Prerelease-only: copy any guide value (App URL / Redirect URL / scopes) to the clipboard.
+  const [copiedKey, setCopiedKey] = useState(null);
+  const copyText = async (text, key) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 1600);
+    } catch {
+      onNotice?.({ tone: "error", text: "Couldn't copy — select the text and copy it manually." });
+    }
+  };
+
+  // Prerelease-only: the step-by-step setup guide is a Next/Back modal wizard (not a side rail).
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guideStep, setGuideStep] = useState(0);
+  useEffect(() => {
+    if (!guideOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [guideOpen]);
 
   // Start OAuth: ask the backend for the Shopify authorize URL, then redirect the browser to it.
   // Shopify sends the user back to the API callback, which redirects to this page with
@@ -959,6 +1057,273 @@ function ConnectStore({ canCancel, onCancel, onNotice, initialDomain = "" }) {
     }
     setConnecting(false);
   };
+
+  // Prerelease bring-your-own-OAuth-app: send the customer's app credentials to the backend, which
+  // parks them and returns their app's Shopify authorize URL; then redirect to install/approve.
+  const connectCustomOAuth = async () => {
+    if (!domainValid || !clientIdClean || !clientSecretClean || connecting) return;
+    setConnecting(true);
+    try {
+      const res = await fetch("/nextapi/export/shopify/connect-custom-oauth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shop: domainClean, clientId: clientIdClean, clientSecret: clientSecretClean }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.url) {
+        window.location.href = data.url;
+        return; // navigating away to Shopify's consent screen
+      }
+      onNotice({ tone: "error", text: data?.error || "Could not start the connection." });
+    } catch {
+      onNotice({ tone: "error", text: "Could not reach the server to start the connection." });
+    }
+    setConnecting(false);
+  };
+
+  if (isPrerelease) {
+    // The step-by-step setup wizard (rendered in the modal). Steps carry an optional copy field
+    // (App URL / Redirect URL / scopes) and an optional amber warning.
+    const guideSteps = [
+      {
+        title: "Create a NEW app",
+        body: (
+          <>
+            Go to <span className="font-mono text-neutral-300">dev.shopify.com</span> (the Shopify Dev Dashboard) and sign in.
+            Open <span className="font-medium text-neutral-200">Apps → Create app</span>, create it manually and name it
+            (e.g. <span className="text-neutral-200">&quot;Patrik Portal&quot;</span>). Open the app, then start a new{" "}
+            <span className="font-medium text-neutral-200">version</span> to edit its configuration.
+          </>
+        ),
+        warn: "Create your OWN new app. Do NOT reuse our \"time-4-action-integration\" app — that's our public app still under Shopify review, so a store can't install it (that's the \"app under review\" screen).",
+      },
+      {
+        title: "Set the App URL",
+        body: (<>In the version&apos;s <span className="font-medium text-neutral-200">URLs</span> section, paste this as the <span className="font-medium text-neutral-200">App URL</span>, and un-tick <span className="font-medium text-neutral-200">Embed app in Shopify admin</span>.</>),
+        copy: { key: "appUrl", label: "App URL", value: oauth.appUrl },
+      },
+      {
+        title: "Set the Redirect URL",
+        body: (<>In <span className="font-medium text-neutral-200">Access</span>, paste this into <span className="font-medium text-neutral-200">Redirect URLs</span>, and tick <span className="font-medium text-neutral-200">Use legacy install flow</span>.</>),
+        copy: { key: "redirect", label: "Redirect URL", value: oauth.redirectUrl },
+        warn: "Paste it exactly — this must match, character for character, or the connect will fail.",
+      },
+      {
+        title: "Add the scopes",
+        body: (<>Paste this comma-separated list into <span className="font-medium text-neutral-200">Scopes</span> (leave Optional scopes empty), then click <span className="font-medium text-neutral-200">Release</span> to save the version.</>),
+        copy: { key: "scopes", label: "Scopes", value: CUSTOM_APP_SCOPES.join(",") },
+      },
+      {
+        title: "Make it Custom distribution",
+        body: (<>Open <span className="font-medium text-neutral-200">Distribution</span>, choose <span className="font-medium text-neutral-200">Custom distribution</span> and enter your store{domainClean ? <> (<span className="font-mono text-neutral-300">{domainClean}.myshopify.com</span>)</> : ""}.</>),
+        warn: "This is what avoids the \"app under review\" wall — a custom-distribution app installs on your one store without any Shopify review.",
+      },
+      {
+        title: "Copy your credentials",
+        body: (<>Open the app&apos;s <span className="font-medium text-neutral-200">Client credentials</span> (a.k.a. API credentials). You&apos;ll paste the <span className="font-medium text-neutral-200">Client ID</span> and <span className="font-medium text-neutral-200">Client secret</span> into this page next.</>),
+        warn: "Do NOT click \"Install\" in the Dev Dashboard — that installs the wrong app. The install is started from THIS page (the Connect button below), which uses your app's key.",
+      },
+      {
+        title: "Connect",
+        body: (<>Come back to this page, paste your <span className="font-medium text-neutral-200">store domain</span>, <span className="font-medium text-neutral-200">Client ID</span> and <span className="font-medium text-neutral-200">Client secret</span> into the form, and click <span className="font-medium text-neutral-200">Connect store</span> (not the Dashboard&apos;s Install button). You&apos;ll be sent to Shopify to approve — the consent screen should show YOUR app&apos;s name, not ours.</>),
+      },
+    ];
+    const gStep = guideSteps[guideStep] || guideSteps[0];
+    const isLastStep = guideStep >= guideSteps.length - 1;
+
+    return (
+      <>
+        <div className="mx-auto max-w-2xl space-y-6">
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div className="relative mb-6 w-fit">
+                <div aria-hidden="true" className="absolute -inset-2 rounded-2xl bg-[#95BF47]/20 blur-xl" />
+                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
+                  <ShopifyLogo className="h-8 w-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]" />
+                </div>
+              </div>
+              {canCancel && (
+                <button
+                  onClick={onCancel}
+                  className="rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white"
+                >
+                  Back to stores
+                </button>
+              )}
+            </div>
+
+            <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-[#01a0be]">
+              Beta · Prerelease
+            </div>
+            <h2 className="text-xl font-semibold text-white">
+              {canCancel ? "Connect another store" : "Connect your Shopify store"}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              While our public Shopify app is in review, connect now with your{" "}
+              <span className="font-medium text-neutral-200">own Shopify app</span> — create one in the Shopify Dev
+              Dashboard, then paste its API key and secret below. New here? Open the guide first.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => { setGuideStep(0); setGuideOpen(true); }}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#01a0be]/40 bg-[#01a0be]/10 px-4 py-2.5 text-sm font-semibold text-[#01a0be] transition-colors hover:bg-[#01a0be]/15"
+            >
+              <BookIcon className="h-4 w-4" />
+              Open setup guide
+            </button>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="pr-shop-domain" className="mb-2 block text-sm font-medium text-neutral-300">Your store domain</label>
+                <div className="flex overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900/60 transition-colors focus-within:border-[#01a0be]/50">
+                  <input
+                    id="pr-shop-domain"
+                    type="text"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={domainInput}
+                    onChange={(e) => setDomainInput(e.target.value)}
+                    placeholder="ruzkrw-7q"
+                    className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none"
+                  />
+                  <span className="flex select-none items-center whitespace-nowrap border-l border-neutral-700 px-3 text-sm text-neutral-500">
+                    .myshopify.com
+                  </span>
+                </div>
+                <p className={`mt-2 text-xs ${domainInput && !domainValid ? "text-amber-400" : "text-neutral-500"}`}>
+                  {domainInput && !domainValid
+                    ? "Use only lowercase letters, numbers and hyphens — just the store name."
+                    : "Use your permanent .myshopify.com name (e.g. ruzkrw-7q) — find it in Shopify admin → Settings → Domains. NOT your custom domain or store title."}
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="pr-client-id" className="mb-2 block text-sm font-medium text-neutral-300">API key (Client ID)</label>
+                <input
+                  id="pr-client-id"
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={clientIdInput}
+                  onChange={(e) => setClientIdInput(e.target.value)}
+                  placeholder="e.g. 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d"
+                  className="w-full rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-3.5 font-mono text-sm text-white placeholder:text-neutral-600 transition-colors focus:border-[#01a0be]/50 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="pr-client-secret" className="mb-2 block text-sm font-medium text-neutral-300">API secret key</label>
+                <input
+                  id="pr-client-secret"
+                  type="password"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={clientSecretInput}
+                  onChange={(e) => setClientSecretInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && connectCustomOAuth()}
+                  placeholder="shpss_••••••••••••••••••••••••••••••••"
+                  className="w-full rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-3.5 font-mono text-sm text-white placeholder:text-neutral-600 transition-colors focus:border-[#01a0be]/50 focus:outline-none"
+                />
+                <p className="mt-2 text-xs text-neutral-500">
+                  Both are on your app&apos;s <span className="text-neutral-300">Client credentials</span> page in the Dev Dashboard.
+                  The secret is stored encrypted and never displayed again.
+                </p>
+              </div>
+
+              <button
+                onClick={connectCustomOAuth}
+                disabled={!domainValid || !clientIdClean || !clientSecretClean || connecting}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {connecting ? <SpinnerIcon className="h-4 w-4" /> : <BagIcon className="h-4 w-4" />}
+                {connecting ? "Redirecting to Shopify…" : "Connect store"}
+              </button>
+            </div>
+
+            <div className="mt-6 border-t border-neutral-800 pt-5">
+              <ul className="space-y-2">
+                {[
+                  "Your app secret and token are encrypted at rest and never logged or shown again.",
+                  "One-way push only — we never read or change your orders.",
+                  "Least-privilege scopes; disconnect any time to uninstall from your store.",
+                ].map((t) => (
+                  <li key={t} className="flex items-start gap-2.5 text-xs text-neutral-500">
+                    <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#01a0be]" />
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        </div>
+
+        {guideOpen && (
+          <div className="fixed inset-0 z-[80] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-4" onClick={() => setGuideOpen(false)}>
+            <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-5 py-3.5">
+                <div className="min-w-0">
+                  <h2 className="mb-0 text-base font-semibold leading-none text-white">Set up your app</h2>
+                  <p className="mt-1 text-xs text-neutral-500">Step {guideStep + 1} of {guideSteps.length} · dev.shopify.com</p>
+                </div>
+                <button type="button" onClick={() => setGuideOpen(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              <div className="flex shrink-0 gap-1.5 px-5 pt-4">
+                {guideSteps.map((s, i) => (
+                  <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= guideStep ? "bg-[#01a0be]" : "bg-neutral-800"}`} />
+                ))}
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-sm font-bold text-white">{guideStep + 1}</span>
+                  <h3 className="mb-0 text-base font-semibold text-white">{gStep.title}</h3>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-neutral-300">{gStep.body}</p>
+
+                {gStep.warn && (
+                  <div className="mt-3 flex gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-3">
+                    <WarningIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                    <p className="text-xs leading-snug text-amber-200/90">{gStep.warn}</p>
+                  </div>
+                )}
+
+                {gStep.copy && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">{gStep.copy.label}</p>
+                      <button type="button" onClick={() => copyText(gStep.copy.value, gStep.copy.key)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900/60 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white">
+                        {copiedKey === gStep.copy.key ? <CheckIcon className="h-3.5 w-3.5 text-[#01a0be]" /> : <ClipboardIcon className="h-3.5 w-3.5" />}
+                        {copiedKey === gStep.copy.key ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <div className="mt-1.5 rounded-lg border border-neutral-800 bg-neutral-950/60 p-2.5">
+                      <code className="block select-all break-words font-mono text-[0.7rem] leading-relaxed text-neutral-300">{gStep.copy.value}</code>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-neutral-800 px-5 py-3.5">
+                <button type="button" onClick={() => setGuideStep((s) => Math.max(0, s - 1))} disabled={guideStep === 0} className="rounded-lg border border-neutral-700 bg-neutral-900/60 px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+                  Back
+                </button>
+                <button type="button" onClick={() => { if (isLastStep) setGuideOpen(false); else setGuideStep((s) => s + 1); }} className="rounded-lg bg-[#01a0be] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">
+                  {isLastStep ? "Got it" : "Next"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -1099,7 +1464,10 @@ function ConnectStore({ canCancel, onCancel, onNotice, initialDomain = "" }) {
 /*  ConnectionPanel — full management UI for ONE connected store               */
 /* -------------------------------------------------------------------------- */
 
-function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions = [], aiExportOptions = [], pricelists, addSourceId, onAddSourceConsumed, onNotice, onDisconnected, onPatch }) {
+function ConnectionPanel({ connection: initialConn, variant = "standard", exportOptions, feedOptions = [], aiExportOptions = [], pricelists, addSourceId, onAddSourceConsumed, onNotice, onDisconnected, onPatch }) {
+  // On the Prerelease page the "Create export" deep-link must return HERE, not to the shared
+  // /integrations/shopify page (where this store is filtered out and would auto-launch shared OAuth).
+  const exportFromParam = variant === "prerelease" ? "&from=prerelease" : "";
   const isDemo = !initialConn._id;
   const myKey = connKey(initialConn);
 
@@ -1579,7 +1947,12 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
     if (connecting || !connection.shopDomain) return;
     setConnecting(true);
     try {
-      const res = await fetch(`/nextapi/export/shopify/connect?shop=${encodeURIComponent(connection.shopDomain)}`);
+      // A Prerelease (bring-your-own-app) store must reconnect through ITS OWN app, using the stored
+      // credentials — never the shared /shopify/connect (that would install OUR public app).
+      const endpoint = variant === "prerelease"
+        ? `/nextapi/export/shopify/connection/${connection._id}/reconnect-custom`
+        : `/nextapi/export/shopify/connect?shop=${encodeURIComponent(connection.shopDomain)}`;
+      const res = await fetch(endpoint);
       const data = await res.json();
       if (res.ok && data.url) {
         window.location.href = data.url;
@@ -2063,7 +2436,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
           <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-6 text-center">
             <p className="text-sm text-neutral-300">No products to sync yet.</p>
             <p className="mt-1 text-xs text-neutral-500">
-              Create a <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}`} className="text-[#01a0be] hover:underline">Shopify export</a> or register an{" "}
+              Create a <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}${exportFromParam}`} className="text-[#01a0be] hover:underline">Shopify export</a> or register an{" "}
               <a href="/integrations/own-sources" className="text-[#01a0be] hover:underline">Own Source feed</a> to choose what syncs.
             </p>
           </div>
@@ -2139,7 +2512,7 @@ function ConnectionPanel({ connection: initialConn, exportOptions, feedOptions =
                 <PlusIcon className="h-4 w-4" />
                 Add source
               </button>
-              <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}`} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
+              <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}${exportFromParam}`} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
                 <PlusIcon className="h-3.5 w-3.5" />
                 Create source
               </a>

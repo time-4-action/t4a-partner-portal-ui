@@ -152,6 +152,13 @@ function getNavLinks(user) {
           badge: "Alpha",
         },
         {
+          href: "/integrations/shopify-prerelease",
+          label: "Shopify Prerelease",
+          description: "Use your own custom app",
+          icon: "shopify",
+          badge: "Beta",
+        },
+        {
           href: "/integrations/own-sources",
           label: "Own sources",
           description: "Push your own brand feeds",
@@ -261,12 +268,12 @@ function NavDropdown({ group, pathname }) {
                 >
                   <NavIcon name={child.icon} />
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2 text-sm font-medium">
-                    {child.label}
+                    <span className="truncate">{child.label}</span>
                     {child.badge && <NavBadge label={child.badge} />}
                   </span>
-                  <span className="block text-xs text-neutral-500">{child.description}</span>
+                  <span className="block truncate text-xs text-neutral-500">{child.description}</span>
                 </span>
               </Link>
             );

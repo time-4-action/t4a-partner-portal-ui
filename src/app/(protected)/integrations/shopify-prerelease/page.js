@@ -3,11 +3,18 @@ import TierGate from "@/components/TierGate";
 import { FEATURE_TIERS, hasTierAccess } from "@/lib/featureTiers";
 import { auth0 } from "@/lib/auth0";
 
+/**
+ * Shopify **Prerelease** route (Route B — bring-your-own custom app).
+ *
+ * Same integration surface as `/integrations/shopify`, but stores connect by pasting a custom-app
+ * Admin API token they generate in their OWN store admin, instead of installing our public OAuth
+ * app. This lets pilot customers use the integration before the public app clears Shopify review.
+ * The only difference vs the OAuth page is the connect screen (`variant="prerelease"`); everything
+ * downstream (sources, sync, activity, disconnect) is identical and shares the same backend.
+ */
+
 const apiUrl = process.env.EXPORT_API_URL || "http://localhost:4000";
 
-// Fetch the saved export configurations that use the Shopify preset. These are the real
-// `custom-export` configs (auth-scoped to the current user by the backend) that drive the
-// "Products to sync" selector — the sync follows the chosen config's filters and field rules.
 async function getShopifyExportConfigs() {
   try {
     const { token } = await auth0.getAccessToken();
@@ -23,9 +30,6 @@ async function getShopifyExportConfigs() {
   }
 }
 
-// Fetch every Shopify store the current user has connected (lightweight — no per-store Shopify
-// calls; the client lazy-loads each store's live locations/channels on demand). Returns null on
-// failure so the client component falls back to its demo state.
 async function getShopifyConnections() {
   try {
     const { token } = await auth0.getAccessToken();
@@ -41,9 +45,6 @@ async function getShopifyConnections() {
   }
 }
 
-// Fetch the user's Own Source feeds so the per-store scope selector can offer "Own source" as
-// an alternative to a Patrik export config (design §9.2). Empty on failure → the option group
-// simply doesn't appear.
 async function getOwnSources() {
   try {
     const { token } = await auth0.getAccessToken();
@@ -59,10 +60,6 @@ async function getOwnSources() {
   }
 }
 
-// Fetch the exports with AI categorization enabled — the per-source "AI categorization" picker
-// adds the chosen export's AI categories to the source's Shopify tags. Filtered to those the
-// user's roles and user ID can access (same rule as the Export/Categories pages), since
-// `/exports` returns every export unscoped. Empty on failure → the section simply doesn't render.
 async function getAiExports(userRoles, userId) {
   try {
     const { token } = await auth0.getAccessToken();
@@ -83,8 +80,6 @@ async function getAiExports(userRoles, userId) {
   }
 }
 
-// Fetch the distinct pricelists in the catalogue so the pricing panel seeds from real names
-// (not mock). Empty on failure → the panel falls back to its demo template.
 async function getShopifyPricelists() {
   try {
     const { token } = await auth0.getAccessToken();
@@ -100,17 +95,10 @@ async function getShopifyPricelists() {
   }
 }
 
-export default async function ShopifyIntegrationRoute({ searchParams }) {
+export default async function ShopifyPrereleaseRoute() {
   const session = await auth0.getSession();
   const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
   const userId = session?.user?.sub ?? null;
-
-  // A merchant who completed a Shopify install but lacks access arrives here (from the welcome
-  // page → sign-in) with ?shop&claim. In the non-alpha branch below we hand these to TierGate so it
-  // can do the clean break — uninstall the app + delete the pending record — and explain why.
-  const sp = (await searchParams) || {};
-  const claimShop = typeof sp.shop === "string" ? sp.shop : undefined;
-  const claimToken = typeof sp.claim === "string" ? sp.claim : undefined;
 
   if (!roles.includes("export")) {
     return (
@@ -128,8 +116,7 @@ export default async function ShopifyIntegrationRoute({ searchParams }) {
     );
   }
 
-  // Early-access gate: the feature stays visible in the navbar, but without the tier role
-  // the page shows the join-the-program screen instead of the integration.
+  // Early-access gate — same tier as the main Shopify page.
   if (!hasTierAccess(roles, FEATURE_TIERS.shopify.tier)) {
     return (
       <div className="relative bg-transparent py-6 lg:py-8">
@@ -138,8 +125,6 @@ export default async function ShopifyIntegrationRoute({ searchParams }) {
             featureKey="shopify"
             userEmail={session?.user?.email}
             userName={session?.user?.name}
-            declineShop={claimToken ? claimShop : undefined}
-            declineClaim={claimToken ? claimToken : undefined}
           />
         </div>
       </div>
@@ -154,21 +139,31 @@ export default async function ShopifyIntegrationRoute({ searchParams }) {
     getAiExports(roles, userId),
   ]);
 
-  // This page owns only the shared public-app connections. Bring-your-own-app connections
-  // (custom_oauth / custom_app) live on /integrations/shopify-prerelease, so a store never shows on
-  // both pages. `null` = the fetch failed → leave it null so the client shows its demo fallback.
+  // This page owns only the bring-your-own-app connections (custom_oauth / custom_app). The shared
+  // public-app connections live on /integrations/shopify, so a store never shows on both pages.
+  // `null` = the fetch failed → leave it null so the client shows its demo fallback.
   const connections = allConnections === null
     ? null
-    : allConnections.filter((c) => c.authMethod !== "custom_oauth" && c.authMethod !== "custom_app");
+    : allConnections.filter((c) => c.authMethod === "custom_oauth" || c.authMethod === "custom_app");
+
+  // Fixed URLs the customer pastes into their own Partner Dashboard app. These point at OUR
+  // infrastructure, so they're the same for every customer. The redirect URL must EXACTLY equal the
+  // API's {SHOPIFY_API_BASE_URL}/shopify/callback-custom — override via env per deployment.
+  const apiPublicBase = process.env.SHOPIFY_PUBLIC_API_BASE_URL || "https://api.time-4-action.com/api/export";
+  const portalPublicBase = process.env.SHOPIFY_PUBLIC_PORTAL_URL || "https://export.time-4-action.com";
+  const oauthConfig = {
+    appUrl: `${portalPublicBase}/integrations/shopify-prerelease`,
+    redirectUrl: `${apiPublicBase}/shopify/callback-custom`,
+  };
 
   return (
     <div className="relative bg-transparent py-6 lg:py-8">
       <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
         <ShopifyIntegrationPage
+          variant="prerelease"
+          oauthConfig={oauthConfig}
           initialExports={shopifyExports ?? []}
           ownerEmail={session?.user?.email}
-          // null = the connections fetch failed → client shows its demo store. An empty array =
-          // the fetch succeeded but the user has no stores yet → client shows the connect screen.
           initialConnections={connections}
           initialPricelists={pricelists ?? []}
           initialFeeds={ownSources ?? []}

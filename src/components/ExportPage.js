@@ -532,6 +532,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     // locked to the Shopify format, starts on Filters (no Format step), returns to Shopify on save.
     const [fromIntegration, setFromIntegration] = useState(false);
     const returnShop = useRef("");
+    // Which integration page to return to after creating a Shopify source. Defaults to the shared
+    // page; `?from=prerelease` on the deep-link sends it back to the Prerelease page instead (that
+    // store lives only there — returning to the shared page would auto-launch the shared OAuth).
+    const returnBase = useRef("/integrations/shopify");
     // Step order for the configurator. From the integration the Format step is dropped (always Shopify).
     const stepsFor = (preset) => {
         const base = preset === "inventory" ? ["format", "filters", "export"] : ["format", "filters", "fields", "export"];
@@ -1316,7 +1320,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             if (fromIntegration) {
                 // Created from the Shopify integration → return there with the new export id so the
                 // Shopify page auto-adds it as a source on the store you came from.
-                window.location.href = `/integrations/shopify?addSource=${result.data._id}${returnShop.current ? `&shop=${encodeURIComponent(returnShop.current)}` : ""}`;
+                window.location.href = `${returnBase.current}?addSource=${result.data._id}${returnShop.current ? `&shop=${encodeURIComponent(returnShop.current)}` : ""}`;
                 return;
             }
             setCurrentConfigId(result.data._id);
@@ -1506,10 +1510,13 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         if (params.get("source") !== "shopify") return;
         setFromIntegration(true);
         returnShop.current = params.get("shop") || "";
+        returnBase.current = params.get("from") === "prerelease"
+            ? "/integrations/shopify-prerelease"
+            : "/integrations/shopify";
         startNewExport();
         setExportStep("filters");
         const url = new URL(window.location.href);
-        ["source", "shop"].forEach((k) => url.searchParams.delete(k));
+        ["source", "shop", "from"].forEach((k) => url.searchParams.delete(k));
         window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -1517,7 +1524,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     // Closing the builder: from the integration, go back to Shopify instead of the saved list.
     const closeConfigurator = () => {
         if (fromIntegration) {
-            window.location.href = `/integrations/shopify${returnShop.current ? `?shop=${encodeURIComponent(returnShop.current)}` : ""}`;
+            window.location.href = `${returnBase.current}${returnShop.current ? `?shop=${encodeURIComponent(returnShop.current)}` : ""}`;
             return;
         }
         setActiveTab("saved");
