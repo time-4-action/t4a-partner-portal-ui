@@ -149,12 +149,11 @@ function getNavLinks(user) {
           label: "Shopify",
           description: "Sync products to your store",
           icon: "shopify",
-          badge: "Alpha",
         },
         {
-          href: "/integrations/shopify-prerelease",
-          label: "Shopify Prerelease",
-          description: "Use your own custom app",
+          href: "/integrations/shopify-deprecated",
+          label: "Shopify Deprecated",
+          description: "Legacy custom-app connect",
           icon: "shopify",
           badge: "Beta",
         },
@@ -163,7 +162,6 @@ function getNavLinks(user) {
           label: "Own sources",
           description: "Push your own brand feeds",
           icon: "integrations",
-          badge: "Alpha",
         },
       ],
     });

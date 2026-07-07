@@ -88,12 +88,12 @@ function StatusStrip({ stores }) {
   // linking it to /integrations/shopify would land on a page that filters it out and then
   // auto-launches the shared OAuth. Route each store to the page that owns it.
   const isPrereleaseStore = (s) => s.authMethod === "custom_oauth" || s.authMethod === "custom_app";
-  const pageFor = (s) => (isPrereleaseStore(s) ? "/integrations/shopify-prerelease" : "/integrations/shopify");
+  const pageFor = (s) => (isPrereleaseStore(s) ? "/integrations/shopify-deprecated" : "/integrations/shopify");
 
   let label;
   // Multi-store aggregate link: prerelease page only if every store is prerelease, else the shared page.
   let href = visible.length > 0 && visible.every(isPrereleaseStore)
-    ? "/integrations/shopify-prerelease"
+    ? "/integrations/shopify-deprecated"
     : "/integrations/shopify";
   if (visible.length === 1) {
     const s = visible[0];
@@ -165,7 +165,7 @@ function AuthedHome({ firstName, hasStores, stores }) {
   // should open the prerelease page (that's the page that owns them); otherwise the shared page.
   const allPrerelease = (stores?.length ?? 0) > 0 &&
     stores.every((s) => s.authMethod === "custom_oauth" || s.authMethod === "custom_app");
-  const shopifyHref = allPrerelease ? "/integrations/shopify-prerelease" : "/integrations/shopify";
+  const shopifyHref = allPrerelease ? "/integrations/shopify-deprecated" : "/integrations/shopify";
   return (
     <div className="relative min-h-[calc(100vh-4rem)] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
       <div className="relative mx-auto w-full max-w-3xl">

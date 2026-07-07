@@ -4,13 +4,15 @@ import { FEATURE_TIERS, hasTierAccess } from "@/lib/featureTiers";
 import { auth0 } from "@/lib/auth0";
 
 /**
- * Shopify **Prerelease** route (Route B — bring-your-own custom app).
+ * Shopify **Deprecated** route (formerly "Prerelease" — Route B, bring-your-own custom app).
  *
  * Same integration surface as `/integrations/shopify`, but stores connect by pasting a custom-app
- * Admin API token they generate in their OWN store admin, instead of installing our public OAuth
- * app. This lets pilot customers use the integration before the public app clears Shopify review.
- * The only difference vs the OAuth page is the connect screen (`variant="prerelease"`); everything
- * downstream (sources, sync, activity, disconnect) is identical and shares the same backend.
+ * Admin API token (or their own OAuth app credentials) generated in their OWN store admin, instead
+ * of installing our public OAuth app. This was the pilot path used before the public app cleared
+ * Shopify review; it's now deprecated and kept (behind the `beta` tier) only for stores that already
+ * connected this way. The only difference vs the OAuth page is the connect screen
+ * (`variant="prerelease"`); everything downstream (sources, sync, activity, disconnect) is identical
+ * and shares the same backend.
  */
 
 const apiUrl = process.env.EXPORT_API_URL || "http://localhost:4000";
@@ -95,7 +97,7 @@ async function getShopifyPricelists() {
   }
 }
 
-export default async function ShopifyPrereleaseRoute() {
+export default async function ShopifyDeprecatedRoute() {
   const session = await auth0.getSession();
   const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
   const userId = session?.user?.sub ?? null;
@@ -116,13 +118,13 @@ export default async function ShopifyPrereleaseRoute() {
     );
   }
 
-  // Early-access gate — same tier as the main Shopify page.
-  if (!hasTierAccess(roles, FEATURE_TIERS.shopify.tier)) {
+  // Beta gate — this legacy connect flow is deprecated and kept behind the beta tier.
+  if (!hasTierAccess(roles, FEATURE_TIERS.shopifyDeprecated.tier)) {
     return (
       <div className="relative bg-transparent py-6 lg:py-8">
         <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
           <TierGate
-            featureKey="shopify"
+            featureKey="shopifyDeprecated"
             userEmail={session?.user?.email}
             userName={session?.user?.name}
           />
@@ -152,7 +154,7 @@ export default async function ShopifyPrereleaseRoute() {
   const apiPublicBase = process.env.SHOPIFY_PUBLIC_API_BASE_URL || "https://api.time-4-action.com/api/export";
   const portalPublicBase = process.env.SHOPIFY_PUBLIC_PORTAL_URL || "https://export.time-4-action.com";
   const oauthConfig = {
-    appUrl: `${portalPublicBase}/integrations/shopify-prerelease`,
+    appUrl: `${portalPublicBase}/integrations/shopify-deprecated`,
     redirectUrl: `${apiPublicBase}/shopify/callback-custom`,
   };
 

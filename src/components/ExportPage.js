@@ -1511,7 +1511,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
         setFromIntegration(true);
         returnShop.current = params.get("shop") || "";
         returnBase.current = params.get("from") === "prerelease"
-            ? "/integrations/shopify-prerelease"
+            ? "/integrations/shopify-deprecated"
             : "/integrations/shopify";
         startNewExport();
         setExportStep("filters");

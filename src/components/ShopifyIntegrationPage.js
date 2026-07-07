@@ -66,9 +66,9 @@ const CUSTOM_APP_SCOPES = [
 // Fixed portal URLs the customer pastes into their Partner Dashboard app (same for everyone — they
 // point at OUR infrastructure). The redirect URL must EXACTLY equal the API's
 // {SHOPIFY_API_BASE_URL}/shopify/callback-custom. Overridable per-deployment via the `oauthConfig`
-// prop (the prerelease page passes it from env); these are the production defaults.
+// prop (the deprecated page passes it from env); these are the production defaults.
 const OAUTH_DEFAULTS = {
-  appUrl: "https://export.time-4-action.com/integrations/shopify-prerelease",
+  appUrl: "https://export.time-4-action.com/integrations/shopify-deprecated",
   redirectUrl: "https://api.time-4-action.com/api/export/shopify/callback-custom",
 };
 
@@ -363,6 +363,11 @@ const TrashIcon = (p) => (
 const CheckIcon = (p) => (
   <Svg {...p}>
     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+  </Svg>
+);
+const PencilIcon = (p) => (
+  <Svg {...p}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
   </Svg>
 );
 const ClipboardIcon = (p) => (
@@ -706,7 +711,7 @@ export default function ShopifyIntegrationPage({
               {isPrerelease ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
                   <BagIcon className="h-3 w-3" />
-                  Beta · Prerelease
+                  Beta · Deprecated
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
@@ -717,7 +722,7 @@ export default function ShopifyIntegrationPage({
             </div>
             <p className="mt-1 hidden text-xs text-neutral-500 sm:block">
               {isPrerelease
-                ? "Prerelease access — connect your store with your own custom app while our public app is in review."
+                ? "Deprecated connect — this store uses your own custom Shopify app. New stores should use the standard Shopify Integration."
                 : "One-way push of stock, products, prices and images from the portal straight to your Shopify stores."}
             </p>
           </div>
@@ -790,7 +795,7 @@ export default function ShopifyIntegrationPage({
               const key = connKey(c);
               const active = key === selectedKey && !adding;
               const meta = statusMetaFor(c.status);
-              const label = shopLabel(c.shopDomain);
+              const label = (c.displayName && c.displayName.trim()) || shopLabel(c.shopDomain);
               return (
                 <button
                   key={key}
@@ -1095,7 +1100,7 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
             <span className="font-medium text-neutral-200">version</span> to edit its configuration.
           </>
         ),
-        warn: "Create your OWN new app. Do NOT reuse our \"time-4-action-integration\" app — that's our public app still under Shopify review, so a store can't install it (that's the \"app under review\" screen).",
+        warn: "Create your OWN new app. Do NOT reuse our \"time-4-action-integration\" app — that's our public app and you can't install it directly here (use the standard Shopify Integration for the one-click connect instead).",
       },
       {
         title: "Set the App URL",
@@ -1153,15 +1158,17 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
             </div>
 
             <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-              Beta · Prerelease
+              Beta · Deprecated
             </div>
             <h2 className="text-xl font-semibold text-white">
               {canCancel ? "Connect another store" : "Connect your Shopify store"}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              While our public Shopify app is in review, connect now with your{" "}
+              This is the deprecated connect flow. It uses your{" "}
               <span className="font-medium text-neutral-200">own Shopify app</span> — create one in the Shopify Dev
-              Dashboard, then paste its API key and secret below. New here? Open the guide first.
+              Dashboard, then paste its API key and secret below. New here? Open the guide first.{" "}
+              For a new store, prefer the one-click{" "}
+              <a href="/integrations/shopify" className="text-[#01a0be] hover:underline">standard Shopify Integration</a>.
             </p>
 
             <button
@@ -1541,6 +1548,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   };
 
   const [connection, setConnection] = useState(initialConn);
+  // Inline "rename this store" editor — a friendly display name shown in the switcher + header.
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(initialConn.displayName || "");
+  const [savingName, setSavingName] = useState(false);
   const [locations, setLocations] = useState(isDemo ? MOCK_LOCATIONS : []);
   const [publications, setPublications] = useState([]);
   const [publishingEnabled, setPublishingEnabled] = useState(false);
@@ -2169,6 +2180,38 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     }
     setSaving(false);
   };
+
+  // Persist a friendly display name for this store (PUT /config with just `displayName`). Independent
+  // of the config save bar — applies immediately and reflects up onto the switcher via onPatch. Demo
+  // mode saves locally only.
+  const saveDisplayName = async () => {
+    const next = nameDraft.trim().slice(0, 60);
+    const current = (connection.displayName || "").trim();
+    if (next === current) { setEditingName(false); return; }
+    const applyLocal = () => {
+      setConnection((c) => ({ ...c, displayName: next || null }));
+      onPatch?.(myKey, { displayName: next || null });
+      setEditingName(false);
+    };
+    if (isDemo) { applyLocal(); return; }
+    setSavingName(true);
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connection._id}/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: next }),
+      });
+      if (res.ok) {
+        applyLocal();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        onNotice({ tone: "error", text: data.error || "Could not rename the store." });
+      }
+    } catch {
+      onNotice({ tone: "error", text: "Could not reach the server to rename the store." });
+    }
+    setSavingName(false);
+  };
   const discard = () => setConfig(savedConfig);
   // Leave-guard actions: navigate to the stashed target (the leavingRef silences the native prompt).
   const go = (target) => { leavingRef.current = true; setLeaveTarget(null); if (target) window.location.href = target; };
@@ -2296,22 +2339,84 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <PingDot tone={statusMeta.tone} />
-              <a
-                href={`https://${connection.shopDomain}/admin`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open in Shopify admin"
-                className="group inline-flex min-w-0 max-w-full items-center gap-1.5"
+            {editingName ? (
+              <form
+                onSubmit={(e) => { e.preventDefault(); saveDisplayName(); }}
+                className="flex flex-wrap items-center gap-2"
               >
-                <span className="truncate font-[family-name:var(--font-montserrat)] text-xl font-semibold leading-none text-white transition-colors group-hover:text-[#01a0be]">
-                  {connection.shopDomain}
-                </span>
-                <svg className="h-4 w-4 shrink-0 text-neutral-500 transition-colors group-hover:text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-              </a>
-              <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
-            </div>
+                <PingDot tone={statusMeta.tone} />
+                <input
+                  autoFocus
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") { setNameDraft(connection.displayName || ""); setEditingName(false); } }}
+                  maxLength={60}
+                  placeholder={shopLabel(connection.shopDomain)}
+                  aria-label="Store name"
+                  className="min-w-0 flex-1 rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-1.5 text-lg font-semibold text-white outline-none focus:border-[#01a0be]"
+                />
+                <button
+                  type="submit"
+                  disabled={savingName}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingName ? <SpinnerIcon className="h-4 w-4" /> : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setNameDraft(connection.displayName || ""); setEditingName(false); }}
+                  className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:text-white"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <PingDot tone={statusMeta.tone} />
+                  {connection.displayName ? (
+                    <span className="truncate font-[family-name:var(--font-montserrat)] text-xl font-semibold leading-none text-white">
+                      {connection.displayName}
+                    </span>
+                  ) : (
+                    <a
+                      href={`https://${connection.shopDomain}/admin`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open in Shopify admin"
+                      className="group inline-flex min-w-0 max-w-full items-center gap-1.5"
+                    >
+                      <span className="truncate font-[family-name:var(--font-montserrat)] text-xl font-semibold leading-none text-white transition-colors group-hover:text-[#01a0be]">
+                        {connection.shopDomain}
+                      </span>
+                      <svg className="h-4 w-4 shrink-0 text-neutral-500 transition-colors group-hover:text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setNameDraft(connection.displayName || ""); setEditingName(true); }}
+                    title="Rename this store"
+                    aria-label="Rename this store"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:text-white"
+                  >
+                    <PencilIcon className="h-3.5 w-3.5" />
+                  </button>
+                  <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
+                </div>
+                {connection.displayName && (
+                  <a
+                    href={`https://${connection.shopDomain}/admin`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open in Shopify admin"
+                    className="group mt-1 inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-[#01a0be]"
+                  >
+                    {connection.shopDomain}
+                    <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                  </a>
+                )}
+              </>
+            )}
 
             <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
               <span className="inline-flex items-center gap-2 text-neutral-400">

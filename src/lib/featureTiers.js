@@ -13,7 +13,9 @@ export const ROLES_CLAIM = "https://time-4-action.com/roles";
 
 export const FEATURE_TIERS = {
   shopify: {
-    tier: "alpha",
+    // Generally available — no early-access tier. `tier: null` makes hasTierAccess() open to everyone
+    // with the `export` role. The copy below still feeds the public Shopify welcome page.
+    tier: null,
     name: "Shopify Integration",
     tagline:
       "Connect your own Shopify store and let the portal keep it in sync — live stock, product creation, prices, descriptions, images and sales channels, fully automatic.",
@@ -24,7 +26,8 @@ export const FEATURE_TIERS = {
     ],
   },
   ownSources: {
-    tier: "alpha",
+    // Generally available — no early-access tier (see note above).
+    tier: null,
     name: "Own Sources",
     tagline:
       "Bring the other brands you resell — register your own supplier feeds and push them through the same Shopify pipeline as the Patrik catalogue.",
@@ -32,6 +35,20 @@ export const FEATURE_TIERS = {
       "Register any supplier feed that follows the published format",
       "Scheduled imports with validation and health reporting",
       "Same matching, pricing and image pipeline as the main catalogue",
+    ],
+  },
+  // The legacy "bring your own custom app" connect flow (formerly "Shopify Prerelease"). Kept on the
+  // beta tier while it's wound down — hence its own feature entry so the main Shopify page can go GA
+  // while /integrations/shopify-deprecated stays gated.
+  shopifyDeprecated: {
+    tier: "beta",
+    name: "Shopify Deprecated",
+    tagline:
+      "The older way to connect: install with your own custom Shopify app instead of our public app. Kept for pilot stores that connected this way — new stores should use the standard Shopify Integration.",
+    perks: [
+      "Connect a store with your own custom app credentials",
+      "Same sync engine as the standard Shopify Integration",
+      "Being phased out — prefer the standard one-click connect",
     ],
   },
 };
