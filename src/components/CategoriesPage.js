@@ -58,12 +58,21 @@ function Toast({ toasts }) {
 
 // ─── Modal shell ──────────────────────────────────────────────────────────────
 
-function Modal({ open, onClose, children, width = "max-w-lg" }) {
+function Modal({ open, onClose, children, width = "max-w-lg", fullScreenMobile = false }) {
+    // Lock background scroll while any modal is open.
+    useEffect(() => {
+        if (!open) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, [open]);
     if (!open) return null;
     return (
-        <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4">
+        <div className={`fixed inset-0 z-[9990] flex ${fullScreenMobile ? "sm:items-center sm:justify-center sm:p-4" : "items-center justify-center p-4"}`}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
-            <div className={`relative w-full ${width} bg-neutral-950 ring-1 ring-white/[0.08] rounded-3xl shadow-2xl overflow-hidden`}>
+            <div className={`relative overflow-hidden bg-neutral-950 shadow-2xl ${fullScreenMobile
+                ? `flex h-full w-full flex-col sm:h-auto sm:max-h-[90vh] ${width} sm:rounded-3xl sm:ring-1 sm:ring-white/[0.08]`
+                : `w-full ${width} rounded-3xl ring-1 ring-white/[0.08]`}`}>
                 {children}
             </div>
         </div>
@@ -125,7 +134,7 @@ function ExportFormModal({ open, initial, onClose, onSave }) {
             <div className="h-1 w-full bg-gradient-to-r from-[#01a0be] to-cyan-400" />
             <div className="p-6 space-y-5">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-white">{initial ? "Edit Export" : "New Export"}</h2>
+                    <h2 className="text-base font-semibold text-white">{initial ? "Edit Category Set" : "New Category Set"}</h2>
                     <button onClick={onClose} className={`${S.iconBtn} text-neutral-500 hover:text-white hover:bg-white/[0.06]`}><Ic.X /></button>
                 </div>
                 <div className="space-y-3">
@@ -141,7 +150,7 @@ function ExportFormModal({ open, initial, onClose, onSave }) {
                         className={`w-full flex items-center justify-between p-4 rounded-xl ring-1 transition-all ${form.aiCategorizationEnabled ? "ring-[#01a0be]/30 bg-[#01a0be]/[0.05]" : "ring-white/[0.06] bg-white/[0.02] hover:ring-white/[0.1]"}`}>
                         <div className="text-left">
                             <p className="text-sm font-medium text-white">AI Categorization</p>
-                            <p className="text-xs text-neutral-500 mt-0.5">Auto-categorize products via Gemini</p>
+                            <p className="text-xs text-neutral-500 mt-0.5">Auto-categorize products via Claude</p>
                         </div>
                         <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${form.aiCategorizationEnabled ? "bg-[#01a0be]" : "bg-neutral-700"}`}>
                             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${form.aiCategorizationEnabled ? "translate-x-4" : "translate-x-1"}`} />
@@ -153,7 +162,7 @@ function ExportFormModal({ open, initial, onClose, onSave }) {
                     <button onClick={onClose} className={S.btnGhost}>Cancel</button>
                     <button onClick={handleSubmit} disabled={saving} className={S.btnPrimary}>
                         {saving ? <Ic.Refresh spin /> : <Ic.Check />}
-                        {initial ? "Save Changes" : "Create Export"}
+                        {initial ? "Save Changes" : "Create Category Set"}
                     </button>
                 </div>
             </div>
@@ -471,7 +480,7 @@ function CategoriesTab({ exportId, toast }) {
 
     const clearAll = () => setConfirm({
         title: "Clear All Categories", danger: true, confirmLabel: "Delete All",
-        message: `Delete all ${categories.length} categories for this export?`,
+        message: `Delete all ${categories.length} categories for this category set?`,
         onConfirm: async () => {
             setConfirm(null);
             try {
@@ -491,7 +500,7 @@ function CategoriesTab({ exportId, toast }) {
                 {/* Toolbar */}
                 <div className="flex items-center gap-2">
                     {/* Search */}
-                    <div className="relative flex-1">
+                    <div className="relative min-w-0 flex-1">
                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-600"><Ic.Search /></div>
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search categories…"
                             className={`${S.input} pl-9 pr-8`} />
@@ -531,7 +540,7 @@ function CategoriesTab({ exportId, toast }) {
                     ) : search && filtered.length === 0 ? (
                         <div className="py-16 flex flex-col items-center gap-3 text-neutral-600">
                             <Ic.Search />
-                            <p className="text-sm text-neutral-500">No match for <span className="text-neutral-300">"{search}"</span></p>
+                            <p className="text-sm text-neutral-500">No match for <span className="text-neutral-300">&quot;{search}&quot;</span></p>
                         </div>
                     ) : (
                         <div className="p-3 overflow-y-auto max-h-[520px]">
@@ -546,8 +555,8 @@ function CategoriesTab({ exportId, toast }) {
                 {/* Add new */}
                 <div className="flex gap-2">
                     <input value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
-                        placeholder='New category — use " / " for subcategories, e.g. "Electronics / Phones"'
-                        className={`${S.input} flex-1`} />
+                        placeholder='New category — e.g. "Electronics / Phones"'
+                        className={`${S.input} min-w-0 flex-1`} />
                     <button onClick={add} disabled={!newLabel.trim() || adding} className={`${S.btnPrimary} shrink-0`}>
                         {adding ? <Ic.Refresh spin /> : <Ic.Plus />}Add
                     </button>
@@ -643,6 +652,9 @@ function ProductsTab({ exportId, toast }) {
     const [filter, setFilter] = useState("all");
     const [triggering, setTriggering] = useState(false);
     const [confirm, setConfirm] = useState(null);
+    // Latest AI-categorization run (polled while running → live progress in the stats card).
+    const [aiRun, setAiRun] = useState(null);
+    const pollRef = useRef(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -657,6 +669,40 @@ function ProductsTab({ exportId, toast }) {
     }, [exportId]);
 
     useEffect(() => { if (exportId) load(); }, [exportId, load]);
+
+    const fetchAiRun = useCallback(async () => {
+        try {
+            const d = await (await fetch(`/nextapi/exports/${exportId}/ai-status`, { cache: "no-store" })).json();
+            const run = d.run ?? null;
+            setAiRun(run);
+            return run;
+        } catch { return null; }
+    }, [exportId]);
+
+    const stopAiPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+    const startAiPolling = useCallback(() => {
+        stopAiPolling();
+        pollRef.current = setInterval(async () => {
+            const run = await fetchAiRun();
+            if (run && run.status === "running") return;
+            stopAiPolling();
+            if (run?.status === "done") { toast(`AI categorized ${run.categorized ?? 0} products`, "success"); load(); }
+            else if (run?.status === "failed") toast(run.error || "AI categorization failed", "error");
+        }, 2500);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchAiRun, load]);
+
+    // On mount / category-set switch: if a run is already going (page reload mid-run), resume polling.
+    useEffect(() => {
+        if (!exportId) return undefined;
+        let cancelled = false;
+        (async () => {
+            const run = await fetchAiRun();
+            if (!cancelled && run?.status === "running") startAiPolling();
+        })();
+        return () => { cancelled = true; stopAiPolling(); };
+    }, [exportId, fetchAiRun, startAiPolling]);
 
     const stats = useMemo(() => {
         const total = products.length, categorized = products.filter(p => p.aiCategory).length;
@@ -693,8 +739,12 @@ function ProductsTab({ exportId, toast }) {
         setTriggering(true);
         try {
             const r = await fetch("/nextapi/ai-categorization", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ exportId }) });
-            const d = await r.json();
-            if (r.status === 202 || d.message) toast("AI categorization started", "success"); else throw new Error(d.error);
+            const d = await r.json().catch(() => ({}));
+            // Only a 202 means the run actually started — error responses ALSO carry `message`.
+            if (r.status !== 202) throw new Error(d.message || d.error || `Could not start AI categorization (HTTP ${r.status})`);
+            toast("AI categorization started", "success");
+            setAiRun({ status: "running", total: Math.max(stats.total - stats.categorized, 0), processed: 0, categorized: 0, batch: 0, totalBatches: 0 });
+            startAiPolling();
         } catch (e) { toast(e.message, "error"); }
         finally { setTriggering(false); }
     };
@@ -712,7 +762,30 @@ function ProductsTab({ exportId, toast }) {
         }
     });
 
-    const pctColor = stats.pct >= 80 ? "#22c55e" : stats.pct >= 50 ? "#f59e0b" : "#ef4444";
+    // While a run is going, the stat tiles track it live without reloading the product list:
+    // categorized-at-run-start = total − run.total (run.total = uncategorized when it began),
+    // so categorized-now = total − run.total + run.categorized. Independent of list state.
+    const aiRunning = aiRun?.status === "running";
+    const liveCategorized = aiRunning && stats.total
+        ? Math.min(Math.max(stats.total - (aiRun.total || 0) + (aiRun.categorized || 0), stats.categorized), stats.total)
+        : stats.categorized;
+    const livePct = stats.total ? Math.round((liveCategorized / stats.total) * 100) : 0;
+
+    // ETA from the run's own pace: elapsed / processed × remaining.
+    const aiEta = (() => {
+        if (!aiRunning || !aiRun.startedAt || !aiRun.processed || !aiRun.total) return null;
+        const elapsedMs = Date.now() - new Date(aiRun.startedAt).getTime();
+        if (elapsedMs <= 0) return null;
+        const remainingMs = (aiRun.total - aiRun.processed) * (elapsedMs / aiRun.processed);
+        if (!Number.isFinite(remainingMs) || remainingMs < 0) return null;
+        const s = Math.round(remainingMs / 1000);
+        if (s < 5) return "almost done";
+        if (s < 90) return `~${s}s left`;
+        const m = Math.round(s / 60);
+        return `~${m} min left`;
+    })();
+
+    const pctColor = livePct >= 80 ? "#22c55e" : livePct >= 50 ? "#f59e0b" : "#ef4444";
 
     return (
         <>
@@ -726,27 +799,52 @@ function ProductsTab({ exportId, toast }) {
                             <div>
                                 <p className={`${S.label} mb-1`}>Categorized</p>
                                 <p className="text-2xl font-bold text-white tabular-nums">
-                                    {stats.categorized}
+                                    {liveCategorized}
                                     <span className="text-sm font-normal text-neutral-600 ml-1">/ {stats.total}</span>
                                 </p>
                             </div>
                             <div className="w-px h-8 bg-white/[0.06]" />
                             <div>
                                 <p className={`${S.label} mb-1`}>Coverage</p>
-                                <p className="text-2xl font-bold tabular-nums" style={{ color: pctColor }}>{stats.pct}%</p>
+                                <p className="text-2xl font-bold tabular-nums" style={{ color: pctColor }}>{livePct}%</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={triggerAI} disabled={triggering} className={S.btnPrimary}>
-                                {triggering ? <Ic.Refresh spin /> : <Ic.Spark />}Trigger AI
+                            <button onClick={triggerAI} disabled={triggering || aiRun?.status === "running"} className={S.btnPrimary}>
+                                {(triggering || aiRun?.status === "running") ? <Ic.Refresh spin /> : <Ic.Spark />}
+                                {aiRun?.status === "running" ? "Categorizing…" : "Trigger AI"}
                             </button>
                             <button onClick={load} disabled={loading} className={`${S.btnOutline} w-9 px-0 justify-center`}><Ic.Refresh spin={loading} /></button>
                             {stats.categorized > 0 && <button onClick={clearAll} className={S.btnDanger}><Ic.Trash /></button>}
                         </div>
                     </div>
+
+                    {/* Live AI-run progress (polled) */}
+                    {aiRun?.status === "running" && (
+                        <div className="mb-4 rounded-xl bg-[#01a0be]/[0.06] ring-1 ring-[#01a0be]/20 p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                                <span className="flex items-center gap-2 text-sm font-medium text-white">
+                                    <Ic.Refresh spin />AI is categorizing with Claude…
+                                </span>
+                                <span className="text-xs text-neutral-400 tabular-nums">
+                                    {aiRun.totalBatches ? `Batch ${Math.max(aiRun.batch || 0, 1)}/${aiRun.totalBatches} · ` : ""}
+                                    {aiRun.processed ?? 0}/{aiRun.total || "…"} products · {aiRun.categorized ?? 0} categorized
+                                    {aiEta ? <span className="text-[#01a0be]"> · {aiEta}</span> : ""}
+                                </span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                <div
+                                    className="h-full rounded-full bg-[#01a0be] transition-all duration-500"
+                                    style={{ width: `${aiRun.total ? Math.max(Math.round(((aiRun.processed || 0) / aiRun.total) * 100), 3) : 3}%`, boxShadow: "0 0 8px #01a0be60" }}
+                                />
+                            </div>
+                            {aiRun.error && <p className="mt-2 text-xs text-amber-400">Last batch issue: {aiRun.error}</p>}
+                        </div>
+                    )}
+
                     {/* Progress */}
                     <div className="h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${stats.pct}%`, backgroundColor: pctColor, boxShadow: `0 0 8px ${pctColor}60` }} />
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${livePct}%`, backgroundColor: pctColor, boxShadow: `0 0 8px ${pctColor}60` }} />
                     </div>
                 </div>
 
@@ -769,8 +867,11 @@ function ProductsTab({ exportId, toast }) {
 
                 {/* Table */}
                 <div className={`${S.card} overflow-hidden`}>
-                    <div className="grid grid-cols-[auto_1fr_2fr_auto] gap-x-4 px-4 py-2.5 border-b border-white/[0.05]">
-                        {["#", "Code", "Product", "Category"].map(h => <span key={h} className={S.label}>{h}</span>)}
+                    <div className="grid grid-cols-[auto_2fr_auto] gap-x-3 px-4 py-2.5 border-b border-white/[0.05] sm:grid-cols-[auto_1fr_2fr_auto] sm:gap-x-4">
+                        <span className={S.label}>#</span>
+                        <span className={`${S.label} hidden sm:block`}>Code</span>
+                        <span className={S.label}>Product</span>
+                        <span className={S.label}>Category</span>
                     </div>
                     {loading ? (
                         <div className="py-20 flex flex-col items-center gap-3 text-neutral-600"><Ic.Refresh spin /><p className="text-sm">Loading…</p></div>
@@ -782,9 +883,9 @@ function ProductsTab({ exportId, toast }) {
                     ) : (
                         <div className="max-h-[520px] overflow-y-auto">
                             {filtered.map((p, i) => (
-                                <div key={p._id} className="group grid grid-cols-[auto_1fr_2fr_auto] gap-x-4 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors border-b border-white/[0.03] last:border-0">
+                                <div key={p._id} className="group grid grid-cols-[auto_2fr_auto] gap-x-3 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors border-b border-white/[0.03] last:border-0 sm:grid-cols-[auto_1fr_2fr_auto] sm:gap-x-4">
                                     <span className="text-xs text-neutral-700 tabular-nums w-6">{i + 1}</span>
-                                    <span className="text-xs text-neutral-600 font-mono truncate">{p.code}</span>
+                                    <span className="hidden text-xs text-neutral-600 font-mono truncate sm:block">{p.code}</span>
                                     <span className="text-sm text-neutral-300 truncate">{p.product_name}</span>
                                     <CategorySelect categories={categories} currentCategoryId={p.aiCategory?.categoryId}
                                         onSelect={cat => setCategory(p, cat)} onClear={() => removeCategory(p)} />
@@ -886,7 +987,7 @@ function PlaygroundTab({ exportId, toast }) {
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white mb-1">AI Categorization Playground</p>
                         <p className="text-xs text-neutral-500 leading-relaxed">
-                            Paste a JSON array of third-party products below and categorize them against this export's category set.
+                            Paste a JSON array of third-party products below and categorize them against this category set.
                             Nothing is saved — results are returned directly. Max 300 products per request.
                         </p>
                         <div className="flex items-center gap-3 mt-3">
@@ -959,7 +1060,7 @@ function PlaygroundTab({ exportId, toast }) {
                         </div>
                         <div className="text-center">
                             <p className="text-sm font-medium text-white mb-1">AI is analyzing your products...</p>
-                            <p className="text-xs text-neutral-500">Processing with Gemini 2.5 Flash in batches of 30</p>
+                            <p className="text-xs text-neutral-500">Processing with Claude Haiku in batches of 30</p>
                         </div>
                         {/* Progress shimmer */}
                         <div className="w-full max-w-xs h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
@@ -1256,9 +1357,9 @@ function ExportSelector({ exports, selected, onSelect, onCreateEdit, onDelete })
     }, [open]);
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
             <button ref={btnRef} onClick={openDrop}
-                className={`flex items-center justify-between gap-3 flex-1 max-w-sm px-4 py-3 rounded-2xl ring-1 text-left transition-all
+                className={`flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3 rounded-2xl ring-1 text-left transition-all sm:max-w-sm sm:px-4
                     ${open ? "ring-[#01a0be]/40 bg-white/[0.06]" : "ring-white/[0.08] bg-white/[0.03] hover:ring-white/[0.14] hover:bg-white/[0.05]"}`}>
                 {selected ? (
                     <div className="flex items-center gap-3 min-w-0">
@@ -1274,27 +1375,27 @@ function ExportSelector({ exports, selected, onSelect, onCreateEdit, onDelete })
                         )}
                     </div>
                 ) : (
-                    <span className="text-sm text-neutral-600">Select export…</span>
+                    <span className="text-sm text-neutral-600">Select category set…</span>
                 )}
                 <div className={`text-neutral-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}><Ic.Chevron /></div>
             </button>
 
             {selected && (
                 <button onClick={() => onCreateEdit(selected)}
-                    className={`${S.btnOutline} w-10 h-10 px-0 justify-center rounded-xl shrink-0`} title="Edit export">
+                    className={`${S.btnOutline} w-10 h-10 px-0 justify-center rounded-xl shrink-0`} title="Edit category set">
                     <Ic.Settings />
                 </button>
             )}
             <button onClick={() => onCreateEdit(null)}
-                className={`${S.btnPrimary} h-10 shrink-0 rounded-xl`}>
-                <Ic.Plus />New
+                className={`${S.btnPrimary} h-10 w-10 shrink-0 justify-center rounded-xl px-0 sm:w-auto sm:px-4`} title="New category set">
+                <Ic.Plus /><span className="hidden sm:inline">New</span>
             </button>
 
             {open && (
                 <div ref={menuRef} style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
                     className="z-[9980] bg-neutral-950 ring-1 ring-white/[0.1] rounded-2xl shadow-2xl shadow-black/60 overflow-hidden py-1.5">
                     {exports.length === 0 ? (
-                        <p className="px-4 py-6 text-sm text-neutral-600 text-center">No exports yet</p>
+                        <p className="px-4 py-6 text-sm text-neutral-600 text-center">No category sets yet</p>
                     ) : exports.map(exp => (
                         <div key={exp._id} className={`group flex items-center gap-2 px-2 mx-1.5 py-2 rounded-xl transition-colors cursor-pointer
                             ${selected?._id === exp._id ? "bg-[#01a0be]/8" : "hover:bg-white/[0.04]"}`}>
@@ -1310,7 +1411,7 @@ function ExportSelector({ exports, selected, onSelect, onCreateEdit, onDelete })
                                     <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#01a0be]/10 text-[#01a0be] ring-1 ring-[#01a0be]/20 shrink-0">AI</span>
                                 )}
                             </button>
-                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <div className="flex gap-0.5 opacity-100 transition-opacity shrink-0 sm:opacity-0 sm:group-hover:opacity-100">
                                 <button onClick={e => { e.stopPropagation(); setOpen(false); onCreateEdit(exp); }} className={`${S.iconBtn} text-neutral-600 hover:text-[#01a0be] hover:bg-[#01a0be]/10`}><Ic.Pencil /></button>
                                 <button onClick={e => { e.stopPropagation(); setOpen(false); onDelete(exp); }} className={`${S.iconBtn} text-neutral-600 hover:text-red-400 hover:bg-red-500/10`}><Ic.Trash /></button>
                             </div>
@@ -1331,6 +1432,7 @@ export default function CategoriesPage({ initialExports }) {
     const [toasts, setToasts] = useState([]);
     const [exportForm, setExportForm] = useState({ open: false, initial: null });
     const [confirm, setConfirm] = useState(null);
+    const [showHelp, setShowHelp] = useState(false); // "What is this?" help modal
 
     const toast = useCallback((message, type = "info") => {
         const id = Date.now() + Math.random();
@@ -1342,16 +1444,16 @@ export default function CategoriesPage({ initialExports }) {
         if (isEdit) {
             setExports(p => p.map(e => e._id === saved._id ? saved : e));
             if (selected?._id === saved._id) setSelected(saved);
-            toast("Export updated", "success");
+            toast("Category set updated", "success");
         } else {
             setExports(p => [...p, saved]);
             setSelected(saved); setTab("categories");
-            toast("Export created", "success");
+            toast("Category set created", "success");
         }
     };
 
     const onDeleteExport = exp => setConfirm({
-        title: "Delete Export", danger: true, confirmLabel: "Delete",
+        title: "Delete Category Set", danger: true, confirmLabel: "Delete",
         message: `Delete "${exp.name}"? Categories and product assignments are kept.`,
         onConfirm: async () => {
             setConfirm(null);
@@ -1360,7 +1462,7 @@ export default function CategoriesPage({ initialExports }) {
                 if (!d.success) throw new Error(d.message);
                 setExports(p => p.filter(e => e._id !== exp._id));
                 if (selected?._id === exp._id) setSelected(null);
-                toast("Export deleted", "success");
+                toast("Category set deleted", "success");
             } catch (e) { toast(e.message, "error"); }
         }
     });
@@ -1378,16 +1480,76 @@ export default function CategoriesPage({ initialExports }) {
             <ExportFormModal open={exportForm.open} initial={exportForm.initial}
                 onClose={() => setExportForm({ open: false, initial: null })} onSave={onExportSaved} />
 
-            <div className="space-y-8 pb-16">
-                {/* Header */}
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#01a0be]/20 to-cyan-400/10 ring-1 ring-[#01a0be]/20 flex items-center justify-center text-[#01a0be]">
+            {/* Help modal — "What is Category Management?" */}
+            <Modal open={showHelp} onClose={() => setShowHelp(false)} width="max-w-2xl" fullScreenMobile>
+                <div className="flex min-h-0 flex-1 flex-col bg-neutral-900">
+                    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] px-5 py-4 sm:px-6">
+                        <h2 className="mb-0 text-base font-semibold leading-none text-white">What is Category Management?</h2>
+                        <button onClick={() => setShowHelp(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 ring-1 ring-white/[0.08] transition-colors hover:text-white hover:ring-white/20"><Ic.X /></button>
+                    </div>
+
+                    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-6 sm:px-6">
+                        <p className="text-[15px] leading-relaxed text-neutral-200">
+                            Organize the catalog into <span className="font-semibold text-white">your own categories</span>, then let
+                            AI sort every product into them automatically. Those categories flow through to your exports and Shopify as
+                            <span className="font-semibold text-white"> tags / collections</span>.
+                        </p>
+
+                        <div>
+                            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">How it works — 4 steps</h3>
+                            <ol className="space-y-3">
+                                {[
+                                    ["Create a category set", "Each set is tied to one export. Pick an existing set above or create a new one."],
+                                    ["Add your categories", "Build the list by hand, or import a ready-made set of category paths (e.g. “Sails / Slalom”)."],
+                                    ["Run AI", "AI reads each product and assigns it to the closest category — no manual tagging needed."],
+                                    ["Review & refine", "Check or override any product in the Products tab, and test wording in the Playground."],
+                                ].map(([title, desc], i) => (
+                                    <li key={title} className="flex gap-3">
+                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 font-orbitron text-sm font-bold text-[#01a0be]">{i + 1}</span>
+                                        <p className="pt-0.5 text-[15px] leading-snug text-neutral-300">
+                                            <span className="font-semibold text-white">{title}.</span> {desc}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ol>
+                        </div>
+
+                        <div className="flex gap-3 rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] p-4">
+                            <svg className="h-5 w-5 shrink-0 text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                            <p className="text-[15px] leading-snug text-neutral-300">
+                                <span className="font-semibold text-white">Why it matters:</span> well-organized categories become clean{" "}
+                                <span className="font-medium text-[#01a0be]">tags</span> on your Shopify sync and exports — so your store&apos;s collections and filtering stay tidy automatically.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex shrink-0 justify-end border-t border-white/[0.08] px-5 py-3.5 sm:px-6">
+                        <button onClick={() => setShowHelp(false)} className="rounded-xl bg-[#01a0be] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#02b5d8]">Got it</button>
+                    </div>
+                </div>
+            </Modal>
+
+            <div className="space-y-6 pb-16 sm:space-y-8">
+                {/* Compact header — icon + title on the left, Help button on the right. */}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10 text-[#01a0be]">
                             <Ic.Tag />
                         </div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight font-orbitron">Category Management</h1>
+                        <div className="min-w-0">
+                            <h1 className="mb-0 text-lg font-bold leading-tight tracking-tight text-white sm:text-xl">Category Management</h1>
+                            <p className="mt-1 hidden text-xs leading-relaxed text-neutral-500 sm:block">Define categories, manage AI assignments and manually override product categorizations.</p>
+                        </div>
                     </div>
-                    <p className="text-sm text-neutral-500 ml-12">Define categories, manage AI assignments and manually override product categorizations.</p>
+                    <button
+                        type="button"
+                        onClick={() => setShowHelp(true)}
+                        aria-label="Open guide"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
+                    >
+                        <svg className="h-4 w-4 text-[#01a0be]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+                        Guide
+                    </button>
                 </div>
 
                 {/* Export selector */}
@@ -1406,24 +1568,25 @@ export default function CategoriesPage({ initialExports }) {
                             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2zM17 17h.01M17 13h-2a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2zM7 13H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2z" /></svg>
                         </div>
                         <div className="text-center">
-                            <p className="text-sm font-medium text-neutral-300">No export selected</p>
-                            <p className="text-xs text-neutral-600 mt-1">Pick one above or create a new export configuration</p>
+                            <p className="text-sm font-medium text-neutral-300">No category set selected</p>
+                            <p className="text-xs text-neutral-600 mt-1">Pick one above or create a new category set</p>
                         </div>
                         <button onClick={() => setExportForm({ open: true, initial: null })} className={S.btnPrimary}>
-                            <Ic.Plus />Create Export
+                            <Ic.Plus />Create Category Set
                         </button>
                     </div>
                 ) : (
                     <div className="space-y-5">
                         {/* Tabs */}
-                        <div className="flex gap-1 p-1 bg-white/[0.03] ring-1 ring-white/[0.06] rounded-2xl w-fit">
+                        <div className="flex w-full gap-1 p-1 bg-white/[0.03] ring-1 ring-white/[0.06] rounded-2xl sm:w-fit">
                             {tabs.map(t => (
                                 <button key={t.key} onClick={() => setTab(t.key)}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+                                    className={`flex min-w-0 flex-1 items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 sm:flex-none sm:px-5
                                         ${tab === t.key
                                             ? "bg-[#01a0be] text-white shadow-lg shadow-[#01a0be]/25"
                                             : "text-neutral-500 hover:text-neutral-200"}`}>
-                                    {t.icon}{t.label}
+                                    <span className="shrink-0">{t.icon}</span>
+                                    <span className="truncate">{t.label}</span>
                                 </button>
                             ))}
                         </div>

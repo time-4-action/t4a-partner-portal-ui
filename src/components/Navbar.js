@@ -4,9 +4,12 @@
  * Main navigation bar with Auth0 integration for user authentication.
  * Features include:
  * - Responsive desktop and mobile layouts
+ * - Grouped navigation: catalog tools collapse into a "Products" dropdown and
+ *   third-party connectors into an "Integrations" dropdown
+ * - Active-route highlighting (desktop + mobile)
  * - Auth0 user authentication status
  * - Profile dropdown menu (desktop)
- * - Mobile hamburger menu
+ * - Mobile hamburger menu with grouped sections
  * - Sticky positioning with backdrop blur
  *
  * @module Navbar
@@ -16,25 +19,267 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 
 /**
- * Returns navigation links. Export is hidden for users without the 'export' role.
+ * Outline icon paths (Heroicons v2) keyed by name, rendered by <NavIcon />.
+ */
+const ICON_PATHS = {
+  home: [
+    "m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25",
+  ],
+  products: [
+    "M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z",
+  ],
+  exports: [
+    "M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-.98.626-1.813 1.5-2.122",
+  ],
+  contact: [
+    "M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75",
+  ],
+  export: [
+    "M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5",
+    "M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3",
+  ],
+  categories: [
+    "M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z",
+    "M6 6h.008v.008H6V6Z",
+  ],
+  shopify: [
+    "M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z",
+  ],
+  privacy: [
+    "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z",
+  ],
+  integrations: [
+    "M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .37-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z",
+  ],
+};
+
+/**
+ * Renders a stroked SVG icon by name. Returns null for unknown names.
+ */
+function NavIcon({ name, className = "h-5 w-5" }) {
+  const paths = ICON_PATHS[name];
+  if (!paths) return null;
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      {paths.map((d, i) => (
+        <path key={i} strokeLinecap="round" strokeLinejoin="round" d={d} />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * Small pill used to flag a nav item's status (e.g. "Alpha" for the
+ * not-yet-wired Shopify integration). Amber to read as "experimental".
+ */
+// Tier badges match the TierGate program chips: alpha = violet, beta = cyan.
+const BADGE_STYLES = {
+  alpha: "bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 ring-violet-400/30",
+  beta: "bg-gradient-to-r from-[#01a0be]/20 to-cyan-400/20 text-cyan-300 ring-cyan-400/30",
+};
+
+function NavBadge({ label, className = "" }) {
+  const style = BADGE_STYLES[String(label).toLowerCase()] || "bg-amber-400/15 text-amber-300 ring-amber-400/30";
+  return (
+    <span
+      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${style} ${className}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+/**
+ * Returns navigation items. For export-role users the catalog tools are grouped
+ * under a "Products" dropdown (View All, Export, Categories) and third-party
+ * connectors under an "Integrations" dropdown (Shopify), keeping the top bar
+ * compact. Non-export users see a plain "Products" link.
  * Roles are injected into the ID token via an Auth0 Post Login Action.
+ *
+ * Item shape:
+ * - Plain link:   { href, label }
+ * - Group:        { label, children: [{ href, label, description, icon }] }
  */
 function getNavLinks(user) {
   const roles = user?.["https://time-4-action.com/roles"] ?? [];
-  const links = [
-    { href: "/", label: "Home" },
-    { href: "/product", label: "Products" },
-  ];
+  const links = [{ href: "/", label: "Home", icon: "home" }];
   if (roles.includes("export")) {
-    links.push({ href: "/export", label: "Export" });
-    links.push({ href: "/categories", label: "Categories" });
+    links.push({
+      label: "Products",
+      icon: "products",
+      children: [
+        {
+          href: "/product",
+          label: "View All",
+          description: "Browse the full catalog",
+          icon: "products",
+        },
+        {
+          href: "/export",
+          label: "Export",
+          description: "Presets & custom export configs",
+          icon: "export",
+        },
+        {
+          href: "/categories",
+          label: "Categories",
+          description: "AI category management",
+          icon: "categories",
+        },
+      ],
+    });
+    links.push({
+      label: "Integrations",
+      icon: "integrations",
+      children: [
+        {
+          href: "/integrations/shopify",
+          label: "Shopify",
+          description: "Sync products to your store",
+          icon: "shopify",
+        },
+        {
+          href: "/integrations/shopify-deprecated",
+          label: "Shopify Deprecated",
+          description: "Legacy custom-app connect",
+          icon: "shopify",
+          badge: "Beta",
+        },
+        {
+          href: "/integrations/own-sources",
+          label: "Own sources",
+          description: "Push your own brand feeds",
+          icon: "integrations",
+        },
+      ],
+    });
+  } else {
+    links.push({ href: "/product", label: "Products", icon: "products" });
   }
-  links.push({ href: "/contact", label: "Contact" });
+  links.push({ href: "/contact", label: "Contact", icon: "contact" });
+  links.push({ href: "/privacy", label: "Privacy", icon: "privacy" });
   return links;
+}
+
+/**
+ * True when `href` matches the current path. The root ("/") matches exactly;
+ * everything else matches itself and any nested route (e.g. /integrations/shopify/x).
+ */
+function isActive(pathname, href) {
+  if (!pathname) return false;
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
+/**
+ * Desktop dropdown for a grouped nav item. Opens on click, closes on outside
+ * click or Escape. The trigger is highlighted when open or when one of its
+ * children is the active route.
+ */
+function NavDropdown({ group, pathname }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const groupActive = group.children.some((c) => isActive(pathname, c.href));
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    };
+    const handleKey = (event) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={`flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#01a0be]/60 ${
+          groupActive || open
+            ? "text-[#01a0be]"
+            : "text-neutral-300 hover:text-[#01a0be]"
+        }`}
+      >
+        <NavIcon name={group.icon} className="h-4 w-4" />
+        {group.label}
+        <svg
+          className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className="animate-dropdown origin-top-left absolute left-0 mt-2 w-64 rounded-xl bg-neutral-900/95 backdrop-blur-md p-1.5 shadow-xl shadow-black/40 ring-1 ring-neutral-700/60"
+          role="menu"
+          aria-label={group.label}
+        >
+          {group.children.map((child) => {
+            const active = isActive(pathname, child.href);
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                onClick={() => setOpen(false)}
+                role="menuitem"
+                aria-current={active ? "page" : undefined}
+                className={`group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors ${
+                  active
+                    ? "bg-[#01a0be]/10 text-[#01a0be]"
+                    : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                }`}
+              >
+                <span
+                  className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors ${
+                    active
+                      ? "bg-[#01a0be]/15 text-[#01a0be] ring-[#01a0be]/30"
+                      : "bg-neutral-800 text-neutral-400 ring-neutral-700 group-hover:text-[#01a0be]"
+                  }`}
+                >
+                  <NavIcon name={child.icon} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <span className="truncate">{child.label}</span>
+                    {child.badge && <NavBadge label={child.badge} />}
+                  </span>
+                  <span className="block truncate text-xs text-neutral-500">{child.description}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -45,12 +290,14 @@ function getNavLinks(user) {
  *
  * Mobile Behavior:
  * - Hamburger menu with overlay
+ * - Grouped sections (e.g. "Exports") with indented sub-links
  * - Simplified auth buttons
  *
  * Desktop Behavior:
- * - Inline navigation links with hover effects
+ * - Inline navigation links with hover/active underline
+ * - Grouped items render as a dropdown with icons and descriptions
  * - Profile dropdown with user info and logout
- * - Click-outside detection to close dropdown
+ * - Click-outside / Escape detection to close menus
  *
  * @returns {JSX.Element} Navigation bar with authentication
  */
@@ -59,6 +306,7 @@ const Navbar = () => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const { user, isLoading } = useUser(); // Auth0 hook for user state
   const profileMenuRef = useRef(null);
+  const pathname = usePathname();
   const navLinks = getNavLinks(user);
 
   /**
@@ -76,7 +324,7 @@ const Navbar = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-  
+
   return (
     <div>
       {/* Overlay for mobile menu */}
@@ -104,16 +352,26 @@ const Navbar = () => {
             </div>
             {/* Desktop Menu & Auth */}
             <div className="hidden md:flex md:items-center md:gap-x-6">
-              <div className="flex items-baseline space-x-4">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.label}
-                    href={link.href}
-                    className="relative text-neutral-300 hover:text-[#01a0be] px-3 py-2 text-sm font-medium transition-colors after:content-[''] after:absolute after:left-0 after:bottom-[6px] after:h-[2px] after:w-full after:bg-[#01a0be] after:scale-x-0 after:origin-left after:transition-transform after:duration-300 hover:after:scale-x-100"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+              <div className="flex items-center space-x-1">
+                {navLinks.map((link) =>
+                  link.children ? (
+                    <NavDropdown key={link.label} group={link} pathname={pathname} />
+                  ) : (
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      aria-current={isActive(pathname, link.href) ? "page" : undefined}
+                      className={`relative inline-flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors after:content-[''] after:absolute after:left-3 after:right-3 after:bottom-[6px] after:h-[2px] after:bg-[#01a0be] after:origin-left after:transition-transform after:duration-300 ${
+                        isActive(pathname, link.href)
+                          ? "text-[#01a0be] after:scale-x-100"
+                          : "text-neutral-300 hover:text-[#01a0be] after:scale-x-0 hover:after:scale-x-100"
+                      }`}
+                    >
+                      <NavIcon name={link.icon} className="h-4 w-4" />
+                      {link.label}
+                    </Link>
+                  )
+                )}
               </div>
               <div className="flex items-center">
                 {isLoading ? (
@@ -178,7 +436,7 @@ const Navbar = () => {
                 type="button"
                 className="inline-flex items-center justify-center p-2 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-800 focus:ring-white"
                 aria-controls="mobile-menu"
-                aria-expanded="false"
+                aria-expanded={isMenuOpen}
               >
                 <span className="sr-only">Open main menu</span>
                 {isMenuOpen ? (
@@ -199,14 +457,50 @@ const Navbar = () => {
         {isMenuOpen && (
           <div className="md:hidden" id="mobile-menu">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              {navLinks.map((link) => (
-                <Link 
-                  key={`${link.href}-${link.label}`}
-                  href={link.href}
-                  onClick={() => setIsMenuOpen(false)}
-                  className="text-neutral-300 hover:bg-neutral-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
-                >{link.label}</Link>
-              ))}
+              {navLinks.map((link) =>
+                link.children ? (
+                  <div key={link.label} className="pt-2">
+                    <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                      {link.label}
+                    </p>
+                    {link.children.map((child) => {
+                      const active = isActive(pathname, child.href);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={() => setIsMenuOpen(false)}
+                          aria-current={active ? "page" : undefined}
+                          className={`flex items-center gap-3 rounded-md px-3 py-2 text-base font-medium ${
+                            active
+                              ? "bg-[#01a0be]/10 text-[#01a0be]"
+                              : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                          }`}
+                        >
+                          <NavIcon name={child.icon} className="h-5 w-5 shrink-0" />
+                          {child.label}
+                          {child.badge && <NavBadge label={child.badge} className="ml-auto" />}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <Link
+                    key={link.label}
+                    href={link.href}
+                    onClick={() => setIsMenuOpen(false)}
+                    aria-current={isActive(pathname, link.href) ? "page" : undefined}
+                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-base font-medium ${
+                      isActive(pathname, link.href)
+                        ? "bg-[#01a0be]/10 text-[#01a0be]"
+                        : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                    }`}
+                  >
+                    <NavIcon name={link.icon} className="h-5 w-5 shrink-0" />
+                    {link.label}
+                  </Link>
+                )
+              )}
               {/* Auth buttons for mobile */}
               <div className="border-t border-neutral-700 pt-4 mt-4">
                 {user ? (

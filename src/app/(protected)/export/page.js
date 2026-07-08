@@ -56,9 +56,9 @@ export default async function ExportPageRoute() {
 
   if (!roles.includes("export")) {
     return (
-      <div className="relative p-8">
-        <div className="max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
-          <div className="p-8 bg-neutral-800/50 border border-neutral-700/50 rounded-2xl text-center">
+      <div className="relative py-6 lg:py-8">
+        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+          <div className="p-6 bg-neutral-800/50 border border-neutral-700/50 rounded-2xl text-center sm:p-8">
             <svg className="w-12 h-12 text-neutral-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
@@ -76,8 +76,8 @@ export default async function ExportPageRoute() {
   ]);
 
   return (
-    <div className="relative p-8 bg-transparent">
-      <div className="relative max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
+    <div className="relative bg-transparent py-6 lg:py-8">
+      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
         {error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
             <div className="flex items-center gap-3">

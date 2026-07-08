@@ -21,13 +21,16 @@ function SkeletonCard() {
 
 export default function Loading() {
   return (
-    <div className="relative p-8 bg-transparent">
-      <div className="relative max-w-screen-2xl mx-auto sm:px-6 lg:px-8">
-        {/* Header Skeleton */}
+    <div className="relative bg-transparent py-6 lg:py-8">
+      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+        {/* Compact header — icon tile + title + count, view toggle on the right */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <div className="h-8 w-56 bg-neutral-700 rounded-lg animate-pulse mb-2" />
-            <div className="h-4 w-24 bg-neutral-700/40 rounded animate-pulse" />
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-neutral-700/40 animate-pulse" />
+            <div>
+              <div className="h-5 w-44 bg-neutral-700 rounded animate-pulse mb-1.5" />
+              <div className="h-3 w-24 bg-neutral-700/30 rounded animate-pulse" />
+            </div>
           </div>
           <div className="flex bg-neutral-800/80 border border-neutral-700/50 rounded-xl p-1 gap-0.5 w-fit">
             <div className="w-8 h-8 bg-neutral-700/40 rounded-lg animate-pulse" />
@@ -35,7 +38,7 @@ export default function Loading() {
           </div>
         </div>
 
-        {/* Grid Skeleton */}
+        {/* Grid */}
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {Array.from({ length: 18 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>

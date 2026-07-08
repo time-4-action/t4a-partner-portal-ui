@@ -4,46 +4,28 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "docs.gravatar.com", // Added this
+        hostname: "**",
         pathname: "/**",
       },
       {
-        protocol: "https",
-        hostname: "imgs.pnvnet.si",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.patrikinternational.com",
-        pathname: "/assets/**",
-      },
-      {
-        protocol: "https",
-        hostname: "via.placeholder.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "s.gravatar.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "lh3.googleusercontent.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "encrypted-tbn0.gstatic.com",
-        port: "",
+        protocol: "http",
+        hostname: "**",
         pathname: "/**",
       },
     ],
   },
   output: "standalone",
+  async redirects() {
+    return [
+      // "Shopify Prerelease" was renamed to "Shopify Deprecated" and moved. Keep old bookmarks,
+      // home-screen links, and any custom-app App URL pointing at the old path working.
+      {
+        source: "/integrations/shopify-prerelease",
+        destination: "/integrations/shopify-deprecated",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -17,7 +17,7 @@ import ProductVariants from "@/components/ProductVariants";
  * @returns {JSX.Element} Product not found message
  */
 const ProductNotFound = () => (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 text-white">
+    <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 text-white">
         Product not found.
     </div>
 );
@@ -91,11 +91,17 @@ export default async function ProductDetailPage({ params }) {
     const product = productData.data;
 
     return (
-        <div className="relative p-4 sm:p-6 md:p-8">
-            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-white">
+        <div className="relative py-4 sm:py-6 md:py-8">
+            <div className="relative max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 text-white">
                 <div className="mb-6">
-                    <Link href="/product" className="text-cyan-400 hover:text-cyan-300">
-                        &larr; Back to Products
+                    <Link
+                        href="/product"
+                        className="group inline-flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3.5 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:bg-neutral-800/60 hover:text-white"
+                    >
+                        <svg className="h-4 w-4 text-[#01a0be] transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Back to Products
                     </Link>
                 </div>
 
