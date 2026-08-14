@@ -83,6 +83,7 @@ const MOCK_CONNECTION = {
   config: {
     exportConfigId: null, // seeded from the first available export config at mount
     priceVatMode: "inclusive", // "inclusive" | "exclusive"
+    priceFactor: 1, // multiplier applied to every pushed price (1 = unchanged)
     futureDatedGuard: true,
     syncStock: true,
     syncNewProducts: true,
@@ -149,7 +150,7 @@ const MOCK_CONNECTION_2 = {
 const SYNC_FLAGS = [
   { key: "syncStock", label: "Stock", desc: "Push live inventory quantities to your store." },
   { key: "syncNewProducts", label: "New products", desc: "Create products that don't exist in your store yet." },
-  { key: "syncPrices", label: "Prices", desc: "Keep variant prices in step with your pricelists." },
+  { key: "syncPrices", label: "Prices", desc: "Keep variant prices in step with your pricelists — corrected on every sync, like stock." },
   { key: "syncDescriptions", label: "Descriptions", desc: "Sync titles, copy and product fields." },
   { key: "syncTags", label: "Tags", desc: "Push tags — for Patrik sources these come from its AI categorization." },
   { key: "syncImages", label: "Images", desc: "Push product and variant images.", slow: true },
@@ -160,7 +161,7 @@ const OWNERSHIP_MODES = [
     value: "create_then_handoff",
     title: "Create, then leave it to you",
     recommended: true,
-    desc: "Adds each product to your store once, then only keeps stock up to date. Your edits in Shopify are safe.",
+    desc: "Adds each product to your store once, then keeps stock — and prices, if you leave Prices on — up to date. Your titles, descriptions and images stay yours.",
     icon: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z",
   },
   {
@@ -288,6 +289,25 @@ const RUN_COUNT_LABELS = [
   ["unmatched", "Unmatched"],
   ["failed", "Failed"],
 ];
+
+// ── Price factor ────────────────────────────────────────────────────────────────────────────
+// The multiplier every pushed price is run through (currency conversion / a fixed uplift). It
+// keeps up to 6 decimals so an exchange rate stays exact; the resulting PRICE is what gets
+// rounded to 2 dp, once, by the API. `1` means "leave prices as they are".
+const PRICE_FACTOR_DECIMALS = 6;
+
+// Parses what the partner typed into a stored factor. Tolerates a comma decimal ("11,4") and a
+// half-typed "11." (→ 11), and falls back to 1 for anything empty/zero/negative/junk — so the
+// field can never persist a factor that would zero out a store's prices.
+const parsePriceFactor = (text) => {
+  const n = Number(String(text ?? "").trim().replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  const p = 10 ** PRICE_FACTOR_DECIMALS;
+  return Math.round(Math.min(n, 1_000_000) * p) / p;
+};
+
+// Display form of a stored factor — trims the float tail (11.400000 → "11.4").
+const formatPriceFactor = (n) => String(parsePriceFactor(n));
 
 // Merge the catalogue's real pricelists with the connection's stored priority/enabled state:
 // stored names (still in the catalogue) keep their order + enabled flag; newly-seen pricelists
@@ -1501,8 +1521,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       syncImages: cfg.syncImages ?? false,
       syncTags: cfg.syncTags ?? true,
       priceVatMode: cfg.priceVatMode ?? "inclusive",
+      priceFactor: parsePriceFactor(cfg.priceFactor),
       futureDatedGuard: cfg.futureDatedGuard ?? true,
       variantOptionName: cfg.variantOptionName ?? "",
+      titlePrefix: cfg.titlePrefix ?? "",
     };
     // Builds one source's full, panel-ready config (rich pricelistPriority, validated channels).
     const withCfg = (s, inheritBase) => {
@@ -1513,7 +1535,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         ownership: pick("ownership"), syncStock: pick("syncStock"), syncNewProducts: pick("syncNewProducts"),
         syncPrices: pick("syncPrices"), syncDescriptions: pick("syncDescriptions"), syncImages: pick("syncImages"),
         syncTags: pick("syncTags"), priceVatMode: pick("priceVatMode"), futureDatedGuard: pick("futureDatedGuard"),
+        priceFactor: parsePriceFactor(pick("priceFactor")),
         variantOptionName: pick("variantOptionName") ?? "",
+        titlePrefix: pick("titlePrefix") ?? "",
         pricelistPriority: buildPricelistPriority(pricelists, s.pricelistPriority ?? (inheritBase ? cfg.pricelistPriority : undefined)),
         publicationIds: validPubs(s.publicationIds ?? (inheritBase ? cfg.publicationIds : [])),
         aiExportId: s.aiExportId,
@@ -1537,7 +1561,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       ownership: active.ownership, syncStock: active.syncStock, syncNewProducts: active.syncNewProducts,
       syncPrices: active.syncPrices, syncDescriptions: active.syncDescriptions, syncImages: active.syncImages,
       syncTags: active.syncTags, priceVatMode: active.priceVatMode, futureDatedGuard: active.futureDatedGuard,
+      priceFactor: parsePriceFactor(active.priceFactor),
       variantOptionName: active.variantOptionName ?? "",
+      titlePrefix: active.titlePrefix ?? "",
       pricelistPriority: active.pricelistPriority,
       publicationIds: active.publicationIds,
       exportConfigId: cfg.exportConfigId ?? exportOptions[0]?._id ?? null,
@@ -1564,6 +1590,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   const [savedConfig, setSavedConfig] = useState(() => makeConfig(initialConn, isDemo ? MOCK_LOCATIONS : [], [], isDemo));
   // Which source row the config panels (ownership / what-to-sync / pricing / channels) are editing.
   const [activeScopeIdx, setActiveScopeIdx] = useState(0);
+  // What's currently in the price-factor box. Kept separate from the stored number so half-typed
+  // input ("11." / "11,") survives a keystroke — `config.priceFactor` is always the parsed value.
+  const [factorText, setFactorText] = useState(() => formatPriceFactor(initialConn.config?.priceFactor));
   // When set, the per-source config modal is open for that source index (null = closed).
   const [editingScopeIdx, setEditingScopeIdx] = useState(null);
   // "View details" modal — keeps the connection card minimal (only sync status stays on the card).
@@ -1711,6 +1740,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         const reseeded = makeConfig(conn, locs, pubs, true);
         setConfig(reseeded);
         setSavedConfig(reseeded);
+        setFactorText(formatPriceFactor(reseeded.priceFactor));
       } catch {
         /* keep the optimistic seed */
       } finally {
@@ -1785,7 +1815,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   const sourceScopes = config.scopes || [];
   const activeIdx = Math.min(activeScopeIdx, Math.max(0, sourceScopes.length - 1));
   const activeScope = sourceScopes[activeIdx] || null;
-  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "futureDatedGuard", "pricelistPriority", "publicationIds", "variantOptionName"];
+  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "priceFactor", "futureDatedGuard", "pricelistPriority", "publicationIds", "variantOptionName", "titlePrefix"];
   const pickMirror = (c) => Object.fromEntries(MIRROR_KEYS.map((k) => [k, c[k]]));
   // After any change to a mirrored field, copy the whole set into the active scope.
   const mirrorActive = (c) => ({ ...c, scopes: (c.scopes || []).map((s, i) => (i === activeIdx ? { ...s, ...pickMirror(c) } : s)) });
@@ -1806,7 +1836,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       )
     );
   const setVatMode = (v) => setConfig((c) => mirrorActive({ ...c, priceVatMode: v }));
+  // The stored factor is always a clean number — `factorText` below holds what's being typed.
+  const setPriceFactor = (v) => setConfig((c) => mirrorActive({ ...c, priceFactor: parsePriceFactor(v) }));
   const setVariantOptionName = (v) => setConfig((c) => mirrorActive({ ...c, variantOptionName: v }));
+  const setTitlePrefix = (v) => setConfig((c) => mirrorActive({ ...c, titlePrefix: v }));
   const togglePublication = (id) =>
     setConfig((c) => {
       const ids = c.publicationIds || [];
@@ -1818,6 +1851,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   // Loads a scope's stored config into the mirror so the panels show THAT source's settings.
   const selectScope = (idx) => {
     setActiveScopeIdx(idx);
+    // Reflect the newly-selected source's multiplier in the input box (a brand-new source that
+    // isn't in `sourceScopes` yet reads as undefined → 1, which is what it was created with).
+    setFactorText(formatPriceFactor(sourceScopes[idx]?.priceFactor));
     setConfig((c) => {
       const s = (c.scopes || [])[idx];
       if (!s) return c;
@@ -1825,6 +1861,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       for (const k of MIRROR_KEYS) if (s[k] !== undefined) mirror[k] = s[k];
       mirror.pricelistPriority = buildPricelistPriority(pricelists, s.pricelistPriority);
       mirror.publicationIds = s.publicationIds || [];
+      mirror.priceFactor = parsePriceFactor(s.priceFactor);
       return { ...c, ...mirror };
     });
   };
@@ -1834,7 +1871,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     locationId: locations[0]?.id ?? null,
     ownership: "create_then_handoff", syncStock: true, syncNewProducts: true, syncPrices: true,
     syncDescriptions: true, syncImages: true, syncTags: true,
-    priceVatMode: "inclusive", futureDatedGuard: true, variantOptionName: "",
+    priceVatMode: "inclusive", priceFactor: 1, futureDatedGuard: true, variantOptionName: "", titlePrefix: "",
     pricelistPriority: buildPricelistPriority(pricelists, []), publicationIds: publications.map((p) => p.id),
   });
   const addScope = () => {
@@ -2123,8 +2160,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     }
     setSaving(true);
     try {
-      const { pricelistPriority, priceVatMode, futureDatedGuard, syncStock, syncNewProducts,
-        syncPrices, syncDescriptions, syncImages, ownership, scopes, publicationIds, variantOptionName } = config;
+      const { pricelistPriority, priceVatMode, priceFactor, futureDatedGuard, syncStock, syncNewProducts,
+        syncPrices, syncDescriptions, syncTags, syncImages, ownership, scopes, publicationIds, variantOptionName,
+        titlePrefix } = config;
       // Each source pushes with its OWN full config to its own location. Persist the cleaned
       // scopes (incl. per-source ownership / toggles / pricing / channels) and mirror the first
       // source's location onto the connection-level field (back-compat / summary line).
@@ -2142,10 +2180,16 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
           syncImages: !!s.syncImages,
           syncTags: s.syncTags ?? true,
           priceVatMode: s.priceVatMode ?? "inclusive",
+          // Always present so a source can't inherit another one's multiplier via the
+          // connection-level fallback — an absent factor would silently mean "someone else's".
+          priceFactor: parsePriceFactor(s.priceFactor),
           futureDatedGuard: s.futureDatedGuard ?? true,
           // Always present (even "") so a source never inherits another source's option name
           // through the connection-level fallback. "" = use the default (export setting / Size).
           variantOptionName: (s.variantOptionName || "").trim(),
+          // Same reason as above: always present so a source can't inherit another source's
+          // prefix through the connection-level fallback. "" = no prefix.
+          titlePrefix: (s.titlePrefix || "").trim(),
           pricelistPriority: (s.pricelistPriority || []).map((p, i) => ({ name: p.name, enabled: p.enabled !== false, priority: p.priority ?? i })),
           publicationIds: s.publicationIds || [],
           ...(s.aiExportId ? { aiExportId: s.aiExportId } : {}),
@@ -2163,9 +2207,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shopifyLocationId,
-          config: { pricelistPriority: minimalPricelistPriority, priceVatMode, futureDatedGuard,
-            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncImages, ownership, scopes: cleanScopes, publicationIds,
-            variantOptionName: (variantOptionName || "").trim() },
+          config: { pricelistPriority: minimalPricelistPriority, priceVatMode, priceFactor: parsePriceFactor(priceFactor), futureDatedGuard,
+            syncStock, syncNewProducts, syncPrices, syncDescriptions, syncTags: syncTags !== false, syncImages, ownership, scopes: cleanScopes, publicationIds,
+            variantOptionName: (variantOptionName || "").trim(), titlePrefix: (titlePrefix || "").trim() },
         }),
       });
       if (res.ok) {
@@ -2212,14 +2256,17 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     }
     setSavingName(false);
   };
-  const discard = () => setConfig(savedConfig);
+  const discard = () => { setConfig(savedConfig); setFactorText(formatPriceFactor(savedConfig.priceFactor)); };
   // Leave-guard actions: navigate to the stashed target (the leavingRef silences the native prompt).
   const go = (target) => { leavingRef.current = true; setLeaveTarget(null); if (target) window.location.href = target; };
   const discardAndLeave = () => { setConfig(savedConfig); go(leaveTarget); };
   const saveAndLeave = async () => { await saveConfig(); go(leaveTarget); };
   // Configure modal: Cancel reverts to the snapshot taken on open; Save persists and closes.
   const cancelEditScope = () => {
-    if (scopeSnapshot.current) setConfig(scopeSnapshot.current);
+    if (scopeSnapshot.current) {
+      setConfig(scopeSnapshot.current);
+      setFactorText(formatPriceFactor(scopeSnapshot.current.priceFactor));
+    }
     setEditingScopeIdx(null);
   };
   const saveEditScope = async () => {
@@ -2606,6 +2653,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   {/* quick summary so each source's setup is legible at a glance */}
                   <p className="mt-2 text-xs text-neutral-500">
                     {modeLabel}{locName ? ` · ${locName}` : ""} · {[s.syncStock && "stock", s.syncPrices && "prices", s.syncDescriptions && "content", s.syncTags && "tags", s.syncImages && "images", s.syncNewProducts && "new"].filter(Boolean).join(", ") || "nothing selected"}
+                    {parsePriceFactor(s.priceFactor) !== 1 ? ` · prices ×${formatPriceFactor(s.priceFactor)}` : ""}
                     {aiName && <span className="text-cyan-500/90"> · AI tags: {aiName}</span>}
                   </p>
                 </div>
@@ -2775,6 +2823,48 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         </fieldset>
       </section>
 
+      {/* ----------------------- Product title prefix ------------------ */}
+      <section className="border-t border-neutral-800 pt-8">
+        <SectionHeading
+          title="Product title prefix"
+          desc="Text put in front of every product title this source pushes — handy for grouping a brand or discipline in your store, e.g. WINDSURF."
+        />
+        {stockOnly && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+            <span><span className="font-medium text-neutral-200">Stock only</span> ownership never writes titles — the prefix doesn&apos;t apply. Switch ownership mode to use it.</span>
+          </div>
+        )}
+        <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
+          <label className="mb-1 block text-xs font-medium text-neutral-400">Prefix</label>
+          <input
+            type="text"
+            value={config.titlePrefix || ""}
+            onChange={(e) => setTitlePrefix(e.target.value)}
+            placeholder="e.g. WINDSURF -"
+            maxLength={40}
+            className="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2.5 text-sm text-white placeholder-neutral-500 focus:border-[#01a0be] focus:outline-none"
+          />
+          {/* Shows exactly how the prefix is joined (one space), so nobody has to guess whether
+              to type a trailing space — leading/trailing spaces are trimmed on save. */}
+          <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2.5">
+            <span className="block text-[11px] uppercase tracking-wide text-neutral-500">Title in Shopify</span>
+            <span className="mt-1 block truncate text-sm text-neutral-300">
+              {(config.titlePrefix || "").trim() && (
+                <span className="font-medium text-[#01a0be]">{(config.titlePrefix || "").trim()} </span>
+              )}
+              <span className="text-neutral-400">Product name</span>
+            </span>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+            Leave blank to push titles unchanged. Only the title changes — SKUs, barcodes and product matching are untouched, so you can turn this on or off safely.
+            {config.ownership === "create_then_handoff"
+              ? <> In <span className="font-medium text-neutral-300">Create, then hand off</span> the prefix is applied when a product is created; products already in your store keep their current title.</>
+              : <> Titles already in your store are rewritten with the new prefix on the next sync.</>}
+          </p>
+        </fieldset>
+      </section>
+
       {/* --------------------- AI categorization (tags) ---------------- */}
       {activeScope?.type !== "own_source" && aiExportOptions.length > 0 && (
         <section className="border-t border-neutral-800 pt-8">
@@ -2932,6 +3022,50 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* price factor — multiplier applied to every pushed price */}
+          <div className="mt-8">
+            <p className="mb-1 text-sm font-medium text-neutral-300">Price factor</p>
+            <p className="mb-3 text-xs text-neutral-500">
+              Every price is multiplied by this number before it&apos;s sent to Shopify — for a store selling in another
+              currency, or at a fixed uplift. Leave it at <span className="font-mono text-neutral-400">1</span> to push prices unchanged.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-500">×</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={factorText}
+                  onChange={(e) => {
+                    // Digits + one separator only, so a stray letter can't land in the box.
+                    const t = e.target.value.replace(/[^\d.,]/g, "");
+                    setFactorText(t);
+                    setPriceFactor(t);
+                  }}
+                  onBlur={() => setFactorText(formatPriceFactor(config.priceFactor))}
+                  aria-label="Price factor"
+                  className="w-40 rounded-xl border border-neutral-700/50 bg-neutral-900/60 py-2.5 pl-8 pr-3 font-mono text-sm text-white outline-none transition-colors focus:border-[#01a0be]"
+                  placeholder="1"
+                />
+              </div>
+              {config.priceFactor !== 1 && (
+                <button
+                  type="button"
+                  onClick={() => { setFactorText("1"); setPriceFactor(1); }}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
+                >
+                  Reset to 1
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-neutral-500">
+              Up to {PRICE_FACTOR_DECIMALS} decimals — e.g. <span className="font-mono text-neutral-400">11.456789</span>. A price of{" "}
+              <span className="font-mono text-neutral-400">100.00</span> is pushed as{" "}
+              <span className="font-mono text-cyan-500/90">{(100 * config.priceFactor).toFixed(2)}</span>. Rounding to 2 decimals
+              happens once, on the final price.
+            </p>
           </div>
 
           {/* future-dated guard */}
