@@ -34,6 +34,7 @@ const EMPTY_FORM = {
   authToken: "",
   schedule: { enabled: false, frequency: "every_hours", everyHours: 6, timeOfDay: "03:00", weekday: 1, timezone: "Europe/Ljubljana" },
   options: { defaultStatus: "active", removalPolicy: "delist", maxStalenessHours: 48, allowEmptyFeed: false },
+  aiCategorization: { enabled: false, exportIds: [] },
 };
 
 /* ── shared bits ──────────────────────────────────────────────────────────── */
@@ -364,7 +365,7 @@ function TestFeedResult({ result }) {
 
 /* ── add / edit drawer ────────────────────────────────────────────────────── */
 
-function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
+function AddEditSource({ source, onClose, onSaved, onNotice, onHelp, aiExports = [] }) {
   useLockBody();
   const isNew = !source;
   const [form, setForm] = useState(() => isNew ? structuredClone(EMPTY_FORM) : {
@@ -375,6 +376,7 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
     hasAuthToken: !!source.feed?.hasAuthToken,
     schedule: { ...EMPTY_FORM.schedule, ...(source.schedule || {}) },
     options: { ...EMPTY_FORM.options, ...(source.options || {}) },
+    aiCategorization: { ...EMPTY_FORM.aiCategorization, ...(source.aiCategorization || {}) },
   });
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
@@ -384,6 +386,7 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const setSchedule = (patch) => setForm((f) => ({ ...f, schedule: { ...f.schedule, ...patch } }));
   const setOptions = (patch) => setForm((f) => ({ ...f, options: { ...f.options, ...patch } }));
+  const setAi = (patch) => setForm((f) => ({ ...f, aiCategorization: { ...f.aiCategorization, ...patch } }));
 
   const runTest = async () => {
     setTesting(true); setTestResult(null); setError("");
@@ -410,6 +413,7 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
       brand: form.brand.trim(),
       schedule: form.schedule,
       options: form.options,
+      aiCategorization: form.aiCategorization,
       feed: { url: form.url.trim(), authHeaderName: form.authHeaderName || null, ...(form.authToken ? { authToken: form.authToken } : {}) },
     };
     try {
@@ -417,7 +421,7 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
       if (isNew) {
         res = await fetch("/nextapi/export/external/sources", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ brand: payload.brand, url: payload.feed.url, authHeaderName: payload.feed.authHeaderName, authToken: form.authToken || undefined, schedule: payload.schedule, options: payload.options }),
+          body: JSON.stringify({ brand: payload.brand, url: payload.feed.url, authHeaderName: payload.feed.authHeaderName, authToken: form.authToken || undefined, schedule: payload.schedule, options: payload.options, aiCategorization: payload.aiCategorization }),
         });
       } else {
         res = await fetch(`/nextapi/export/external/sources/${source.feedId}`, {
@@ -522,6 +526,65 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
             hint="Off (recommended) — the wipe-guard refuses a feed that suddenly returns 0 products, so a supplier outage can't empty your store."
           />
 
+          {/* AI categorization — the feed owns WHICH sets it maintains (it can keep several);
+              each Shopify store then picks which one supplies its tags. */}
+          {aiExports.length > 0 && (() => {
+            const picked = form.aiCategorization.exportIds || [];
+            const toggleSet = (id) => {
+              const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+              // Unticking the last set turns the whole thing off — there'd be nothing to run.
+              setAi({ exportIds: next, enabled: next.length > 0 && form.aiCategorization.enabled });
+            };
+            return (
+              <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
+                <Toggle
+                  checked={form.aiCategorization.enabled}
+                  onChange={(v) => setAi({ enabled: v, ...(v && !picked.length ? { exportIds: [aiExports[0]._id] } : {}) })}
+                  label="AI categorization"
+                  hint="Categorize this feed's products against your category sets. A categorized product is tagged with its AI categories only — the supplier's own tags and category paths are replaced, so your store keeps one consistent taxonomy."
+                />
+                {form.aiCategorization.enabled && (
+                  <div className="mt-3 border-t border-neutral-800 pt-3">
+                    <Field
+                      label="Category sets"
+                      hint="Pick as many as you need — each is categorized separately, and a store choosing this feed picks which one it tags with. A product the AI hasn't reached yet keeps the supplier's tags until it has a category. Only new or changed products are re-categorized, so a routine re-import costs nothing."
+                    >
+                      <div className="space-y-1.5">
+                        {aiExports.map((x) => {
+                          const on = picked.includes(x._id);
+                          return (
+                            <button
+                              key={x._id}
+                              type="button"
+                              onClick={() => toggleSet(x._id)}
+                              aria-pressed={on}
+                              className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${on
+                                ? "border-[#01a0be]/40 bg-[#01a0be]/[0.07] text-white"
+                                : "border-neutral-800 bg-neutral-900/40 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"}`}
+                            >
+                              <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${on ? "border-[#01a0be] bg-[#01a0be]" : "border-neutral-600"}`}>
+                                {on && <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>}
+                              </span>
+                              <span className="truncate">{x.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </Field>
+                    {picked.length === 0 && (
+                      <p className="mt-2 text-xs text-amber-400/90">Pick at least one category set, or turn AI categorization off.</p>
+                    )}
+                    <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                      This feed&apos;s products appear on the{" "}
+                      <a href="/categories" className="underline decoration-dotted underline-offset-2 hover:text-neutral-300">Categories</a>{" "}
+                      page under each set you pick, where you can check coverage and correct anything the AI got wrong.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Test */}
           <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -547,6 +610,13 @@ function AddEditSource({ source, onClose, onSaved, onNotice, onHelp }) {
       </div>
     </div>
   );
+}
+
+/** Names of the category sets a feed is categorized against — empty when it's switched off. */
+function aiSetNames(source, aiExports) {
+  const ai = source.aiCategorization;
+  if (!ai?.enabled) return [];
+  return (ai.exportIds || []).map((id) => aiExports.find((x) => x._id === id)?.name || "AI categories");
 }
 
 function describeSchedule(s) {
@@ -810,7 +880,7 @@ function SourcePreview({ source, onClose }) {
 
 /* ── main page ────────────────────────────────────────────────────────────── */
 
-export default function OwnSourcesPage({ initialSources }) {
+export default function OwnSourcesPage({ initialSources, initialAiExports = [] }) {
   const [sources, setSources] = useState(initialSources || []);
   const [editing, setEditing] = useState(null); // null | 'new' | sourceObj
   const [activityFor, setActivityFor] = useState(null);
@@ -952,6 +1022,11 @@ export default function OwnSourcesPage({ initialSources }) {
                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
                     <span>{c && s.health?.lastImportAt ? `${c.products} products · ${c.variants} variants` : "Not imported yet"}</span>
                     <span className="text-neutral-600">· {describeSchedule(s.schedule || {})}</span>
+                    {aiSetNames(s, initialAiExports).map((n) => (
+                      <span key={n} className="inline-flex items-center rounded-md bg-[#01a0be]/10 px-1.5 py-0.5 font-medium text-[#01a0be] ring-1 ring-[#01a0be]/25">
+                        AI · {n}
+                      </span>
+                    ))}
                   </div>
                   <div className="mt-3 flex items-center gap-1.5 border-t border-neutral-800 pt-3">
                     {renderActions(s)}
@@ -965,7 +1040,7 @@ export default function OwnSourcesPage({ initialSources }) {
           <div className="hidden overflow-hidden rounded-2xl border border-neutral-800 sm:block">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-neutral-800 bg-neutral-900/60 text-left text-xs uppercase tracking-wider text-neutral-500">
-                <th className="px-4 py-3">Brand</th><th>Feed</th><th>Health</th><th>Last import</th><th>Schedule</th><th className="text-right px-4">Actions</th>
+                <th className="px-4 py-3">Brand</th><th>Feed</th><th>Health</th><th>Last import</th><th>Schedule</th><th>AI categories</th><th className="text-right px-4">Actions</th>
               </tr></thead>
               <tbody className="divide-y divide-neutral-800">
                 {sources.map((s) => {
@@ -977,6 +1052,19 @@ export default function OwnSourcesPage({ initialSources }) {
                       <td><HealthPill source={s} /></td>
                       <td className="text-neutral-400">{c && s.health?.lastImportAt ? `${c.products} products · ${c.variants} variants` : "—"}</td>
                       <td className="text-neutral-500 text-xs">{describeSchedule(s.schedule || {})}</td>
+                      <td className="text-xs">
+                        {(() => {
+                          const names = aiSetNames(s, initialAiExports);
+                          if (!names.length) return <span className="text-neutral-600">Off</span>;
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {names.map((n) => (
+                                <span key={n} className="inline-flex items-center rounded-md bg-[#01a0be]/10 px-2 py-0.5 font-medium text-[#01a0be] ring-1 ring-[#01a0be]/25">{n}</span>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1.5">
                           {renderActions(s)}
@@ -998,6 +1086,7 @@ export default function OwnSourcesPage({ initialSources }) {
           onSaved={() => { setEditing(null); refresh(); }}
           onNotice={setNotice}
           onHelp={() => setHelpOpen(true)}
+          aiExports={initialAiExports}
         />
       )}
       {activityFor && <SourceActivity source={activityFor} onClose={() => setActivityFor(null)} />}

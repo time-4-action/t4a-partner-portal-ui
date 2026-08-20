@@ -22,6 +22,29 @@ async function getOwnSources() {
   }
 }
 
+// Fetch the category sets the user can access — a feed picks one when it turns AI categorization
+// on. Same role/user filter as the Export/Categories pages, since `/exports` returns everything
+// unscoped. Empty on failure → the feed form simply offers no categorization.
+async function getAiExports(userRoles, userId) {
+  try {
+    const { token } = await auth0.getAccessToken();
+    const res = await fetch(`${apiUrl}/exports`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const all = Array.isArray(data?.data) ? data.data : [];
+    return all.filter((exp) => {
+      const roleOk = !exp.roles?.length || exp.roles.some((r) => userRoles.includes(r));
+      const userOk = !exp.users?.length || exp.users.includes(userId);
+      return roleOk && userOk;
+    });
+  } catch {
+    return [];
+  }
+}
+
 export default async function OwnSourcesRoute() {
   const session = await auth0.getSession();
   const roles = session?.user?.["https://time-4-action.com/roles"] ?? [];
@@ -51,12 +74,15 @@ export default async function OwnSourcesRoute() {
     );
   }
 
-  const sources = await getOwnSources();
+  const [sources, aiExports] = await Promise.all([
+    getOwnSources(),
+    getAiExports(roles, session?.user?.sub),
+  ]);
 
   return (
     <div className="relative bg-transparent py-6 lg:py-8">
       <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-        <OwnSourcesPage initialSources={sources} />
+        <OwnSourcesPage initialSources={sources} initialAiExports={aiExports ?? []} />
       </div>
     </div>
   );

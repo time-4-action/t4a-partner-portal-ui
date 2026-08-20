@@ -650,10 +650,14 @@ function ProductsTab({ exportId, toast }) {
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState("all");
+    const [sourceFilter, setSourceFilter] = useState("all");
     const [triggering, setTriggering] = useState(false);
     const [confirm, setConfirm] = useState(null);
     // Latest AI-categorization run (polled while running → live progress in the stats card).
+    // A category set covers the Patrik catalogue AND any Own Source feed pointed at it, each
+    // categorized as its own run — `aiFeedRuns` holds the feed ones so progress covers everything.
     const [aiRun, setAiRun] = useState(null);
+    const [aiFeedRuns, setAiFeedRuns] = useState([]);
     const pollRef = useRef(null);
 
     const load = useCallback(async () => {
@@ -674,8 +678,12 @@ function ProductsTab({ exportId, toast }) {
         try {
             const d = await (await fetch(`/nextapi/exports/${exportId}/ai-status`, { cache: "no-store" })).json();
             const run = d.run ?? null;
+            const feeds = d.feeds ?? [];
             setAiRun(run);
-            return run;
+            setAiFeedRuns(feeds);
+            // "In flight" = the catalogue run OR any feed run is still going.
+            const running = run?.status === "running" || feeds.some(f => f.run?.status === "running");
+            return { run, feeds, running };
         } catch { return null; }
     }, [exportId]);
 
@@ -684,11 +692,14 @@ function ProductsTab({ exportId, toast }) {
     const startAiPolling = useCallback(() => {
         stopAiPolling();
         pollRef.current = setInterval(async () => {
-            const run = await fetchAiRun();
-            if (run && run.status === "running") return;
+            const res = await fetchAiRun();
+            if (res?.running) return;
             stopAiPolling();
-            if (run?.status === "done") { toast(`AI categorized ${run.categorized ?? 0} products`, "success"); load(); }
-            else if (run?.status === "failed") toast(run.error || "AI categorization failed", "error");
+            const all = [res?.run, ...(res?.feeds ?? []).map(f => f.run)].filter(Boolean);
+            const failed = all.find(r => r.status === "failed");
+            if (failed) toast(failed.error || "AI categorization failed", "error");
+            else if (all.length) toast(`AI categorized ${all.reduce((n, r) => n + (r.categorized ?? 0), 0)} products`, "success");
+            load();
         }, 2500);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchAiRun, load]);
@@ -698,8 +709,8 @@ function ProductsTab({ exportId, toast }) {
         if (!exportId) return undefined;
         let cancelled = false;
         (async () => {
-            const run = await fetchAiRun();
-            if (!cancelled && run?.status === "running") startAiPolling();
+            const res = await fetchAiRun();
+            if (!cancelled && res?.running) startAiPolling();
         })();
         return () => { cancelled = true; stopAiPolling(); };
     }, [exportId, fetchAiRun, startAiPolling]);
@@ -709,13 +720,26 @@ function ProductsTab({ exportId, toast }) {
         return { total, categorized, pct: total ? Math.round((categorized / total) * 100) : 0 };
     }, [products]);
 
+    // Which sources this set actually covers — the Source column and its filter only appear once
+    // there is more than one (a set with no feeds looks exactly as it did before).
+    const sourceNames = useMemo(
+        () => [...new Set(products.map(p => p.sourceName).filter(Boolean))],
+        [products]
+    );
+    const showSource = sourceNames.length > 1;
+    // Mobile keeps #/Product/Category; Source and Code appear from `sm` up.
+    const rowGrid = showSource
+        ? "grid-cols-[auto_2fr_auto] sm:grid-cols-[auto_auto_1fr_2fr_auto]"
+        : "grid-cols-[auto_2fr_auto] sm:grid-cols-[auto_1fr_2fr_auto]";
+
     const filtered = useMemo(() => {
         let r = products;
         if (filter === "categorized") r = r.filter(p => p.aiCategory);
         if (filter === "uncategorized") r = r.filter(p => !p.aiCategory);
-        if (search) { const q = search.toLowerCase(); r = r.filter(p => p.product_name?.toLowerCase().includes(q) || p.code?.toLowerCase().includes(q) || p.aiCategory?.categoryName?.toLowerCase().includes(q)); }
+        if (sourceFilter !== "all") r = r.filter(p => p.sourceName === sourceFilter);
+        if (search) { const q = search.toLowerCase(); r = r.filter(p => p.product_name?.toLowerCase().includes(q) || p.code?.toLowerCase().includes(q) || p.sourceName?.toLowerCase().includes(q) || p.aiCategory?.categoryName?.toLowerCase().includes(q)); }
         return r;
-    }, [products, filter, search]);
+    }, [products, filter, sourceFilter, search]);
 
     const setCategory = async (product, cat) => {
         try {
@@ -765,16 +789,34 @@ function ProductsTab({ exportId, toast }) {
     // While a run is going, the stat tiles track it live without reloading the product list:
     // categorized-at-run-start = total − run.total (run.total = uncategorized when it began),
     // so categorized-now = total − run.total + run.categorized. Independent of list state.
-    const aiRunning = aiRun?.status === "running";
+    // The catalogue run + every feed run, summed — the card tracks the whole category set, not
+    // just Patrik's half. `startedAt` is the earliest so the ETA measures the real elapsed time.
+    const allRuns = useMemo(
+        () => [aiRun, ...aiFeedRuns.map(f => f.run)].filter(Boolean),
+        [aiRun, aiFeedRuns]
+    );
+    const aiRunning = allRuns.some(r => r.status === "running");
+    const agg = useMemo(() => {
+        const running = allRuns.filter(r => r.status === "running" || r.startedAt);
+        const sum = (k) => running.reduce((n, r) => n + (r[k] || 0), 0);
+        const starts = running.map(r => r.startedAt).filter(Boolean).sort();
+        return {
+            total: sum("total"), processed: sum("processed"), categorized: sum("categorized"),
+            batch: sum("batch"), totalBatches: sum("totalBatches"),
+            startedAt: starts[0] || null,
+            error: allRuns.find(r => r.error)?.error || null,
+        };
+    }, [allRuns]);
+
     const liveCategorized = aiRunning && stats.total
-        ? Math.min(Math.max(stats.total - (aiRun.total || 0) + (aiRun.categorized || 0), stats.categorized), stats.total)
+        ? Math.min(Math.max(stats.total - agg.total + agg.categorized, stats.categorized), stats.total)
         : stats.categorized;
     const livePct = stats.total ? Math.round((liveCategorized / stats.total) * 100) : 0;
 
     // ETA from the run's own pace: elapsed / processed × remaining.
     const aiEta = (() => {
-        if (!aiRunning || !aiRun.startedAt || !aiRun.processed || !aiRun.total) return null;
-        const elapsedMs = Date.now() - new Date(aiRun.startedAt).getTime();
+        if (!aiRunning || !agg.startedAt || !agg.processed || !agg.total) return null;
+        const elapsedMs = Date.now() - new Date(agg.startedAt).getTime();
         if (elapsedMs <= 0) return null;
         const remainingMs = (aiRun.total - aiRun.processed) * (elapsedMs / aiRun.processed);
         if (!Number.isFinite(remainingMs) || remainingMs < 0) return null;
@@ -810,35 +852,35 @@ function ProductsTab({ exportId, toast }) {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={triggerAI} disabled={triggering || aiRun?.status === "running"} className={S.btnPrimary}>
-                                {(triggering || aiRun?.status === "running") ? <Ic.Refresh spin /> : <Ic.Spark />}
-                                {aiRun?.status === "running" ? "Categorizing…" : "Trigger AI"}
+                            <button onClick={triggerAI} disabled={triggering || aiRunning} className={S.btnPrimary}>
+                                {(triggering || aiRunning) ? <Ic.Refresh spin /> : <Ic.Spark />}
+                                {aiRunning ? "Categorizing…" : "Trigger AI"}
                             </button>
                             <button onClick={load} disabled={loading} className={`${S.btnOutline} w-9 px-0 justify-center`}><Ic.Refresh spin={loading} /></button>
                             {stats.categorized > 0 && <button onClick={clearAll} className={S.btnDanger}><Ic.Trash /></button>}
                         </div>
                     </div>
 
-                    {/* Live AI-run progress (polled) */}
-                    {aiRun?.status === "running" && (
+                    {/* Live AI-run progress (polled) — catalogue + every feed run, summed */}
+                    {aiRunning && (
                         <div className="mb-4 rounded-xl bg-[#01a0be]/[0.06] ring-1 ring-[#01a0be]/20 p-4">
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                                 <span className="flex items-center gap-2 text-sm font-medium text-white">
                                     <Ic.Refresh spin />AI is categorizing with Claude…
                                 </span>
                                 <span className="text-xs text-neutral-400 tabular-nums">
-                                    {aiRun.totalBatches ? `Batch ${Math.max(aiRun.batch || 0, 1)}/${aiRun.totalBatches} · ` : ""}
-                                    {aiRun.processed ?? 0}/{aiRun.total || "…"} products · {aiRun.categorized ?? 0} categorized
+                                    {agg.totalBatches ? `Batch ${Math.max(agg.batch, 1)}/${agg.totalBatches} · ` : ""}
+                                    {agg.processed}/{agg.total || "…"} products · {agg.categorized} categorized
                                     {aiEta ? <span className="text-[#01a0be]"> · {aiEta}</span> : ""}
                                 </span>
                             </div>
                             <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
                                 <div
                                     className="h-full rounded-full bg-[#01a0be] transition-all duration-500"
-                                    style={{ width: `${aiRun.total ? Math.max(Math.round(((aiRun.processed || 0) / aiRun.total) * 100), 3) : 3}%`, boxShadow: "0 0 8px #01a0be60" }}
+                                    style={{ width: `${agg.total ? Math.max(Math.round((agg.processed / agg.total) * 100), 3) : 3}%`, boxShadow: "0 0 8px #01a0be60" }}
                                 />
                             </div>
-                            {aiRun.error && <p className="mt-2 text-xs text-amber-400">Last batch issue: {aiRun.error}</p>}
+                            {agg.error && <p className="mt-2 text-xs text-amber-400">Last batch issue: {agg.error}</p>}
                         </div>
                     )}
 
@@ -858,6 +900,16 @@ function ProductsTab({ exportId, toast }) {
                             </button>
                         ))}
                     </div>
+                    {showSource && (
+                        <div className="flex gap-0.5 p-1 bg-white/[0.03] ring-1 ring-white/[0.06] rounded-xl">
+                            {["all", ...sourceNames].map(v => (
+                                <button key={v} onClick={() => setSourceFilter(v)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sourceFilter === v ? "bg-[#01a0be] text-white shadow-md shadow-[#01a0be]/20" : "text-neutral-500 hover:text-white"}`}>
+                                    {v === "all" ? "All sources" : v}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <div className="relative flex-1 min-w-40">
                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-600"><Ic.Search /></div>
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…" className={`${S.input} pl-9`} />
@@ -867,8 +919,9 @@ function ProductsTab({ exportId, toast }) {
 
                 {/* Table */}
                 <div className={`${S.card} overflow-hidden`}>
-                    <div className="grid grid-cols-[auto_2fr_auto] gap-x-3 px-4 py-2.5 border-b border-white/[0.05] sm:grid-cols-[auto_1fr_2fr_auto] sm:gap-x-4">
+                    <div className={`grid ${rowGrid} gap-x-3 px-4 py-2.5 border-b border-white/[0.05] sm:gap-x-4`}>
                         <span className={S.label}>#</span>
+                        {showSource && <span className={`${S.label} hidden sm:block`}>Source</span>}
                         <span className={`${S.label} hidden sm:block`}>Code</span>
                         <span className={S.label}>Product</span>
                         <span className={S.label}>Category</span>
@@ -883,8 +936,15 @@ function ProductsTab({ exportId, toast }) {
                     ) : (
                         <div className="max-h-[520px] overflow-y-auto">
                             {filtered.map((p, i) => (
-                                <div key={p._id} className="group grid grid-cols-[auto_2fr_auto] gap-x-3 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors border-b border-white/[0.03] last:border-0 sm:grid-cols-[auto_1fr_2fr_auto] sm:gap-x-4">
+                                <div key={p._id} className={`group grid ${rowGrid} gap-x-3 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors border-b border-white/[0.03] last:border-0 sm:gap-x-4`}>
                                     <span className="text-xs text-neutral-700 tabular-nums w-6">{i + 1}</span>
+                                    {showSource && (
+                                        <span className={`hidden sm:inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 truncate ${p.sourceType === "own_source"
+                                            ? "bg-[#01a0be]/10 text-[#01a0be] ring-[#01a0be]/25"
+                                            : "bg-white/[0.04] text-neutral-400 ring-white/[0.08]"}`}>
+                                            {p.sourceName}
+                                        </span>
+                                    )}
                                     <span className="hidden text-xs text-neutral-600 font-mono truncate sm:block">{p.code}</span>
                                     <span className="text-sm text-neutral-300 truncate">{p.product_name}</span>
                                     <CategorySelect categories={categories} currentCategoryId={p.aiCategory?.categoryId}

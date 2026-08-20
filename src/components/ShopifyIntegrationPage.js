@@ -28,6 +28,11 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Select from "./ui/Select";
+import {
+  DEFAULT_PRICE_ROUNDING, ROUNDING_PRESETS, STEP_OPTIONS,
+  normalizePriceRounding, applyPriceRounding, describePriceRounding,
+  matchRoundingPreset, offsetOptionsForStep, roundingEndingLabel,
+} from "../lib/priceRounding";
 
 // Client-only "now" snapshot (server = 0, client = a single cached timestamp) — lets us
 // flag future-dated pricelists without a hydration mismatch, a setState-in-effect, or an
@@ -84,6 +89,7 @@ const MOCK_CONNECTION = {
     exportConfigId: null, // seeded from the first available export config at mount
     priceVatMode: "inclusive", // "inclusive" | "exclusive"
     priceFactor: 1, // multiplier applied to every pushed price (1 = unchanged)
+    priceRounding: { ...DEFAULT_PRICE_ROUNDING }, // shelf-price rule applied after the factor
     futureDatedGuard: true,
     syncStock: true,
     syncNewProducts: true,
@@ -283,6 +289,7 @@ const RUN_COUNT_LABELS = [
   ["pricesPushed", "Prices pushed"],
   ["contentPushed", "Content pushed"],
   ["optionsRenamed", "Options renamed"],
+  ["optionValuesFixed", "Option values fixed"],
   ["imagesPushed", "Images added"],
   ["variantImagesLinked", "Variant images linked"],
   ["publishedProducts", "Published"],
@@ -1522,6 +1529,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       syncTags: cfg.syncTags ?? true,
       priceVatMode: cfg.priceVatMode ?? "inclusive",
       priceFactor: parsePriceFactor(cfg.priceFactor),
+      priceRounding: normalizePriceRounding(cfg.priceRounding),
       futureDatedGuard: cfg.futureDatedGuard ?? true,
       variantOptionName: cfg.variantOptionName ?? "",
       titlePrefix: cfg.titlePrefix ?? "",
@@ -1536,6 +1544,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         syncPrices: pick("syncPrices"), syncDescriptions: pick("syncDescriptions"), syncImages: pick("syncImages"),
         syncTags: pick("syncTags"), priceVatMode: pick("priceVatMode"), futureDatedGuard: pick("futureDatedGuard"),
         priceFactor: parsePriceFactor(pick("priceFactor")),
+        priceRounding: normalizePriceRounding(pick("priceRounding")),
         variantOptionName: pick("variantOptionName") ?? "",
         titlePrefix: pick("titlePrefix") ?? "",
         pricelistPriority: buildPricelistPriority(pricelists, s.pricelistPriority ?? (inheritBase ? cfg.pricelistPriority : undefined)),
@@ -1562,6 +1571,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       syncPrices: active.syncPrices, syncDescriptions: active.syncDescriptions, syncImages: active.syncImages,
       syncTags: active.syncTags, priceVatMode: active.priceVatMode, futureDatedGuard: active.futureDatedGuard,
       priceFactor: parsePriceFactor(active.priceFactor),
+      // Explicit, NOT left to the `...cfg` spread above: the raw server object would otherwise
+      // land in `config` un-normalized and drift from `savedConfig` on the first edit.
+      priceRounding: normalizePriceRounding(active.priceRounding),
       variantOptionName: active.variantOptionName ?? "",
       titlePrefix: active.titlePrefix ?? "",
       pricelistPriority: active.pricelistPriority,
@@ -1593,6 +1605,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   // What's currently in the price-factor box. Kept separate from the stored number so half-typed
   // input ("11." / "11,") survives a keystroke — `config.priceFactor` is always the parsed value.
   const [factorText, setFactorText] = useState(() => formatPriceFactor(initialConn.config?.priceFactor));
+  // Whether the rounding panel is showing its raw controls. Reset alongside `factorText` wherever
+  // the panel is re-pointed at a different source, so it never carries over from another one.
+  const [roundingCustom, setRoundingCustom] = useState(false);
   // When set, the per-source config modal is open for that source index (null = closed).
   const [editingScopeIdx, setEditingScopeIdx] = useState(null);
   // "View details" modal — keeps the connection card minimal (only sync status stays on the card).
@@ -1741,6 +1756,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         setConfig(reseeded);
         setSavedConfig(reseeded);
         setFactorText(formatPriceFactor(reseeded.priceFactor));
+        setRoundingCustom(false);
       } catch {
         /* keep the optimistic seed */
       } finally {
@@ -1815,7 +1831,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   const sourceScopes = config.scopes || [];
   const activeIdx = Math.min(activeScopeIdx, Math.max(0, sourceScopes.length - 1));
   const activeScope = sourceScopes[activeIdx] || null;
-  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "priceFactor", "futureDatedGuard", "pricelistPriority", "publicationIds", "variantOptionName", "titlePrefix"];
+  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "priceFactor", "priceRounding", "futureDatedGuard", "pricelistPriority", "publicationIds", "variantOptionName", "titlePrefix"];
   const pickMirror = (c) => Object.fromEntries(MIRROR_KEYS.map((k) => [k, c[k]]));
   // After any change to a mirrored field, copy the whole set into the active scope.
   const mirrorActive = (c) => ({ ...c, scopes: (c.scopes || []).map((s, i) => (i === activeIdx ? { ...s, ...pickMirror(c) } : s)) });
@@ -1838,6 +1854,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   const setVatMode = (v) => setConfig((c) => mirrorActive({ ...c, priceVatMode: v }));
   // The stored factor is always a clean number — `factorText` below holds what's being typed.
   const setPriceFactor = (v) => setConfig((c) => mirrorActive({ ...c, priceFactor: parsePriceFactor(v) }));
+  // Patches the rounding rule. Always REPLACES the object (never mutates): `pickMirror` copies by
+  // reference, so the panel's rule and the active source's rule are the same object.
+  const setPriceRounding = (patch) =>
+    setConfig((c) => mirrorActive({ ...c, priceRounding: normalizePriceRounding({ ...c.priceRounding, ...patch }) }));
   const setVariantOptionName = (v) => setConfig((c) => mirrorActive({ ...c, variantOptionName: v }));
   const setTitlePrefix = (v) => setConfig((c) => mirrorActive({ ...c, titlePrefix: v }));
   const togglePublication = (id) =>
@@ -1854,6 +1874,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     // Reflect the newly-selected source's multiplier in the input box (a brand-new source that
     // isn't in `sourceScopes` yet reads as undefined → 1, which is what it was created with).
     setFactorText(formatPriceFactor(sourceScopes[idx]?.priceFactor));
+    setRoundingCustom(false);
     setConfig((c) => {
       const s = (c.scopes || [])[idx];
       if (!s) return c;
@@ -1862,6 +1883,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       mirror.pricelistPriority = buildPricelistPriority(pricelists, s.pricelistPriority);
       mirror.publicationIds = s.publicationIds || [];
       mirror.priceFactor = parsePriceFactor(s.priceFactor);
+      mirror.priceRounding = normalizePriceRounding(s.priceRounding);
       return { ...c, ...mirror };
     });
   };
@@ -1871,7 +1893,8 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     locationId: locations[0]?.id ?? null,
     ownership: "create_then_handoff", syncStock: true, syncNewProducts: true, syncPrices: true,
     syncDescriptions: true, syncImages: true, syncTags: true,
-    priceVatMode: "inclusive", priceFactor: 1, futureDatedGuard: true, variantOptionName: "", titlePrefix: "",
+    priceVatMode: "inclusive", priceFactor: 1, priceRounding: { ...DEFAULT_PRICE_ROUNDING },
+    futureDatedGuard: true, variantOptionName: "", titlePrefix: "",
     pricelistPriority: buildPricelistPriority(pricelists, []), publicationIds: publications.map((p) => p.id),
   });
   const addScope = () => {
@@ -1920,7 +1943,8 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       : (kind === "feed" ? { ...s, type: "own_source", feedId: id, exportConfigId: undefined } : { ...s, type: "export_config", exportConfigId: id, feedId: undefined })));
   };
   const setScopeLocation = (i, locId) => setScopes(sourceScopes.map((s, idx) => idx === i ? { ...s, locationId: locId } : s));
-  // Per-source AI categorization (Patrik sources only): its categories are pushed as tags.
+  // Per-source AI categorization: for a Patrik export this picks the category set to categorize
+  // against; for a feed it picks WHICH of the feed's own sets this store tags with.
   const setScopeAi = (i, id) => setScopes(sourceScopes.map((s, idx) => idx === i ? { ...s, aiExportId: id || undefined } : s));
   const removeScope = (i) => {
     const next = sourceScopes.filter((_, idx) => idx !== i);
@@ -2160,7 +2184,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     }
     setSaving(true);
     try {
-      const { pricelistPriority, priceVatMode, priceFactor, futureDatedGuard, syncStock, syncNewProducts,
+      const { pricelistPriority, priceVatMode, priceFactor, priceRounding, futureDatedGuard, syncStock, syncNewProducts,
         syncPrices, syncDescriptions, syncTags, syncImages, ownership, scopes, publicationIds, variantOptionName,
         titlePrefix } = config;
       // Each source pushes with its OWN full config to its own location. Persist the cleaned
@@ -2183,6 +2207,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
           // Always present so a source can't inherit another one's multiplier via the
           // connection-level fallback — an absent factor would silently mean "someone else's".
           priceFactor: parsePriceFactor(s.priceFactor),
+          // Always present, for the same reason as the factor: an absent rule would fall back to
+          // the connection-level one, i.e. silently push with another source's rounding.
+          priceRounding: normalizePriceRounding(s.priceRounding),
           futureDatedGuard: s.futureDatedGuard ?? true,
           // Always present (even "") so a source never inherits another source's option name
           // through the connection-level fallback. "" = use the default (export setting / Size).
@@ -2192,6 +2219,8 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
           titlePrefix: (s.titlePrefix || "").trim(),
           pricelistPriority: (s.pricelistPriority || []).map((p, i) => ({ name: p.name, enabled: p.enabled !== false, priority: p.priority ?? i })),
           publicationIds: s.publicationIds || [],
+          // For a Patrik export this IS the categorization; for a feed it only picks which of the
+          // feed's own sets this store tags with (the engine ignores it if the feed dropped that set).
           ...(s.aiExportId ? { aiExportId: s.aiExportId } : {}),
         }));
       const shopifyLocationId = cleanScopes[0]?.locationId ?? config.shopifyLocationId ?? null;
@@ -2207,7 +2236,8 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shopifyLocationId,
-          config: { pricelistPriority: minimalPricelistPriority, priceVatMode, priceFactor: parsePriceFactor(priceFactor), futureDatedGuard,
+          config: { pricelistPriority: minimalPricelistPriority, priceVatMode, priceFactor: parsePriceFactor(priceFactor),
+            priceRounding: normalizePriceRounding(priceRounding), futureDatedGuard,
             syncStock, syncNewProducts, syncPrices, syncDescriptions, syncTags: syncTags !== false, syncImages, ownership, scopes: cleanScopes, publicationIds,
             variantOptionName: (variantOptionName || "").trim(), titlePrefix: (titlePrefix || "").trim() },
         }),
@@ -2256,7 +2286,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     }
     setSavingName(false);
   };
-  const discard = () => { setConfig(savedConfig); setFactorText(formatPriceFactor(savedConfig.priceFactor)); };
+  const discard = () => { setConfig(savedConfig); setFactorText(formatPriceFactor(savedConfig.priceFactor)); setRoundingCustom(false); };
   // Leave-guard actions: navigate to the stashed target (the leavingRef silences the native prompt).
   const go = (target) => { leavingRef.current = true; setLeaveTarget(null); if (target) window.location.href = target; };
   const discardAndLeave = () => { setConfig(savedConfig); go(leaveTarget); };
@@ -2266,6 +2296,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     if (scopeSnapshot.current) {
       setConfig(scopeSnapshot.current);
       setFactorText(formatPriceFactor(scopeSnapshot.current.priceFactor));
+      setRoundingCustom(false);
     }
     setEditingScopeIdx(null);
   };
@@ -2279,6 +2310,49 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   const enabledPricelists = config.pricelistPriority.filter((p) => p.enabled).length;
   const attentionCount = unmatched.length;
   const stockOnly = config.ownership === "stock_only";
+
+  /* ----- price rounding: the panel reads the active source's rule ----- */
+  const rounding = normalizePriceRounding(config.priceRounding);
+  // "Custom…" is sticky once chosen — a hand-built rule that happens to equal a preset should keep
+  // showing its controls rather than silently collapsing back to the preset name.
+  const showRoundingCustom = roundingCustom || matchRoundingPreset(rounding) === "custom";
+  const roundingPreset = showRoundingCustom ? "custom" : matchRoundingPreset(rounding);
+  const offsetChoices = offsetOptionsForStep(rounding.step);
+  const roundingEnding = roundingEndingLabel(rounding);
+  // Three prices — cheap / mid / expensive — so a coarse rule's effect on a cheap item is visible
+  // BEFORE saving (a €5 item under "end in 99" becomes €99, and the partner should see that).
+  // `onTarget` is a price already sitting on the rule's ending, to demonstrate "always move up".
+  const money = (n) => Number(n).toFixed(2);
+  const roundingExamples = [12.34, 178.94, 2039.8].map((from) => {
+    const onTarget = applyPriceRounding(from, { ...rounding, alwaysAdvance: false });
+    return {
+      from: money(from),
+      to: money(applyPriceRounding(from, rounding)),
+      onTarget: money(onTarget),
+      onTargetOut: money(applyPriceRounding(onTarget, { ...rounding, alwaysAdvance: true })),
+    };
+  });
+  // WHICH category sets a feed is categorized against is set on the feed (Own Sources), so every
+  // store pushing it works from the same data. WHICH ONE of them supplies THIS store's tags is
+  // chosen here — so the picker below offers the feed's sets, not every set in the portal.
+  const isOwnSourceScope = activeScope?.type === "own_source";
+  const feedAiSets = (feedId) => {
+    const ai = feedOptions.find((f) => f.feedId === feedId)?.aiCategorization;
+    if (!ai?.enabled) return [];
+    return (ai.exportIds || []).map((id) => ({
+      _id: id,
+      name: aiExportOptions.find((x) => x._id === id)?.name || "AI categories",
+    }));
+  };
+  // The set actually used when the scope hasn't picked one (or picked one the feed dropped) —
+  // mirrors the engine's fallback so the UI never claims something the push won't do.
+  const effectiveScopeAiSet = (scope) => {
+    const sets = feedAiSets(scope.feedId);
+    if (!sets.length) return null;
+    return sets.find((s) => s._id === scope.aiExportId) || sets[0];
+  };
+  const activeFeedSets = isOwnSourceScope ? feedAiSets(activeScope.feedId) : [];
+  const activeFeedAiSet = isOwnSourceScope ? effectiveScopeAiSet(activeScope) : null;
   const scopes = connection.scopes || [];
 
   // Renders the needs-attention list — one clean, dense row design for desktop + mobile.
@@ -2606,9 +2680,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 : (exportOptions.find((x) => x._id === s.exportConfigId)?.name || "Export");
               const modeLabel = (OWNERSHIP_MODES.find((m) => m.value === s.ownership)?.title) || "Stock only";
               const locName = locations.find((l) => l.id === s.locationId)?.name;
-              const aiName = s.type !== "own_source" && s.aiExportId
-                ? (aiExportOptions.find((x) => x._id === s.aiExportId)?.name || "AI")
-                : null;
+              // A feed's sets come from the feed (with the engine's same fallback applied); an
+              // export's categorization is the scope's own.
+              const aiName = s.type === "own_source"
+                ? (effectiveScopeAiSet(s)?.name || null)
+                : (s.aiExportId ? (aiExportOptions.find((x) => x._id === s.aiExportId)?.name || "AI") : null);
               const openEditor = () => { selectScope(i); setEditingScopeIdx(i); };
               return (
                 <div key={i} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
@@ -2654,6 +2730,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   <p className="mt-2 text-xs text-neutral-500">
                     {modeLabel}{locName ? ` · ${locName}` : ""} · {[s.syncStock && "stock", s.syncPrices && "prices", s.syncDescriptions && "content", s.syncTags && "tags", s.syncImages && "images", s.syncNewProducts && "new"].filter(Boolean).join(", ") || "nothing selected"}
                     {parsePriceFactor(s.priceFactor) !== 1 ? ` · prices ×${formatPriceFactor(s.priceFactor)}` : ""}
+                    {normalizePriceRounding(s.priceRounding).enabled ? ` · ${describePriceRounding(s.priceRounding)}` : ""}
                     {aiName && <span className="text-cyan-500/90"> · AI tags: {aiName}</span>}
                   </p>
                 </div>
@@ -2865,8 +2942,73 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         </fieldset>
       </section>
 
+      {/* --- AI categorization for a FEED: sets come from the feed, choice is per store --- */}
+      {isOwnSourceScope && (
+        <section className="border-t border-neutral-800 pt-8">
+          <SectionHeading
+            title="AI categorization"
+            desc="The feed is categorized against the sets chosen in its own settings. Pick which of them this store tags with."
+            right={
+              <a
+                href="/integrations/own-sources"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Manage feed
+              </a>
+            }
+          />
+          {activeFeedSets.length === 0 ? (
+            <div className="flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
+              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+              <span>Categorization is <span className="font-medium text-neutral-200">off</span> for this feed — tags come from the feed&apos;s own tags and category paths. Turn it on in the feed&apos;s settings to choose a set here.</span>
+            </div>
+          ) : (
+            <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
+              <legend className="sr-only">AI categorization</legend>
+              {/* Three settings can stop categories reaching products ALREADY in the store. Say so
+                  here, next to the picker — otherwise a sync finishes clean and the tags just
+                  never change, with nothing on screen explaining why. */}
+              {stockOnly ? (
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90">
+                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                  <span><span className="font-medium">Stock only</span> ownership never touches tags — no product gets AI categories in this mode, new or existing. Switch ownership mode above to use them.</span>
+                </div>
+              ) : config.ownership === "create_then_handoff" ? (
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90">
+                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                  <span>In <span className="font-medium">Create, then hand off</span> the categories are applied only when a product is <span className="font-medium">created</span>. Products already in your store keep their current tags — that&apos;s the hand-off. Use <span className="font-medium">Portal authoritative</span> if you want tags kept up to date.</span>
+                </div>
+              ) : !config.syncTags ? (
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90">
+                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                  <span><span className="font-medium">Tags sync is off</span> for this source — categories are applied only when a product is first created. Turn on <span className="font-medium">Tags</span> under What to sync to keep existing products up to date.</span>
+                </div>
+              ) : null}
+              <label className="mb-1 block text-xs font-medium text-neutral-400">Tag this store with</label>
+              <Select
+                ariaLabel="AI categorization"
+                value={activeFeedAiSet?._id || ""}
+                onChange={(e) => setScopeAi(editingScopeIdx, e.target.value || null)}
+              >
+                {activeFeedSets.map((x) => (
+                  <option key={x._id} value={x._id}>{x.name}</option>
+                ))}
+              </Select>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                {activeFeedSets.length > 1
+                  ? <>This feed is categorized against {activeFeedSets.length} sets; this store tags with <span className="font-medium text-cyan-500/90">{activeFeedAiSet?.name}</span> only — the supplier&apos;s own tags are replaced.</>
+                  : <>Categorized by <span className="font-medium text-cyan-500/90">{activeFeedAiSet?.name}</span> — its categories replace the supplier&apos;s own tags. Add another set in the feed&apos;s settings to choose between them here.</>}
+              </p>
+            </fieldset>
+          )}
+        </section>
+      )}
+
       {/* --------------------- AI categorization (tags) ---------------- */}
-      {activeScope?.type !== "own_source" && aiExportOptions.length > 0 && (
+      {!isOwnSourceScope && aiExportOptions.length > 0 && (
         <section className="border-t border-neutral-800 pt-8">
           <SectionHeading
             title="AI categorization"
@@ -3066,6 +3208,128 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               <span className="font-mono text-cyan-500/90">{(100 * config.priceFactor).toFixed(2)}</span>. Rounding to 2 decimals
               happens once, on the final price.
             </p>
+          </div>
+
+          {/* price rounding — shelf-price rule applied AFTER the factor */}
+          <div className="mt-8">
+            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+              <span className="min-w-0">
+                <span className="text-sm font-medium text-white">Round prices</span>
+                <span className="mt-1 block text-xs text-neutral-500">
+                  Snap every price to a shelf-friendly figure after the factor — e.g. always ending in 9, or to the nearest 0.05.
+                </span>
+              </span>
+              <ToggleSwitch
+                checked={rounding.enabled}
+                onChange={() => setPriceRounding({ enabled: !rounding.enabled })}
+                ariaLabel="Round prices"
+              />
+            </label>
+
+            {rounding.enabled && (
+              <div className="mt-3 space-y-4 rounded-xl border border-neutral-700/50 bg-neutral-900/40 p-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-400">Rule</label>
+                  <Select
+                    ariaLabel="Rounding rule"
+                    value={roundingPreset}
+                    onChange={(e) => {
+                      const preset = ROUNDING_PRESETS.find((p) => p.id === e.target.value);
+                      // "Custom…" keeps the current numbers and just reveals the controls.
+                      if (preset) setPriceRounding(preset.rule);
+                      setRoundingCustom(!preset);
+                    }}
+                  >
+                    {ROUNDING_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                    <option value="custom">Custom…</option>
+                  </Select>
+                </div>
+
+                {showRoundingCustom && (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-400">Direction</label>
+                      <Select ariaLabel="Rounding direction" value={rounding.mode} onChange={(e) => setPriceRounding({ mode: e.target.value })}>
+                        <option value="up">Up</option>
+                        <option value="down">Down</option>
+                        <option value="nearest">Nearest</option>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-400">Step</label>
+                      <Select
+                        ariaLabel="Rounding step"
+                        value={String(rounding.step)}
+                        onChange={(e) => {
+                          // A coarser/finer grid can't keep the old ending — fold it back in range.
+                          const step = Number(e.target.value);
+                          const opts = offsetOptionsForStep(step);
+                          setPriceRounding({ step, offset: opts.includes(rounding.offset) ? rounding.offset : 0 });
+                        }}
+                      >
+                        {STEP_OPTIONS.map((s) => <option key={s} value={String(s)}>{s}</option>)}
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-400">Ends in</label>
+                      <Select
+                        ariaLabel="Price ending"
+                        value={String(rounding.offset)}
+                        disabled={offsetChoices.length <= 1}
+                        onChange={(e) => setPriceRounding({ offset: Number(e.target.value) })}
+                      >
+                        {offsetChoices.map((o) => (
+                          <option key={o} value={String(o)}>{o === 0 ? "No ending" : String(o).replace(/^0/, "")}</option>
+                        ))}
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                {rounding.mode !== "nearest" && (
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={rounding.alwaysAdvance}
+                      onChange={() => setPriceRounding({ alwaysAdvance: !rounding.alwaysAdvance })}
+                      className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[#01a0be]"
+                    />
+                    <span className="min-w-0 text-xs text-neutral-400">
+                      Always move {rounding.mode === "up" ? "up" : "down"}, even when the price already{" "}
+                      {roundingEnding ? <>ends in <span className="font-mono text-neutral-300">{roundingEnding.replace("…", "")}</span></> : "sits on the step"}.
+                      <span className="mt-0.5 block text-neutral-600">
+                        Off by default — with this on, a price of{" "}
+                        <span className="font-mono">{roundingExamples[1].onTarget}</span> is pushed as{" "}
+                        <span className="font-mono">{roundingExamples[1].onTargetOut}</span>.
+                      </span>
+                    </span>
+                  </label>
+                )}
+
+                {/* worked example — three prices, so a coarse rule's effect on a cheap item is visible */}
+                <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
+                  <p className="mb-2 text-xs font-medium text-neutral-400">{describePriceRounding(rounding)}</p>
+                  <div className="space-y-1">
+                    {roundingExamples.map((ex) => (
+                      <p key={ex.from} className="font-mono text-xs text-neutral-500">
+                        {ex.from} <span className="text-neutral-600">→</span>{" "}
+                        <span className={ex.from === ex.to ? "text-neutral-400" : "text-cyan-500/90"}>{ex.to}</span>
+                      </p>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-neutral-500">
+                    Applies to the{" "}
+                    <span className="text-neutral-400">
+                      {config.priceVatMode === "inclusive" ? "VAT-inclusive" : "VAT-exclusive (net)"}
+                    </span>{" "}
+                    price sent to Shopify
+                    {config.priceVatMode === "exclusive"
+                      ? " — shoppers see it after tax is added, so what they pay won't carry the ending."
+                      : " — the price a shopper sees."}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* future-dated guard */}
