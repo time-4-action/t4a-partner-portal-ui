@@ -51,11 +51,11 @@ export default async function OwnSourcesRoute() {
 
   if (!roles.includes("export")) {
     return (
-      <div className="relative py-6 lg:py-8">
-        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-          <div className="p-6 bg-neutral-800/50 border border-neutral-700/50 rounded-2xl text-center sm:p-8">
-            <h2 className="text-xl font-semibold text-white mb-2">Access Restricted</h2>
-            <p className="text-neutral-400">You do not have access to the Own Sources feature. Contact your administrator to request access.</p>
+      <div className="p-4 md:p-8">
+        <div className="contents">
+          <div className="p-6 bg-muted/50 border border-input/50 rounded-2xl text-center sm:p-8">
+            <h2 className="text-[15px] font-semibold text-foreground mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground">You do not have access to the Own Sources feature. Contact your administrator to request access.</p>
           </div>
         </div>
       </div>
@@ -66,8 +66,8 @@ export default async function OwnSourcesRoute() {
   // shows the join-the-program screen instead of the feature.
   if (!hasTierAccess(roles, FEATURE_TIERS.ownSources.tier)) {
     return (
-      <div className="relative bg-transparent py-6 lg:py-8">
-        <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+      <div className="p-4 md:p-8">
+        <div className="contents">
           <TierGate featureKey="ownSources" userEmail={session?.user?.email} userName={session?.user?.name} />
         </div>
       </div>
@@ -80,8 +80,8 @@ export default async function OwnSourcesRoute() {
   ]);
 
   return (
-    <div className="relative bg-transparent py-6 lg:py-8">
-      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full">
+      <div className="contents">
         <OwnSourcesPage initialSources={sources} initialAiExports={aiExports ?? []} />
       </div>
     </div>

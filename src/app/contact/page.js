@@ -1,18 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import PageHeader from "@/components/ui/PageHeader";
+import { countPill } from "@/lib/ui";
 
 /**
  * Contact — public "get in touch" surface. Visually aligned with the Integrations
  * pages (Shopify / Own Sources): header card with a glowing icon tile + badge pill,
  * a two-column layout (form card + info rail), and the border-based input style
- * (`bg-neutral-900/60` + `focus:border-[#01a0be]`) those pages use.
+ * (`bg-card` + `focus:border-accent-brand`) those pages use.
  */
 
 const ACCENT = '#01a0be';
 
 const inputCls =
-  'w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3.5 py-2.5 text-sm text-white placeholder-neutral-500 transition-colors focus:border-[#01a0be] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50';
+  'w-full rounded-lg border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder-muted-foreground transition-colors focus:border-accent-brand focus:outline-none disabled:cursor-not-allowed disabled:opacity-50';
 
 function MailIcon({ className }) {
   return (
@@ -87,47 +89,37 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="relative bg-transparent py-8">
+    <div className="flex flex-col min-h-full">
       {/* Match the navbar's container exactly so left/right edges align pixel-precise (see Navbar.js) */}
-      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+      <div className="contents">
         {/* ----------------------------- Header ----------------------------- */}
         {/* Compact header — small icon + title + badge on one line, matching the Export / Shopify / Own Sources pages. */}
-        <header className="mb-6 flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
-            <MailIcon className="h-5 w-5 text-[#01a0be]" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-white">Contact us</h1>
-              <span className="inline-flex items-center rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-                Support
-              </span>
-            </div>
-            <p className="truncate text-xs text-neutral-500">
-              Questions about product data synchronization, integrations or anything else? Send us a note and we&apos;ll get back to you.
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="Contact us"
+          badge={<span className={countPill}>Support</span>}
+          description={"Questions about product data synchronization, integrations or anything else? Send us a note and we'll get back to you."}
+        />
+        <div className="flex-1 p-4 md:p-8">
 
         {/* Notice banner */}
         {status === 'success' && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 animate-fade-in">
-            <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-fg-softer animate-fade-in">
+            <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-fg" />
             <div>
-              <p className="font-medium text-emerald-200">Message sent successfully</p>
-              <p className="mt-0.5 text-emerald-300/70">We&apos;ll get back to you as soon as possible.</p>
+              <p className="font-medium text-emerald-fg-softer">Message sent successfully</p>
+              <p className="mt-0.5 text-emerald-fg-soft/70">We&apos;ll get back to you as soon as possible.</p>
             </div>
           </div>
         )}
 
         {status === 'error' && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 animate-fade-in">
-            <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-fg-softer animate-fade-in">
+            <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-fg" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <div>
-              <p className="font-medium text-red-200">Failed to send message</p>
-              <p className="mt-0.5 text-red-300/70">Please try again later or contact us directly.</p>
+              <p className="font-medium text-red-fg-softer">Failed to send message</p>
+              <p className="mt-0.5 text-red-fg-soft/70">Please try again later or contact us directly.</p>
             </div>
           </div>
         )}
@@ -135,16 +127,16 @@ export default function ContactPage() {
         {/* --------------------- Two-column: form + info rail --------------------- */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
           {/* Form card */}
-          <section className="lg:col-span-3 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
-            <h2 className="text-xl font-semibold text-white">Send a message</h2>
-            <p className="mt-2 max-w-lg text-sm leading-relaxed text-neutral-400">
+          <section className="lg:col-span-3 rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+            <h2 className="text-[15px] font-semibold text-foreground">Send a message</h2>
+            <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
               Tell us a little about what you need and the best way to reach you.
             </p>
 
             <form onSubmit={handleSubmit} method="POST" className="mt-6 space-y-5">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-neutral-300">
+                  <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-foreground">
                     Name
                   </label>
                   <input
@@ -159,7 +151,7 @@ export default function ContactPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="company" className="mb-1.5 block text-sm font-medium text-neutral-300">
+                  <label htmlFor="company" className="mb-1.5 block text-sm font-medium text-foreground">
                     Company
                   </label>
                   <input
@@ -176,7 +168,7 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-neutral-300">
+                <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground">
                   Email
                 </label>
                 <input
@@ -192,7 +184,7 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label htmlFor="message" className="mb-1.5 block text-sm font-medium text-neutral-300">
+                <label htmlFor="message" className="mb-1.5 block text-sm font-medium text-foreground">
                   Message
                 </label>
                 <textarea
@@ -211,7 +203,7 @@ export default function ContactPage() {
                 <button
                   type="submit"
                   disabled={status === 'sending'}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#01a0be] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-7 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 h-10"
                 >
                   {status === 'sending' ? (
                     <>
@@ -231,33 +223,34 @@ export default function ContactPage() {
 
           {/* Info rail */}
           <aside className="lg:col-span-2 space-y-6">
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm">
-              <h3 className="text-sm font-semibold text-white">What we can help with</h3>
+            <section className="rounded-2xl border border-border bg-card p-6">
+              <h3 className="text-[13px] font-semibold text-foreground">What we can help with</h3>
               <ul className="mt-4 space-y-3">
                 {HELP_TOPICS.map((t) => (
-                  <li key={t} className="flex items-start gap-3 text-sm text-neutral-400">
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+                  <li key={t} className="flex items-start gap-3 text-sm text-muted-foreground">
+                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
                     {t}
                   </li>
                 ))}
               </ul>
             </section>
 
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-                <MailIcon className="h-4 w-4 text-[#01a0be]" />
+            <section className="rounded-2xl border border-border bg-card p-6">
+              <h3 className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                <MailIcon className="h-4 w-4 text-accent-brand" />
                 What to expect
               </h3>
               <ul className="mt-4 space-y-3">
                 {EXPECTATIONS.map((t) => (
-                  <li key={t} className="flex items-start gap-3 text-sm text-neutral-400">
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+                  <li key={t} className="flex items-start gap-3 text-sm text-muted-foreground">
+                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
                     {t}
                   </li>
                 ))}
               </ul>
             </section>
           </aside>
+        </div>
         </div>
       </div>
     </div>

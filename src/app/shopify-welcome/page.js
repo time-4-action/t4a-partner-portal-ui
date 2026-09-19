@@ -56,7 +56,7 @@ export default async function ShopifyWelcomePage({ searchParams }) {
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden px-5 py-14 sm:py-20">
       {/* one soft ambient glow — restraint over decoration */}
-      <div className="pointer-events-none absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full bg-[#01a0be]/15 blur-[120px]" />
+      <div className="pointer-events-none absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full bg-accent-brand/15 blur-[120px]" />
 
       <div className="relative w-full max-w-md sm:max-w-lg">
         {/* Hero */}
@@ -64,15 +64,15 @@ export default async function ShopifyWelcomePage({ searchParams }) {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-[#95BF47]/10">
             <ShopifyMark className="h-7 w-7 text-[#95BF47]" />
           </div>
-          <h1 className="font-orbitron mt-6 text-2xl font-bold leading-tight tracking-tight text-white sm:text-[1.75rem]">
-            {shop ? <>Connect <span className="text-[#01a0be]">{shopLabel(shop)}</span></> : "Connect your store"}
+          <h1 className="mt-6 text-2xl font-bold leading-tight tracking-tight text-foreground sm:text-[1.75rem]">
+            {shop ? <>Connect <span className="text-accent-brand">{shopLabel(shop)}</span></> : "Connect your store"}
           </h1>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
             {feature.tagline}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {PERKS.map((p) => (
-              <span key={p} className="rounded-full border border-neutral-800 bg-neutral-900/60 px-3 py-1 text-xs text-neutral-400">
+              <span key={p} className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
                 {p}
               </span>
             ))}
@@ -83,25 +83,25 @@ export default async function ShopifyWelcomePage({ searchParams }) {
         <div className="mt-9">
           <Link
             href={signInHref}
-            className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#01a0be] to-violet-500 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition hover:shadow-[#01a0be]/40 hover:brightness-110"
+            className="group inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Sign in to connect
             <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <p className="mt-3 text-center text-xs leading-relaxed text-neutral-500">
-            Already a Patrik partner? We&apos;ll finish connecting{shop ? <> <span className="text-neutral-300">{shopLabel(shop)}</span></> : " your store"} automatically.
+          <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">
+            Already a Patrik partner? We&apos;ll finish connecting{shop ? <> <span className="text-foreground">{shopLabel(shop)}</span></> : " your store"} automatically.
           </p>
         </div>
 
         {/* Secondary path — request access (collapsed by default for a minimal first view) */}
         <details className="group mt-8">
-          <summary className="flex cursor-pointer list-none items-center justify-center gap-1.5 text-sm text-neutral-400 transition hover:text-neutral-200 [&::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-center gap-1.5 text-sm text-muted-foreground transition hover:text-foreground [&::-webkit-details-marker]:hidden">
             New to the portal?
-            <span className="font-medium text-[#01a0be]">Request access</span>
-            <ArrowIcon className="h-3.5 w-3.5 text-[#01a0be] transition-transform group-open:rotate-90" />
+            <span className="font-medium text-accent-brand">Request access</span>
+            <ArrowIcon className="h-3.5 w-3.5 text-accent-brand transition-transform group-open:rotate-90" />
           </summary>
-          <div className="mt-5 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 sm:p-6">
-            <p className="mb-5 text-[13px] leading-relaxed text-neutral-400">
+          <div className="mt-5 rounded-2xl border border-border bg-muted/40 p-5 sm:p-6">
+            <p className="mb-5 text-[13px] leading-relaxed text-muted-foreground">
               The portal is for approved Patrik International partners. Tell us about your business and
               we&apos;ll get you set up.
             </p>
@@ -109,7 +109,7 @@ export default async function ShopifyWelcomePage({ searchParams }) {
           </div>
         </details>
 
-        <p className="mt-10 text-center text-[11px] leading-relaxed text-neutral-600">
+        <p className="mt-10 text-center text-[11px] leading-relaxed text-muted-foreground/70">
           One-way sync — the portal pushes catalogue data into your store and never deletes products.
         </p>
       </div>

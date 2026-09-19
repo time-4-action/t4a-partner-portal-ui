@@ -29,9 +29,9 @@ const CheckIcon = (props) => (
 );
 
 const inputCls =
-  "h-11 w-full rounded-xl border border-neutral-800 bg-neutral-950/70 px-3.5 text-sm text-neutral-100 placeholder:text-neutral-600 outline-none transition focus:border-[#01a0be]/70 focus:ring-2 focus:ring-[#01a0be]/20";
-const labelCls = "mb-1.5 block text-[13px] font-medium text-neutral-300";
-const Req = () => <span className="text-[#01a0be]">*</span>;
+  "h-11 w-full rounded-xl border border-border bg-popover px-3.5 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition focus:border-accent-brand/70 focus:ring-2 focus:ring-accent-brand/20";
+const labelCls = "mb-1.5 block text-[13px] font-medium text-foreground";
+const Req = () => <span className="text-accent-brand">*</span>;
 
 export default function RequestAccessForm({
   featureName = "Shopify Integration",
@@ -93,10 +93,10 @@ export default function RequestAccessForm({
   if (state === "sent") {
     return (
       <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4 text-left">
-        <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+        <CheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-fg-soft" />
         <div>
-          <p className="text-sm font-medium text-emerald-200">Request sent</p>
-          <p className="mt-0.5 text-[13px] leading-relaxed text-emerald-300/80">
+          <p className="text-sm font-medium text-emerald-fg-softer">Request sent</p>
+          <p className="mt-0.5 text-[13px] leading-relaxed text-emerald-fg-soft/80">
             Thanks — we&apos;ll review your details and email you once your access is enabled.
           </p>
         </div>
@@ -131,7 +131,7 @@ export default function RequestAccessForm({
       <div>
         <label className={labelCls}>About your business</label>
         <textarea
-          className={`${inputCls.replace("h-11", "min-h-[88px] py-2.5")} resize-y`}
+          className={`${inputCls.replace("h-11","min-h-[88px] py-2")} resize-y`}
           rows={3}
           value={form.message}
           onChange={set("message")}
@@ -140,7 +140,7 @@ export default function RequestAccessForm({
       </div>
 
       {state === "error" && (
-        <p className="text-[13px] text-red-400">
+        <p className="text-[13px] text-red-fg">
           Please add your name, email and company, then try again.
         </p>
       )}
@@ -148,7 +148,7 @@ export default function RequestAccessForm({
       <button
         type="submit"
         disabled={state === "sending"}
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#01a0be] to-violet-500 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition hover:shadow-[#01a0be]/40 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
       >
         {state === "sending" && <SpinnerIcon className="h-4 w-4" />}
         {state === "sending" ? "Sending…" : "Request access"}

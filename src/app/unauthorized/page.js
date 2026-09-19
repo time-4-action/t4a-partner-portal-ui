@@ -26,41 +26,41 @@ export default async function UnauthorizedPage({ searchParams }) {
   if (isShopify) {
     return (
       <div className="relative flex min-h-[70vh] items-center justify-center px-4 py-12">
-        <div className="w-full max-w-lg rounded-2xl border border-neutral-800 bg-neutral-900/60 p-8 text-center backdrop-blur-sm">
+        <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
           <div className="relative mx-auto mb-6 w-fit">
             <div aria-hidden="true" className="absolute -inset-3 rounded-[1.75rem] bg-[#95BF47]/20 blur-2xl" />
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-shopify-deep via-card to-popover shadow-xs">
               <ShopifyMark className="h-9 w-9" />
             </div>
           </div>
 
-          <h1 className="text-2xl font-bold text-white">Almost there — your account needs Shopify access</h1>
-          <p className="mt-3 text-sm leading-relaxed text-neutral-400">
-            You&apos;re signed in{email ? <> as <span className="font-medium text-neutral-200">{email}</span></> : null}, but this
+          <h1 className="text-2xl font-bold text-foreground">Almost there — your account needs Shopify access</h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            You&apos;re signed in{email ? <> as <span className="font-medium text-foreground">{email}</span></> : null}, but this
             account isn&apos;t enabled for the Shopify sync yet. To connect{" "}
-            <span className="font-semibold text-white">{shop}</span>, ask your Patrik&nbsp;International contact to enable
+            <span className="font-semibold text-foreground">{shop}</span>, ask your Patrik&nbsp;International contact to enable
             Shopify access for your account.
           </p>
 
-          <div className="mt-5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-left text-xs text-neutral-400">
-            <p><span className="text-neutral-500">Store:</span> <span className="font-mono text-neutral-200">{shop}.myshopify.com</span></p>
-            {email && <p className="mt-1"><span className="text-neutral-500">Account:</span> <span className="text-neutral-200">{email}</span></p>}
+          <div className="mt-5 rounded-xl border border-input/50 bg-muted/40 px-4 py-3 text-left text-xs text-muted-foreground">
+            <p><span className="text-muted-foreground">Store:</span> <span className="font-mono text-foreground">{shop}.myshopify.com</span></p>
+            {email && <p className="mt-1"><span className="text-muted-foreground">Account:</span> <span className="text-foreground">{email}</span></p>}
           </div>
 
-          <p className="mt-4 text-xs text-neutral-500">
+          <p className="mt-4 text-xs text-muted-foreground">
             Once access is granted, reopen the app from your Shopify admin — it will pick up right where you left off.
           </p>
 
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
             <a
               href="/contact"
-              className="inline-flex items-center justify-center rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f]"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 h-9"
             >
               Request access
             </a>
             <a
               href="/auth/logout"
-              className="inline-flex items-center justify-center rounded-xl border border-neutral-700 bg-neutral-900/60 px-5 py-2.5 text-sm font-semibold text-neutral-300 transition-all hover:border-neutral-600 hover:text-white"
+              className="inline-flex items-center justify-center rounded-md border border-input bg-card px-5 text-sm font-medium text-foreground transition-all hover:border-input hover:text-foreground h-9"
             >
               Switch account
             </a>
@@ -73,10 +73,10 @@ export default async function UnauthorizedPage({ searchParams }) {
   // Generic denial (any other protected route).
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4 text-center">
-      <h1 className="text-3xl font-bold text-red-400" style={{ fontFamily: "var(--font-orbitron)" }}>
+      <h1 className="text-3xl font-bold text-red-fg">
         Access Denied
       </h1>
-      <p className="max-w-md text-gray-300">
+      <p className="max-w-md text-foreground">
         You do not have permission to access this portal. Please contact your administrator to request access.
       </p>
       <a

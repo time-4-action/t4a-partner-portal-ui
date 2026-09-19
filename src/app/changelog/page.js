@@ -17,6 +17,8 @@ import {
   CHANGELOG_STATS,
   formatReleaseDate,
 } from "@/lib/changelog";
+import PageHeader from "@/components/ui/PageHeader";
+import { countPill } from "@/lib/ui";
 
 export const metadata = {
   title: "Changelog | Patrik Partner Portal",
@@ -122,29 +124,29 @@ function WrenchIcon({ className }) {
 /* ─── Badge / label helpers ──────────────────────────────────────────────── */
 
 const TIER_STYLES = {
-  GA: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
-  Stable: "border-[#01a0be]/25 bg-[#01a0be]/10 text-[#01a0be]",
-  Beta: "border-cyan-400/30 bg-cyan-400/10 text-cyan-300",
+  GA: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+  Stable: "bg-muted text-muted-foreground",
+  Beta: "bg-accent-brand/10 text-accent-brand",
 };
 
 const SCOPE_STYLES = {
-  api: "border-violet-400/25 bg-violet-400/10 text-violet-300",
-  ui: "border-[#01a0be]/25 bg-[#01a0be]/10 text-[#01a0be]",
+  api: "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300",
+  ui: "bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300",
 };
 
 const SCOPE_LABELS = { api: "API", ui: "Portal" };
 
 /** Category rendering config — label, icon, and its accent colour. */
 const CATEGORIES = [
-  { key: "added", label: "Added", icon: PlusIcon, dot: "bg-emerald-400", text: "text-emerald-300", ring: "border-emerald-400/25 bg-emerald-400/10" },
-  { key: "changed", label: "Changed", icon: RefreshIcon, dot: "bg-[#01a0be]", text: "text-[#01a0be]", ring: "border-[#01a0be]/25 bg-[#01a0be]/10" },
-  { key: "fixed", label: "Fixed", icon: WrenchIcon, dot: "bg-amber-400", text: "text-amber-300", ring: "border-amber-400/25 bg-amber-400/10" },
+  { key: "added", label: "Added", icon: PlusIcon, dot: "bg-emerald-400", text: "text-emerald-fg-soft", ring: "border-emerald-400/25 bg-emerald-400/10" },
+  { key: "changed", label: "Changed", icon: RefreshIcon, dot: "bg-primary", text: "text-accent-brand", ring: "border-accent-brand/25 bg-accent-brand/10" },
+  { key: "fixed", label: "Fixed", icon: WrenchIcon, dot: "bg-amber-400", text: "text-amber-fg-soft", ring: "border-amber-400/25 bg-amber-400/10" },
 ];
 
 function Pill({ className, children }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest ${className}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${className}`}
     >
       {children}
     </span>
@@ -155,21 +157,21 @@ function Pill({ className, children }) {
 
 function StatCard({ icon: Icon, label, value }) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 backdrop-blur-sm transition-colors hover:border-[#01a0be]/40">
+    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-colors hover:border-accent-brand/40 shadow-sm">
       <div
-        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-[#01a0be]/10 blur-2xl opacity-0 transition-opacity group-hover:opacity-100"
+        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent-brand/10 blur-2xl opacity-0 transition-opacity group-hover:opacity-100"
         aria-hidden="true"
       />
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#01a0be]/25 bg-[#01a0be]/10">
-        <Icon className="h-4.5 w-4.5 text-[#01a0be]" />
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent-brand/25 bg-accent-brand/10">
+        <Icon className="h-4.5 w-4.5 text-accent-brand" />
       </div>
       <p
-        className="mt-3 text-lg font-bold text-white"
-        style={{ fontFamily: "var(--font-orbitron)" }}
+        className="mt-3 text-lg font-bold text-foreground"
+       
       >
         {value}
       </p>
-      <p className="mt-0.5 text-xs text-neutral-500">{label}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -189,7 +191,7 @@ function ChangeGroup({ config, items }) {
       </div>
       <ul className="space-y-2 pl-1">
         {items.map((item, i) => (
-          <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed text-neutral-400">
+          <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
             <span className={`mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
             <span>{item}</span>
           </li>
@@ -209,38 +211,38 @@ function Release({ release }) {
       <span
         aria-hidden="true"
         className={`absolute left-5 top-6 hidden h-4 w-4 -translate-x-1/2 rounded-full border-2 sm:block ${
-          latest
-            ? "border-[#01a0be] bg-[#01a0be] shadow-[0_0_0_4px_rgba(1,160,190,0.15)]"
-            : "border-neutral-700 bg-neutral-950"
-        }`}
+ latest
+ ? "border-accent-brand bg-primary ring-4 ring-accent-brand/15"
+ :"border-input bg-popover"
+ }`}
       />
 
       <div
-        className={`overflow-hidden rounded-2xl border bg-neutral-900/60 backdrop-blur-sm transition-colors ${
-          latest ? "border-[#01a0be]/40" : "border-neutral-800 hover:border-neutral-700"
-        }`}
+        className={`overflow-hidden rounded-2xl border bg-card transition-colors shadow-sm ${
+ latest ? "border-accent-brand/40" : "border-border hover:border-input"
+ }`}
       >
         {/* Header strip */}
-        <div className="flex flex-col gap-3 border-b border-neutral-800/80 p-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border/80 p-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2
-                className="text-2xl font-bold tracking-tight text-white"
-                style={{ fontFamily: "var(--font-orbitron)" }}
+                className="text-2xl font-bold tracking-tight text-foreground"
+               
               >
                 v{version}
               </h2>
               {latest && (
-                <Pill className="border-[#01a0be]/40 bg-[#01a0be]/15 text-[#01a0be]">Latest</Pill>
+                <Pill className="bg-accent-brand/10 text-accent-brand">Latest</Pill>
               )}
               <Pill className={TIER_STYLES[tier] || TIER_STYLES.Stable}>{tier}</Pill>
             </div>
-            <p className="mt-2 text-base font-semibold text-white">{title}</p>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-neutral-400">{tagline}</p>
+            <p className="mt-2 text-base font-semibold text-foreground">{title}</p>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">{tagline}</p>
           </div>
 
           <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-            <span className="inline-flex items-center gap-1.5 text-xs text-neutral-500">
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <CalendarIcon className="h-3.5 w-3.5" />
               {formatReleaseDate(date)}
             </span>
@@ -252,11 +254,11 @@ function Release({ release }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   title={commits[s] ? `${SCOPE_LABELS[s]} · commit ${commits[s]}` : SCOPE_LABELS[s]}
-                  className={`transition-opacity hover:opacity-80 ${SCOPE_STYLES[s]} inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest`}
+                  className={`transition-opacity hover:opacity-80 ${SCOPE_STYLES[s]} inline-flex items-center gap-1 rounded-full px-2 text-[10px] font-medium h-6`}
                 >
                   {SCOPE_LABELS[s]}
                   {commits[s] && (
-                    <span className="font-mono lowercase tracking-normal opacity-70">
+                    <span className="font-mono opacity-70">
                       {commits[s]}
                     </span>
                   )}
@@ -281,26 +283,15 @@ function Release({ release }) {
 
 export default function ChangelogPage() {
   return (
-    <div className="relative bg-transparent py-8">
-      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+    <div className="flex flex-col min-h-full">
+      <div className="contents">
         {/* ----------------------------- Header ----------------------------- */}
-        <header className="mb-6 flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
-            <HistoryIcon className="h-5 w-5 text-[#01a0be]" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-white">Changelog</h1>
-              <span className="inline-flex items-center rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-                Releases
-              </span>
-            </div>
-            <p className="truncate text-xs text-neutral-500">
-              Every version of the Time 4 Action Partner Portal &amp; API — from the first commit to
-              today.
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="Changelog"
+          badge={<span className={countPill}>Releases</span>}
+          description={"Every version of the Time 4 Action Partner Portal & API — from the first commit to today."}
+        />
+        <div className="flex-1 p-4 md:p-8">
 
         {/* --------------------------- At a glance --------------------------- */}
         <div className="mb-8 grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -319,7 +310,7 @@ export default function ChangelogPage() {
           {/* Vertical rail (desktop) */}
           <div
             aria-hidden="true"
-            className="absolute left-5 top-2 bottom-2 hidden w-px bg-gradient-to-b from-[#01a0be]/40 via-neutral-800 to-transparent sm:block"
+            className="absolute left-5 top-2 bottom-2 hidden w-px bg-gradient-to-b from-accent-brand/40 via-muted to-transparent sm:block"
           />
           <div className="space-y-6">
             {RELEASES.map((release) => (
@@ -329,10 +320,10 @@ export default function ChangelogPage() {
         </div>
 
         {/* ----------------------------- Footer ----------------------------- */}
-        <footer className="mt-10 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 text-sm leading-relaxed text-neutral-500 backdrop-blur-sm">
+        <footer className="mt-10 rounded-2xl border border-border bg-muted/40 p-6 text-sm leading-relaxed text-muted-foreground">
           <p>
             Each release above is an annotated git tag (
-            <code className="rounded bg-neutral-800/80 px-1 py-0.5 text-xs text-neutral-300">
+            <code className="rounded bg-muted/80 px-1 py-0.5 text-xs text-foreground">
               vX.Y.Z
             </code>
             ) pushed to the{" "}
@@ -340,7 +331,7 @@ export default function ChangelogPage() {
               href={REPO_URLS.api}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#01a0be] hover:underline"
+              className="text-accent-brand hover:underline"
             >
               API
             </a>{" "}
@@ -349,7 +340,7 @@ export default function ChangelogPage() {
               href={REPO_URLS.ui}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#01a0be] hover:underline"
+              className="text-accent-brand hover:underline"
             >
               Portal
             </a>{" "}
@@ -358,7 +349,7 @@ export default function ChangelogPage() {
               href="https://semver.org"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#01a0be] hover:underline"
+              className="text-accent-brand hover:underline"
             >
               Semantic Versioning
             </a>
@@ -367,13 +358,14 @@ export default function ChangelogPage() {
               href="https://keepachangelog.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#01a0be] hover:underline"
+              className="text-accent-brand hover:underline"
             >
               Keep a Changelog
             </a>{" "}
             format.
           </p>
         </footer>
+        </div>
       </div>
     </div>
   );

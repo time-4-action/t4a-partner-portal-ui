@@ -125,29 +125,29 @@ export default function ProductVariants({ product }) {
         </h1>
         {/* Subtitle only when it's a real variant (avoids repeating the parent name). */}
         {hasVariants && (
-          <p className="text-lg text-neutral-300 mb-4">
+          <p className="text-lg text-foreground mb-4">
             {selectedVariant?.product_name}
           </p>
         )}
 
         <div
-          className="text-neutral-300 prose prose-invert"
+          className="text-foreground prose prose-invert"
           dangerouslySetInnerHTML={{ __html: product.short_description }}
         />
 
         {product.child_products && product.child_products.length > 0 && (
           <>
-            <h2 className="text-2xl font-bold mt-8 mb-4">Available Models</h2>
+            <h2 className="text-[15px] font-semibold mt-8 mb-4">Available Models</h2>
             <div className="space-y-2 mb-6">
               {product.child_products.map((child) => (
                 <button
                   key={child.code}
                   onClick={() => setSelectedVariant(child)}
-                  className={`w-full text-left p-3 rounded-lg border-2 transition-colors cursor-pointer ${
-                    selectedVariant?.code === child.code
-                      ? "bg-cyan-900/50 border-cyan-400"
-                      : "bg-neutral-800 border-transparent hover:border-neutral-600"
-                  }`}
+                  className={`w-full text-left p-3 rounded-md border-2 transition-colors cursor-pointer ${
+ selectedVariant?.code === child.code
+ ? "bg-cyan-tint border-cyan-400"
+ :"bg-background border-transparent border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
+ }`}
                 >
                   {child.size || child.product_name}
                 </button>
@@ -157,14 +157,14 @@ export default function ProductVariants({ product }) {
         )}
 
         {selectedVariant && (
-          <div className="bg-neutral-800 p-4 rounded-lg">
+          <div className="bg-muted p-4 rounded-lg">
             <div className="flex justify-between items-center mb-4">
               <div
                 className={`text-lg ${
-                  selectedVariant.stock_amount > 0
-                    ? "text-green-400"
-                    : "text-red-400"
-                }`}
+ selectedVariant.stock_amount > 0
+ ? "text-green-fg"
+ :"text-red-fg"
+ }`}
               >
                 {selectedVariant.stock_amount > 0
                   ? `In Stock (${selectedVariant.stock_amount})`
@@ -176,7 +176,7 @@ export default function ProductVariants({ product }) {
                   : "Price not available"}
               </div>
             </div>
-            <div className="text-sm text-neutral-400 space-y-1">
+            <div className="text-sm text-muted-foreground space-y-1">
               {selectedVariant.size && (
                 <p>
                   <span className="font-semibold">Size:</span>{" "}
@@ -195,9 +195,9 @@ export default function ProductVariants({ product }) {
           </div>
         )}
 
-        <h2 className="text-2xl font-bold mt-8 mb-4">Details</h2>
+        <h2 className="text-[15px] font-semibold mt-8 mb-4">Details</h2>
         <div
-          className="text-neutral-400 prose prose-invert"
+          className="text-muted-foreground prose prose-invert"
           dangerouslySetInnerHTML={{ __html: product.detailed_description }}
         />
       </div>

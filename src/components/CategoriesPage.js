@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { HelpCircle } from "lucide-react";
+import PageHeader from "@/components/ui/PageHeader";
+import { cn } from "@/lib/utils";
+import * as ui from "@/lib/ui";
+const { btn } = ui;
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -25,15 +30,15 @@ const Ic = {
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
 const S = {
-    card: "rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08]",
-    cardHover: "rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.08] hover:ring-white/[0.14] hover:bg-white/[0.05] transition-all duration-200",
-    input: "w-full rounded-xl bg-white/[0.05] ring-1 ring-white/[0.08] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:ring-[#01a0be]/60 focus:bg-white/[0.07] transition-all",
-    btnPrimary: "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-[#01a0be] hover:bg-[#02b5d8] text-white transition-all duration-150 shadow-lg shadow-[#01a0be]/20 hover:shadow-[#01a0be]/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none",
-    btnGhost: "flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium text-neutral-400 hover:text-white hover:bg-white/[0.06] transition-all duration-150",
-    btnOutline: "flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium text-neutral-400 ring-1 ring-white/[0.08] hover:text-white hover:ring-white/[0.18] hover:bg-white/[0.04] transition-all duration-150",
-    btnDanger: "flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium text-red-400 ring-1 ring-red-500/20 hover:ring-red-500/40 hover:bg-red-500/[0.06] transition-all duration-150",
-    iconBtn: "w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150",
-    label: "text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.08em]",
+    card: "rounded-xl border border-border bg-card shadow-sm",
+    cardHover: "rounded-xl border border-border bg-card shadow-sm hover:bg-muted/40 transition-colors duration-150",
+    input: ui.input,
+    btnPrimary: cn(btn.base, btn.variant.default, btn.size.default),
+    btnGhost: cn(btn.base, btn.variant.ghost, btn.size.default, "text-muted-foreground"),
+    btnOutline: cn(btn.base, btn.variant.outline, btn.size.default),
+    btnDanger: cn(btn.base, btn.variant.outline, btn.size.default, "text-destructive hover:text-destructive"),
+    iconBtn: "w-7 h-7 rounded-md flex items-center justify-center transition-colors duration-150",
+    label: "text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em]",
 };
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -42,11 +47,11 @@ function Toast({ toasts }) {
     return (
         <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
             {toasts.map(t => (
-                <div key={t.id} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium backdrop-blur-xl ring-1 shadow-2xl
-                    ${t.type === "success" ? "bg-emerald-950/90 ring-emerald-500/20 text-emerald-300 shadow-emerald-900/30"
-                    : t.type === "error" ? "bg-red-950/90 ring-red-500/20 text-red-300 shadow-red-900/30"
-                    : "bg-neutral-900/95 ring-white/10 text-neutral-200"}`}>
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${t.type === "success" ? "bg-emerald-500/20 text-emerald-400" : t.type === "error" ? "bg-red-500/20 text-red-400" : "bg-neutral-700 text-neutral-300"}`}>
+                <div key={t.id} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium ring-1 shadow-lg
+${t.type ==="success" ? "bg-emerald-tint ring-emerald-500/20 text-emerald-fg-soft shadow-emerald-shadow"
+ : t.type ==="error" ? "bg-red-tint ring-red-500/20 text-red-fg-soft shadow-red-shadow"
+ :"bg-card ring-foreground/10 text-foreground"}`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${t.type ==="success" ? "bg-emerald-500/20 text-emerald-fg": t.type ==="error" ? "bg-red-500/20 text-red-fg" : "bg-accent text-foreground"}`}>
                         {t.type === "success" ? <Ic.Check /> : t.type === "error" ? <Ic.X /> : <Ic.Spark />}
                     </span>
                     {t.message}
@@ -69,10 +74,10 @@ function Modal({ open, onClose, children, width = "max-w-lg", fullScreenMobile =
     if (!open) return null;
     return (
         <div className={`fixed inset-0 z-[9990] flex ${fullScreenMobile ? "sm:items-center sm:justify-center sm:p-4" : "items-center justify-center p-4"}`}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
-            <div className={`relative overflow-hidden bg-neutral-950 shadow-2xl ${fullScreenMobile
-                ? `flex h-full w-full flex-col sm:h-auto sm:max-h-[90vh] ${width} sm:rounded-3xl sm:ring-1 sm:ring-white/[0.08]`
-                : `w-full ${width} rounded-3xl ring-1 ring-white/[0.08]`}`}>
+            <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+            <div className={`relative overflow-hidden bg-background shadow-lg ${fullScreenMobile
+                ? `flex h-full w-full flex-col sm:h-auto sm:max-h-[90vh] ${width} sm:rounded-lg sm:border`
+                : `w-full ${width} rounded-lg border`}`}>
                 {children}
             </div>
         </div>
@@ -85,15 +90,15 @@ function ConfirmModal({ open, title, message, confirmLabel = "Confirm", danger =
     return (
         <Modal open={open} onClose={onCancel} width="max-w-md">
             <div className="p-6">
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-4 ${danger ? "bg-red-500/10 text-red-400" : "bg-[#01a0be]/10 text-[#01a0be]"}`}>
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-4 ${danger ? "bg-red-500/10 text-red-fg" : "bg-accent-brand/10 text-accent-brand"}`}>
                     {danger ? <Ic.Warning /> : <Ic.Spark />}
                 </div>
-                <h3 className="text-base font-semibold text-white mb-1.5">{title}</h3>
-                <p className="text-sm text-neutral-500 leading-relaxed">{message}</p>
+                <h3 className="text-[13px] font-semibold text-foreground mb-1.5">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{message}</p>
             </div>
             <div className="flex gap-2 justify-end px-6 pb-6">
                 <button onClick={onCancel} className={S.btnGhost}>Cancel</button>
-                <button onClick={onConfirm} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all ${danger ? "bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/30" : S.btnPrimary}`}>
+                <button onClick={onConfirm} className={`flex items-center gap-2 px-4 rounded-md text-sm font-medium transition-all h-9 ${danger ? "text-white bg-destructive hover:bg-destructive/90 shadow-red-shadow dark:bg-destructive/60": S.btnPrimary}`}>
                     {confirmLabel}
                 </button>
             </div>
@@ -131,11 +136,10 @@ function ExportFormModal({ open, initial, onClose, onSave }) {
     return (
         <Modal open={open} onClose={onClose}>
             {/* Gradient header strip */}
-            <div className="h-1 w-full bg-gradient-to-r from-[#01a0be] to-cyan-400" />
             <div className="p-6 space-y-5">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-white">{initial ? "Edit Category Set" : "New Category Set"}</h2>
-                    <button onClick={onClose} className={`${S.iconBtn} text-neutral-500 hover:text-white hover:bg-white/[0.06]`}><Ic.X /></button>
+                    <h2 className="text-[14px] font-semibold text-foreground">{initial ? "Edit Category Set" : "New Category Set"}</h2>
+                    <button onClick={onClose} className={`${S.iconBtn} text-muted-foreground hover:text-foreground hover:bg-accent`}><Ic.X /></button>
                 </div>
                 <div className="space-y-3">
                     <div>
@@ -147,17 +151,17 @@ function ExportFormModal({ open, initial, onClose, onSave }) {
                         <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Short description…" className={S.input} />
                     </div>
                     <button type="button" onClick={() => setForm(f => ({ ...f, aiCategorizationEnabled: !f.aiCategorizationEnabled }))}
-                        className={`w-full flex items-center justify-between p-4 rounded-xl ring-1 transition-all ${form.aiCategorizationEnabled ? "ring-[#01a0be]/30 bg-[#01a0be]/[0.05]" : "ring-white/[0.06] bg-white/[0.02] hover:ring-white/[0.1]"}`}>
+                        className={`w-full flex items-center justify-between p-4 rounded-md ring-1 transition-all ${form.aiCategorizationEnabled ? "ring-accent-brand/30 bg-accent-brand/[0.05]" : "border-border bg-muted/40 hover:border-input"}`}>
                         <div className="text-left">
-                            <p className="text-sm font-medium text-white">AI Categorization</p>
-                            <p className="text-xs text-neutral-500 mt-0.5">Auto-categorize products via Claude</p>
+                            <p className="text-sm font-medium text-foreground">AI Categorization</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Auto-categorize products via Claude</p>
                         </div>
-                        <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${form.aiCategorizationEnabled ? "bg-[#01a0be]" : "bg-neutral-700"}`}>
+                        <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${form.aiCategorizationEnabled ? "bg-primary" : "bg-accent"}`}>
                             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${form.aiCategorizationEnabled ? "translate-x-4" : "translate-x-1"}`} />
                         </div>
                     </button>
                 </div>
-                {error && <p className="text-xs text-red-400 flex items-center gap-1.5"><Ic.Warning />{error}</p>}
+                {error && <p className="text-xs text-red-fg flex items-center gap-1.5"><Ic.Warning />{error}</p>}
                 <div className="flex gap-2 justify-end pt-1">
                     <button onClick={onClose} className={S.btnGhost}>Cancel</button>
                     <button onClick={handleSubmit} disabled={saving} className={S.btnPrimary}>
@@ -212,45 +216,44 @@ function ImportModal({ open, exportId, onClose, onSuccess }) {
 
     return (
         <Modal open={open} onClose={onClose} width="max-w-2xl">
-            <div className="h-1 w-full bg-gradient-to-r from-[#01a0be] to-cyan-400" />
             <div className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-white">Import Categories</h2>
-                    <button onClick={onClose} className={`${S.iconBtn} text-neutral-500 hover:text-white hover:bg-white/[0.06]`}><Ic.X /></button>
+                    <h2 className="text-[14px] font-semibold text-foreground">Import Categories</h2>
+                    <button onClick={onClose} className={`${S.iconBtn} text-muted-foreground hover:text-foreground hover:bg-accent`}><Ic.X /></button>
                 </div>
-                <div className="flex gap-1 p-1 bg-white/[0.03] rounded-xl w-fit">
+                <div className="flex gap-1 p-1 bg-muted/40 rounded-xl w-fit">
                     {["json", "csv"].map(t => (
                         <button key={t} onClick={() => { setTab(t); setPreview([]); setParseError(""); }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${tab === t ? "bg-[#01a0be] text-white shadow-lg shadow-[#01a0be]/20" : "text-neutral-500 hover:text-white"}`}>
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${tab === t ? "bg-primary text-primary-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}>
                             {t.toUpperCase()}
                         </button>
                     ))}
                 </div>
-                <p className="text-xs text-neutral-600">
+                <p className="text-xs text-muted-foreground/70">
                     {tab === "json" ? '["Category A", "Category B"] or [{"label": "Category A"}, …]' : "One category per line. Optional \"label\" header row."}
                 </p>
                 <textarea rows={6} value={input} onChange={e => { setInput(e.target.value); setPreview([]); setParseError(""); }}
                     placeholder={tab === "json" ? '["Electronics", "Clothing", "Tools"]' : "Electronics\nClothing\nTools"}
                     className={`${S.input} font-mono resize-none`} />
-                {parseError && <p className="text-xs text-red-400 flex items-center gap-1.5"><Ic.Warning />{parseError}</p>}
+                {parseError && <p className="text-xs text-red-fg flex items-center gap-1.5"><Ic.Warning />{parseError}</p>}
                 {!preview.length ? (
-                    <button onClick={parse} disabled={!input.trim()} className={`w-full py-2.5 rounded-xl text-sm font-medium text-neutral-400 ring-1 ring-white/[0.08] hover:ring-white/[0.16] hover:text-white transition-all disabled:opacity-30`}>
+                    <button onClick={parse} disabled={!input.trim()} className={`w-full py-2.5 rounded-md text-sm font-medium text-muted-foreground border border-border hover:border-input hover:text-foreground transition-all disabled:opacity-50`}>
                         Parse &amp; Preview
                     </button>
                 ) : (
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-neutral-400"><span className="text-[#01a0be] font-semibold">{preview.length}</span> categories ready</span>
-                            <button onClick={() => setPreview([])} className="text-xs text-neutral-600 hover:text-neutral-400 transition-colors">Clear</button>
+                            <span className="text-xs text-muted-foreground"><span className="text-accent-brand font-semibold">{preview.length}</span> categories ready</span>
+                            <button onClick={() => setPreview([])} className="text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors">Clear</button>
                         </div>
-                        <div className="max-h-44 overflow-y-auto rounded-xl bg-white/[0.02] ring-1 ring-white/[0.06] divide-y divide-white/[0.04]">
+                        <div className="max-h-44 overflow-y-auto rounded-xl bg-muted/40 border border-border divide-y divide-border">
                             {preview.slice(0, 50).map((item, i) => (
                                 <div key={i} className="flex items-center gap-3 px-3 py-2">
-                                    <span className="text-xs text-neutral-700 w-5 tabular-nums">{i + 1}</span>
-                                    <span className="text-xs text-neutral-300">{item.label}</span>
+                                    <span className="text-xs text-muted-foreground/40 w-5 tabular-nums">{i + 1}</span>
+                                    <span className="text-xs text-foreground">{item.label}</span>
                                 </div>
                             ))}
-                            {preview.length > 50 && <div className="px-3 py-2 text-xs text-neutral-600 text-center">+{preview.length - 50} more</div>}
+                            {preview.length > 50 && <div className="px-3 py-2 text-xs text-muted-foreground/70 text-center">+{preview.length - 50} more</div>}
                         </div>
                     </div>
                 )}
@@ -316,12 +319,12 @@ function TreeNodeRow({ node, onEdit, onDelete, depth = 0 }) {
     return (
         <div>
             <div
-                className="flex items-center gap-1 py-1.5 rounded-xl transition-all group hover:bg-neutral-700/40"
+                className="flex items-center gap-1 py-1.5 rounded-xl transition-all group hover:bg-accent/40"
                 style={{ paddingLeft: `${8 + depth * 20}px`, paddingRight: "10px" }}
                 onClick={() => hasChildren && !editing && setOpen(v => !v)}
             >
                 {hasChildren ? (
-                    <span className="w-6 h-6 shrink-0 flex items-center justify-center text-neutral-500 group-hover:text-neutral-300" style={{ cursor: "pointer" }}>
+                    <span className="w-6 h-6 shrink-0 flex items-center justify-center text-muted-foreground group-hover:text-foreground" style={{ cursor: "pointer" }}>
                         <svg className={`w-3 h-3 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                         </svg>
@@ -334,9 +337,9 @@ function TreeNodeRow({ node, onEdit, onDelete, depth = 0 }) {
                     {editing ? (
                         <input ref={inputRef} value={label} onChange={e => setLabel(e.target.value)}
                             onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") { setEditing(false); setLabel(node.category.label); } }}
-                            className="w-full bg-neutral-700/60 rounded-lg px-2.5 py-1 text-sm text-white ring-1 ring-[#01a0be]/40 focus:outline-none transition-all" />
+                            className="w-full bg-accent/60 rounded-lg px-2.5 py-1 text-sm text-foreground ring-1 ring-accent-brand/40 focus:outline-none transition-all" />
                     ) : (
-                        <span className={`text-sm truncate select-none ${hasCategory ? "text-neutral-300 group-hover:text-white" : "text-neutral-400 group-hover:text-neutral-200 font-medium"}`}
+                        <span className={`text-sm truncate select-none ${hasCategory ? "text-foreground group-hover:text-foreground" : "text-muted-foreground group-hover:text-foreground font-medium"}`}
                             style={{ cursor: hasChildren ? "pointer" : "default" }}>
                             {node.label}
                         </span>
@@ -344,7 +347,7 @@ function TreeNodeRow({ node, onEdit, onDelete, depth = 0 }) {
                 </div>
 
                 {hasChildren && !editing && (
-                    <span className="text-xs tabular-nums text-neutral-600 group-hover:text-neutral-500 shrink-0 ml-1.5">
+                    <span className="text-xs tabular-nums text-muted-foreground/70 group-hover:text-muted-foreground shrink-0 ml-1.5">
                         {countLeaves(node)}
                     </span>
                 )}
@@ -352,19 +355,19 @@ function TreeNodeRow({ node, onEdit, onDelete, depth = 0 }) {
                 {hasCategory && !editing && (
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1" onClick={e => e.stopPropagation()}>
                         <button onClick={() => { setLabel(node.category.label); setEditing(true); }}
-                            className={`${S.iconBtn} text-neutral-600 hover:text-[#01a0be] hover:bg-[#01a0be]/10`}><Ic.Pencil /></button>
+                            className={`${S.iconBtn} text-muted-foreground/70 hover:text-accent-brand hover:bg-accent-brand/10`}><Ic.Pencil /></button>
                         <button onClick={() => onDelete(node.category._id, node.category.label)}
-                            className={`${S.iconBtn} text-neutral-600 hover:text-red-400 hover:bg-red-500/10`}><Ic.Trash /></button>
+                            className={`${S.iconBtn} text-muted-foreground/70 hover:text-red-fg hover:bg-red-500/10`}><Ic.Trash /></button>
                     </div>
                 )}
 
                 {editing && (
                     <div className="flex items-center gap-0.5 shrink-0 ml-1" onClick={e => e.stopPropagation()}>
-                        <button onClick={save} disabled={saving} className={`${S.iconBtn} text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40`}>
+                        <button onClick={save} disabled={saving} className={`${S.iconBtn} text-emerald-fg hover:bg-emerald-500/10 disabled:opacity-50`}>
                             {saving ? <Ic.Refresh spin /> : <Ic.Check />}
                         </button>
                         <button onClick={() => { setEditing(false); setLabel(node.category.label); }}
-                            className={`${S.iconBtn} text-neutral-500 hover:text-white hover:bg-white/[0.06]`}><Ic.X /></button>
+                            className={`${S.iconBtn} text-muted-foreground hover:text-foreground hover:bg-accent`}><Ic.X /></button>
                     </div>
                 )}
             </div>
@@ -392,29 +395,29 @@ function CategoryRow({ category, onEdit, onDelete }) {
     const leaf = parts[parts.length - 1];
     const parent = parts.slice(0, -1).join(" / ");
     return (
-        <div className="flex items-center gap-1 py-1.5 px-3 rounded-xl transition-all group hover:bg-neutral-700/40">
+        <div className="flex items-center gap-1 py-1.5 px-3 rounded-xl transition-all group hover:bg-accent/40">
             <span className="w-6 shrink-0" />
             <div className="flex-1 min-w-0">
                 {editing ? (
                     <input ref={inputRef} value={label} onChange={e => setLabel(e.target.value)}
                         onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") { setEditing(false); setLabel(category.label); } }}
-                        className="w-full bg-neutral-700/60 rounded-lg px-2.5 py-1 text-sm text-white ring-1 ring-[#01a0be]/40 focus:outline-none transition-all" />
+                        className="w-full bg-accent/60 rounded-lg px-2.5 py-1 text-sm text-foreground ring-1 ring-accent-brand/40 focus:outline-none transition-all" />
                 ) : (
                     <div className="min-w-0">
-                        {parent && <p className="text-[10px] text-neutral-600 mb-0.5 truncate">{parent}</p>}
-                        <span className="text-sm text-neutral-300 group-hover:text-white truncate select-none">{leaf}</span>
+                        {parent && <p className="text-[10px] text-muted-foreground/70 mb-0.5 truncate">{parent}</p>}
+                        <span className="text-sm text-foreground group-hover:text-foreground truncate select-none">{leaf}</span>
                     </div>
                 )}
             </div>
             {!editing ? (
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <button onClick={() => { setLabel(category.label); setEditing(true); }} className={`${S.iconBtn} text-neutral-600 hover:text-[#01a0be] hover:bg-[#01a0be]/10`}><Ic.Pencil /></button>
-                    <button onClick={() => onDelete(category._id, category.label)} className={`${S.iconBtn} text-neutral-600 hover:text-red-400 hover:bg-red-500/10`}><Ic.Trash /></button>
+                    <button onClick={() => { setLabel(category.label); setEditing(true); }} className={`${S.iconBtn} text-muted-foreground/70 hover:text-accent-brand hover:bg-accent-brand/10`}><Ic.Pencil /></button>
+                    <button onClick={() => onDelete(category._id, category.label)} className={`${S.iconBtn} text-muted-foreground/70 hover:text-red-fg hover:bg-red-500/10`}><Ic.Trash /></button>
                 </div>
             ) : (
                 <div className="flex gap-0.5 shrink-0">
-                    <button onClick={save} disabled={saving} className={`${S.iconBtn} text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40`}>{saving ? <Ic.Refresh spin /> : <Ic.Check />}</button>
-                    <button onClick={() => { setEditing(false); setLabel(category.label); }} className={`${S.iconBtn} text-neutral-500 hover:bg-white/[0.06]`}><Ic.X /></button>
+                    <button onClick={save} disabled={saving} className={`${S.iconBtn} text-emerald-fg hover:bg-emerald-500/10 disabled:opacity-50`}>{saving ? <Ic.Refresh spin /> : <Ic.Check />}</button>
+                    <button onClick={() => { setEditing(false); setLabel(category.label); }} className={`${S.iconBtn} text-muted-foreground hover:bg-accent`}><Ic.X /></button>
                 </div>
             )}
         </div>
@@ -501,10 +504,10 @@ function CategoriesTab({ exportId, toast }) {
                 <div className="flex items-center gap-2">
                     {/* Search */}
                     <div className="relative min-w-0 flex-1">
-                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-600"><Ic.Search /></div>
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted-foreground/70"><Ic.Search /></div>
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search categories…"
                             className={`${S.input} pl-9 pr-8`} />
-                        {search && <button onClick={() => setSearch("")} className="absolute inset-y-0 right-3 flex items-center text-neutral-600 hover:text-neutral-400 transition-colors"><Ic.X /></button>}
+                        {search && <button onClick={() => setSearch("")} className="absolute inset-y-0 right-3 flex items-center text-muted-foreground/70 hover:text-muted-foreground transition-colors"><Ic.X /></button>}
                     </div>
                     <button onClick={() => setImportOpen(true)} className={S.btnOutline}><Ic.Upload />Import</button>
                     {categories.length > 0 && <button onClick={clearAll} className={S.btnDanger}><Ic.Trash /></button>}
@@ -514,33 +517,33 @@ function CategoriesTab({ exportId, toast }) {
                 {categories.length > 0 && (
                     <div className="flex items-center gap-2 px-1">
                         <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#01a0be]/60" />
-                            <span className="text-xs text-neutral-500"><span className="text-neutral-300 font-medium">{categories.length}</span> categories</span>
+                            <div className="w-1.5 h-1.5 rounded-full bg-accent-brand/60" />
+                            <span className="text-xs text-muted-foreground"><span className="text-foreground font-medium">{categories.length}</span> categories</span>
                         </div>
                         {loading && <Ic.Refresh spin />}
                     </div>
                 )}
 
                 {/* Tree / flat list */}
-                <div className="bg-gradient-to-br from-neutral-800/80 to-neutral-900/80 backdrop-blur-sm rounded-2xl border border-neutral-700/50 overflow-hidden">
+                <div className="bg-gradient-to-br from-muted/80 to-card rounded-2xl border border-input/50 overflow-hidden">
                     {loading && categories.length === 0 ? (
-                        <div className="py-20 flex flex-col items-center gap-3 text-neutral-600">
+                        <div className="py-20 flex flex-col items-center gap-3 text-muted-foreground/70">
                             <Ic.Refresh spin /><p className="text-sm">Loading…</p>
                         </div>
                     ) : categories.length === 0 ? (
                         <div className="py-20 flex flex-col items-center gap-4">
-                            <div className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-neutral-700/50 flex items-center justify-center text-neutral-600">
+                            <div className="w-14 h-14 rounded-2xl bg-muted/40 border border-input/50 flex items-center justify-center text-muted-foreground/70">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2zM17 17h.01M17 13h-2a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2zM7 13H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2z" /></svg>
                             </div>
                             <div className="text-center">
-                                <p className="text-sm font-medium text-neutral-300">No categories yet</p>
-                                <p className="text-xs text-neutral-600 mt-1">Add one below or import a list</p>
+                                <p className="text-sm font-medium text-foreground">No categories yet</p>
+                                <p className="text-xs text-muted-foreground/70 mt-1">Add one below or import a list</p>
                             </div>
                         </div>
                     ) : search && filtered.length === 0 ? (
-                        <div className="py-16 flex flex-col items-center gap-3 text-neutral-600">
+                        <div className="py-16 flex flex-col items-center gap-3 text-muted-foreground/70">
                             <Ic.Search />
-                            <p className="text-sm text-neutral-500">No match for <span className="text-neutral-300">&quot;{search}&quot;</span></p>
+                            <p className="text-sm text-muted-foreground">No match for <span className="text-foreground">&quot;{search}&quot;</span></p>
                         </div>
                     ) : (
                         <div className="p-3 overflow-y-auto max-h-[520px]">
@@ -595,27 +598,27 @@ function CategorySelect({ categories, currentCategoryId, onSelect, onClear }) {
     return (
         <>
             <button ref={btnRef} onClick={openDrop}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all max-w-[180px] ring-1
-                    ${current ? "bg-[#01a0be]/10 ring-[#01a0be]/25 text-[#01a0be] hover:bg-[#01a0be]/15" : "bg-white/[0.04] ring-white/[0.06] text-neutral-500 hover:text-neutral-300 hover:ring-white/[0.12]"}`}>
+                className={`flex items-center gap-1.5 px-2.5 rounded-md text-xs font-medium transition-all max-w-[180px] ring-1
+ h-7 ${current ? "bg-accent-brand/10 ring-accent-brand/25 text-accent-brand hover:bg-accent-brand/15" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground hover:border-input"}`}>
                 <span className="truncate">{leafLabel ?? "—"}</span>
                 <Ic.Chevron open={open} />
             </button>
 
             {open && (
                 <div ref={menuRef} style={{ position: "fixed", top: pos.top, left: pos.left, width: 260 }}
-                    className="z-[9980] bg-neutral-950 ring-1 ring-white/[0.1] rounded-2xl shadow-2xl shadow-black/50 overflow-hidden backdrop-blur-xl">
-                    <div className="p-2 border-b border-white/[0.06]">
+                    className="z-[9980] bg-popover text-popover-foreground border border-border rounded-md shadow-md overflow-hidden p-1">
+                    <div className="p-2 border-b border-border">
                         <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
-                            className="w-full bg-white/[0.04] rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-neutral-600 focus:outline-none ring-1 ring-white/[0.06] focus:ring-[#01a0be]/40 transition-all" />
+                            className="w-full bg-muted/40 rounded-xl px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none border border-border focus:ring-accent-brand/40 transition-all" />
                     </div>
                     <div className="max-h-56 overflow-y-auto py-1.5 px-1.5 space-y-0.5">
                         {current && (
                             <button onClick={() => { onClear(); setOpen(false); setSearch(""); }}
-                                className="w-full text-left px-2.5 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center gap-2">
+                                className="w-full text-left px-2.5 py-2 text-xs text-red-fg hover:bg-red-500/10 rounded-md transition-colors flex items-center gap-2">
                                 <Ic.X /><span>Remove category</span>
                             </button>
                         )}
-                        {filtered.length === 0 && <p className="py-4 text-xs text-neutral-600 text-center">No results</p>}
+                        {filtered.length === 0 && <p className="py-4 text-xs text-muted-foreground/70 text-center">No results</p>}
                         {filtered.map(cat => {
                             const parts = cat.label.split(" / ").map(p => p.trim()).filter(Boolean);
                             const depth = parts.length - 1;
@@ -625,13 +628,13 @@ function CategorySelect({ categories, currentCategoryId, onSelect, onClear }) {
                             return (
                                 <button key={cat._id} onClick={() => { onSelect(cat); setOpen(false); setSearch(""); }}
                                     style={{ paddingLeft: `${depth * 12 + 10}px` }}
-                                    className={`w-full text-left pr-2.5 py-1.5 text-xs rounded-lg transition-colors flex items-center justify-between gap-2
-                                        ${sel ? "bg-[#01a0be]/10 text-[#01a0be]" : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-200"}`}>
+                                    className={`w-full text-left pr-2.5 py-1.5 text-xs rounded-md transition-colors flex items-center justify-between gap-2
+${sel ? "bg-accent-brand/10 text-accent-brand" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                                     <div className="min-w-0">
-                                        {parent && !search && <p className="text-[9px] text-neutral-700 truncate leading-tight mb-0.5">{parent}</p>}
+                                        {parent && !search && <p className="text-[9px] text-muted-foreground/40 truncate leading-tight mb-0.5">{parent}</p>}
                                         <span className="truncate block font-medium">{leaf}</span>
                                     </div>
-                                    {sel && <span className="shrink-0 text-[#01a0be]"><Ic.Check /></span>}
+                                    {sel && <span className="shrink-0 text-accent-brand"><Ic.Check /></span>}
                                 </button>
                             );
                         })}
@@ -840,12 +843,12 @@ function ProductsTab({ exportId, toast }) {
                         <div className="flex items-center gap-6">
                             <div>
                                 <p className={`${S.label} mb-1`}>Categorized</p>
-                                <p className="text-2xl font-bold text-white tabular-nums">
+                                <p className="text-2xl font-bold text-foreground tabular-nums">
                                     {liveCategorized}
-                                    <span className="text-sm font-normal text-neutral-600 ml-1">/ {stats.total}</span>
+                                    <span className="text-sm font-normal text-muted-foreground/70 ml-1">/ {stats.total}</span>
                                 </p>
                             </div>
-                            <div className="w-px h-8 bg-white/[0.06]" />
+                            <div className="w-px h-8 bg-muted" />
                             <div>
                                 <p className={`${S.label} mb-1`}>Coverage</p>
                                 <p className="text-2xl font-bold tabular-nums" style={{ color: pctColor }}>{livePct}%</p>
@@ -863,63 +866,63 @@ function ProductsTab({ exportId, toast }) {
 
                     {/* Live AI-run progress (polled) — catalogue + every feed run, summed */}
                     {aiRunning && (
-                        <div className="mb-4 rounded-xl bg-[#01a0be]/[0.06] ring-1 ring-[#01a0be]/20 p-4">
+                        <div className="mb-4 rounded-xl bg-accent-brand/[0.06] ring-1 ring-accent-brand/20 p-4">
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                                <span className="flex items-center gap-2 text-sm font-medium text-white">
+                                <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                                     <Ic.Refresh spin />AI is categorizing with Claude…
                                 </span>
-                                <span className="text-xs text-neutral-400 tabular-nums">
+                                <span className="text-xs text-muted-foreground tabular-nums">
                                     {agg.totalBatches ? `Batch ${Math.max(agg.batch, 1)}/${agg.totalBatches} · ` : ""}
                                     {agg.processed}/{agg.total || "…"} products · {agg.categorized} categorized
-                                    {aiEta ? <span className="text-[#01a0be]"> · {aiEta}</span> : ""}
+                                    {aiEta ? <span className="text-accent-brand"> · {aiEta}</span> : ""}
                                 </span>
                             </div>
-                            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                                 <div
-                                    className="h-full rounded-full bg-[#01a0be] transition-all duration-500"
+                                    className="h-full rounded-full bg-primary transition-all duration-500"
                                     style={{ width: `${agg.total ? Math.max(Math.round((agg.processed / agg.total) * 100), 3) : 3}%`, boxShadow: "0 0 8px #01a0be60" }}
                                 />
                             </div>
-                            {agg.error && <p className="mt-2 text-xs text-amber-400">Last batch issue: {agg.error}</p>}
+                            {agg.error && <p className="mt-2 text-xs text-amber-fg">Last batch issue: {agg.error}</p>}
                         </div>
                     )}
 
                     {/* Progress */}
-                    <div className="h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
+                    <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${livePct}%`, backgroundColor: pctColor, boxShadow: `0 0 8px ${pctColor}60` }} />
                     </div>
                 </div>
 
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2 items-center">
-                    <div className="flex gap-0.5 p-1 bg-white/[0.03] ring-1 ring-white/[0.06] rounded-xl">
+                    <div className="flex gap-0.5 p-1 bg-muted/40 border border-border rounded-xl">
                         {[["all","All"],[" categorized","Categorized"],["uncategorized","Uncategorized"]].map(([v,l]) => (
                             <button key={v} onClick={() => setFilter(v.trim())}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filter === v.trim() ? "bg-[#01a0be] text-white shadow-md shadow-[#01a0be]/20" : "text-neutral-500 hover:text-white"}`}>
+                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${filter === v.trim() ? "bg-primary text-primary-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}>
                                 {l}
                             </button>
                         ))}
                     </div>
                     {showSource && (
-                        <div className="flex gap-0.5 p-1 bg-white/[0.03] ring-1 ring-white/[0.06] rounded-xl">
+                        <div className="flex gap-0.5 p-1 bg-muted/40 border border-border rounded-xl">
                             {["all", ...sourceNames].map(v => (
                                 <button key={v} onClick={() => setSourceFilter(v)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sourceFilter === v ? "bg-[#01a0be] text-white shadow-md shadow-[#01a0be]/20" : "text-neutral-500 hover:text-white"}`}>
+                                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${sourceFilter === v ? "bg-primary text-primary-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}>
                                     {v === "all" ? "All sources" : v}
                                 </button>
                             ))}
                         </div>
                     )}
                     <div className="relative flex-1 min-w-40">
-                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-neutral-600"><Ic.Search /></div>
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted-foreground/70"><Ic.Search /></div>
                         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…" className={`${S.input} pl-9`} />
                     </div>
-                    <span className="text-xs text-neutral-600">{filtered.length} products</span>
+                    <span className="text-xs text-muted-foreground/70">{filtered.length} products</span>
                 </div>
 
                 {/* Table */}
                 <div className={`${S.card} overflow-hidden`}>
-                    <div className={`grid ${rowGrid} gap-x-3 px-4 py-2.5 border-b border-white/[0.05] sm:gap-x-4`}>
+                    <div className={`grid ${rowGrid} gap-x-3 px-4 py-2.5 border-b border-border sm:gap-x-4`}>
                         <span className={S.label}>#</span>
                         {showSource && <span className={`${S.label} hidden sm:block`}>Source</span>}
                         <span className={`${S.label} hidden sm:block`}>Code</span>
@@ -927,26 +930,26 @@ function ProductsTab({ exportId, toast }) {
                         <span className={S.label}>Category</span>
                     </div>
                     {loading ? (
-                        <div className="py-20 flex flex-col items-center gap-3 text-neutral-600"><Ic.Refresh spin /><p className="text-sm">Loading…</p></div>
+                        <div className="py-20 flex flex-col items-center gap-3 text-muted-foreground/70"><Ic.Refresh spin /><p className="text-sm">Loading…</p></div>
                     ) : filtered.length === 0 ? (
                         <div className="py-20 flex flex-col items-center gap-4">
-                            <div className="w-14 h-14 rounded-2xl bg-white/[0.03] ring-1 ring-white/[0.06] flex items-center justify-center text-neutral-600"><Ic.Cube /></div>
-                            <p className="text-sm text-neutral-500">No products found</p>
+                            <div className="w-14 h-14 rounded-2xl bg-muted/40 border border-border flex items-center justify-center text-muted-foreground/70"><Ic.Cube /></div>
+                            <p className="text-sm text-muted-foreground">No products found</p>
                         </div>
                     ) : (
                         <div className="max-h-[520px] overflow-y-auto">
                             {filtered.map((p, i) => (
-                                <div key={p._id} className={`group grid ${rowGrid} gap-x-3 px-4 py-3 items-center hover:bg-white/[0.02] transition-colors border-b border-white/[0.03] last:border-0 sm:gap-x-4`}>
-                                    <span className="text-xs text-neutral-700 tabular-nums w-6">{i + 1}</span>
+                                <div key={p._id} className={`group grid ${rowGrid} gap-x-3 px-4 py-3 items-center hover:bg-accent transition-colors border-b border-border last:border-0 sm:gap-x-4`}>
+                                    <span className="text-xs text-muted-foreground/40 tabular-nums w-6">{i + 1}</span>
                                     {showSource && (
-                                        <span className={`hidden sm:inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 truncate ${p.sourceType === "own_source"
-                                            ? "bg-[#01a0be]/10 text-[#01a0be] ring-[#01a0be]/25"
-                                            : "bg-white/[0.04] text-neutral-400 ring-white/[0.08]"}`}>
+                                        <span className={`hidden sm:inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 truncate ${p.sourceType ==="own_source"
+ ? "bg-accent-brand/10 text-accent-brand ring-accent-brand/25"
+ :"bg-muted/40 text-muted-foreground border-border"}`}>
                                             {p.sourceName}
                                         </span>
                                     )}
-                                    <span className="hidden text-xs text-neutral-600 font-mono truncate sm:block">{p.code}</span>
-                                    <span className="text-sm text-neutral-300 truncate">{p.product_name}</span>
+                                    <span className="hidden text-xs text-muted-foreground/70 font-mono truncate sm:block">{p.code}</span>
+                                    <span className="text-sm text-foreground truncate">{p.product_name}</span>
                                     <CategorySelect categories={categories} currentCategoryId={p.aiCategory?.categoryId}
                                         onSelect={cat => setCategory(p, cat)} onClear={() => removeCategory(p)} />
                                 </div>
@@ -1041,20 +1044,20 @@ function PlaygroundTab({ exportId, toast }) {
             {/* Info banner */}
             <div className={`${S.card} p-5`}>
                 <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500/15 to-fuchsia-500/10 ring-1 ring-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500/15 to-fuchsia-500/10 ring-1 ring-violet-500/20 flex items-center justify-center text-violet-fg shrink-0">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white mb-1">AI Categorization Playground</p>
-                        <p className="text-xs text-neutral-500 leading-relaxed">
+                        <p className="text-sm font-medium text-foreground mb-1">AI Categorization Playground</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
                             Paste a JSON array of third-party products below and categorize them against this category set.
                             Nothing is saved — results are returned directly. Max 300 products per request.
                         </p>
                         <div className="flex items-center gap-3 mt-3">
-                            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">
+                            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />Export ID
                             </span>
-                            <code className="text-[11px] font-mono text-[#01a0be] bg-[#01a0be]/[0.06] px-2 py-0.5 rounded-md ring-1 ring-[#01a0be]/15 select-all cursor-text">{exportId}</code>
+                            <code className="text-[11px] font-mono text-accent-brand bg-accent-brand/[0.06] px-2 py-0.5 rounded-md ring-1 ring-accent-brand/15 select-all cursor-text">{exportId}</code>
                         </div>
                     </div>
                 </div>
@@ -1064,7 +1067,7 @@ function PlaygroundTab({ exportId, toast }) {
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <label className={S.label}>Product JSON</label>
-                    <button onClick={loadSample} className="text-[11px] text-neutral-600 hover:text-[#01a0be] transition-colors">
+                    <button onClick={loadSample} className="text-[11px] text-muted-foreground/70 hover:text-accent-brand transition-colors">
                         Load sample
                     </button>
                 </div>
@@ -1074,17 +1077,17 @@ function PlaygroundTab({ exportId, toast }) {
                         value={input}
                         onChange={e => { setInput(e.target.value); setError(""); }}
                         placeholder={placeholder}
-                        className={`${S.input} font-mono text-xs leading-relaxed resize-none ${error ? "ring-red-500/40 focus:ring-red-500/60" : ""}`}
+                        className={`${S.input} font-mono text-xs leading-relaxed resize-none ${error ? "ring-red-500/40" : ""}`}
                     />
                     {input && (
                         <button onClick={() => { setInput(""); setResults(null); setError(""); }}
-                            className="absolute top-3 right-3 text-neutral-600 hover:text-neutral-400 transition-colors">
+                            className="absolute top-3 right-3 text-muted-foreground/70 hover:text-muted-foreground transition-colors">
                             <Ic.X />
                         </button>
                     )}
                 </div>
                 {error && (
-                    <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/[0.06] ring-1 ring-red-500/15 rounded-xl px-3.5 py-2.5">
+                    <div className="flex items-center gap-2 text-xs text-red-fg bg-red-500/[0.06] ring-1 ring-red-500/15 rounded-xl px-3.5 py-2.5">
                         <Ic.Warning />
                         <span>{error}</span>
                     </div>
@@ -1112,19 +1115,19 @@ function PlaygroundTab({ exportId, toast }) {
                     <div className="p-8 flex flex-col items-center gap-5">
                         {/* Animated orbs */}
                         <div className="relative w-20 h-20">
-                            <div className="absolute inset-0 rounded-full bg-[#01a0be]/20 animate-ping" style={{ animationDuration: "1.5s" }} />
-                            <div className="absolute inset-2 rounded-full bg-[#01a0be]/15 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.3s" }} />
-                            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#01a0be]/30 to-violet-500/20 flex items-center justify-center backdrop-blur-sm ring-1 ring-[#01a0be]/20">
+                            <div className="absolute inset-0 rounded-full bg-accent-brand/20 animate-ping" style={{ animationDuration: "1.5s" }} />
+                            <div className="absolute inset-2 rounded-full bg-accent-brand/15 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.3s" }} />
+                            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-accent-brand/30 to-violet-500/20 flex items-center justify-center ring-1 ring-accent-brand/20">
                                 <Ic.Spark />
                             </div>
                         </div>
                         <div className="text-center">
-                            <p className="text-sm font-medium text-white mb-1">AI is analyzing your products...</p>
-                            <p className="text-xs text-neutral-500">Processing with Claude Haiku in batches of 30</p>
+                            <p className="text-sm font-medium text-foreground mb-1">AI is analyzing your products...</p>
+                            <p className="text-xs text-muted-foreground">Processing with Claude Haiku in batches of 30</p>
                         </div>
                         {/* Progress shimmer */}
-                        <div className="w-full max-w-xs h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
-                            <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-[#01a0be] to-transparent animate-shimmer"
+                        <div className="w-full max-w-xs h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                            <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-accent-brand to-transparent animate-shimmer"
                                 style={{ animation: "shimmer 1.5s ease-in-out infinite" }} />
                         </div>
                     </div>
@@ -1139,10 +1142,10 @@ function PlaygroundTab({ exportId, toast }) {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/30" />
-                                    <span className="text-sm font-medium text-white">{results.length} categorized</span>
+                                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-xs" />
+                                    <span className="text-sm font-medium text-foreground">{results.length} categorized</span>
                                 </div>
-                                <span className="text-xs text-neutral-600">in {elapsed.toFixed(1)}s</span>
+                                <span className="text-xs text-muted-foreground/70">in {elapsed.toFixed(1)}s</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={copyResults} className={S.btnOutline}>
@@ -1159,17 +1162,17 @@ function PlaygroundTab({ exportId, toast }) {
 
                     {/* Results table */}
                     <div className={`${S.card} overflow-hidden`}>
-                        <div className="grid grid-cols-[auto_1fr_2fr] gap-x-4 px-4 py-2.5 border-b border-white/[0.05]">
+                        <div className="grid grid-cols-[auto_1fr_2fr] gap-x-4 px-4 py-2.5 border-b border-border">
                             {["Code", "Category", "Category ID"].map(h => <span key={h} className={S.label}>{h}</span>)}
                         </div>
                         <div className="max-h-[420px] overflow-y-auto">
                             {results.map((r, i) => (
                                 <div key={`${r.code}-${i}`}
-                                    className="grid grid-cols-[auto_1fr_2fr] gap-x-4 px-4 py-3 items-center border-b border-white/[0.03] last:border-0 hover:bg-white/[0.02] transition-all"
+                                    className="grid grid-cols-[auto_1fr_2fr] gap-x-4 px-4 py-3 items-center border-b border-border last:border-0 hover:bg-accent transition-all"
                                     style={{ animation: `fadeSlideIn 0.3s ease-out ${i * 0.03}s both` }}>
-                                    <span className="text-xs text-neutral-400 font-mono">{r.code}</span>
-                                    <span className="text-sm text-white truncate">{r.categoryName}</span>
-                                    <span className="text-xs text-neutral-600 font-mono truncate">{r.categoryId}</span>
+                                    <span className="text-xs text-muted-foreground font-mono">{r.code}</span>
+                                    <span className="text-sm text-foreground truncate">{r.categoryName}</span>
+                                    <span className="text-xs text-muted-foreground/70 font-mono truncate">{r.categoryId}</span>
                                 </div>
                             ))}
                         </div>
@@ -1177,11 +1180,11 @@ function PlaygroundTab({ exportId, toast }) {
 
                     {/* Raw JSON toggle */}
                     <details className={`${S.card} group`}>
-                        <summary className="px-4 py-3 text-xs text-neutral-500 hover:text-neutral-300 cursor-pointer transition-colors flex items-center gap-2 select-none">
+                        <summary className="px-4 py-3 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors flex items-center gap-2 select-none">
                             <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                             Raw JSON response
                         </summary>
-                        <pre className="px-4 pb-4 text-xs text-neutral-400 font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                        <pre className="px-4 pb-4 text-xs text-muted-foreground font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">
                             {JSON.stringify(results, null, 2)}
                         </pre>
                     </details>
@@ -1191,42 +1194,42 @@ function PlaygroundTab({ exportId, toast }) {
             {/* ── API Reference ─────────────────────────────────────────────── */}
             <div className={`${S.card} overflow-hidden`}>
                 <button onClick={() => setApiDocsOpen(o => !o)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-left group hover:bg-white/[0.02] transition-colors">
+                    className="w-full flex items-center justify-between px-5 py-4 text-left group hover:bg-accent transition-colors">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/10 ring-1 ring-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/10 ring-1 ring-amber-500/20 flex items-center justify-center text-amber-fg shrink-0">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-white">API Reference</p>
-                            <p className="text-[11px] text-neutral-600">Use this endpoint from your own code or third-party services</p>
+                            <p className="text-sm font-medium text-foreground">API Reference</p>
+                            <p className="text-[11px] text-muted-foreground/70">Use this endpoint from your own code or third-party services</p>
                         </div>
                     </div>
-                    <svg className={`w-4 h-4 text-neutral-600 group-hover:text-neutral-400 transition-all ${apiDocsOpen ? "rotate-180" : ""}`}
+                    <svg className={`w-4 h-4 text-muted-foreground/70 group-hover:text-muted-foreground transition-all ${apiDocsOpen ? "rotate-180" : ""}`}
                         fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
 
                 {apiDocsOpen && (
-                    <div className="px-5 pb-6 space-y-5 border-t border-white/[0.05]">
+                    <div className="px-5 pb-6 space-y-5 border-t border-border">
 
                         {/* Endpoint */}
                         <div className="pt-5">
                             <p className={`${S.label} mb-2`}>Endpoint</p>
                             <div className="flex items-center gap-2">
-                                <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-bold tracking-wider ring-1 ring-emerald-500/20">POST</span>
-                                <code className="text-sm font-mono text-neutral-300 select-all">/api/export/webhooks/categorize</code>
+                                <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-fg text-[10px] font-bold tracking-wider ring-1 ring-emerald-500/20">POST</span>
+                                <code className="text-sm font-mono text-foreground select-all">/api/export/webhooks/categorize</code>
                             </div>
                         </div>
 
                         {/* Auth */}
                         <div>
                             <p className={`${S.label} mb-2`}>Authentication</p>
-                            <div className="bg-white/[0.02] rounded-xl ring-1 ring-white/[0.06] p-3.5">
+                            <div className="bg-muted/40 rounded-xl border border-border p-3.5">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-                                    <span className="text-xs text-neutral-300 font-medium">x-api-key header</span>
+                                    <svg className="w-3.5 h-3.5 text-amber-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                                    <span className="text-xs text-foreground font-medium">x-api-key header</span>
                                 </div>
-                                <p className="text-[11px] text-neutral-500 leading-relaxed">
-                                    Pass your <code className="text-neutral-400 bg-white/[0.04] px-1 rounded">WEBHOOK_API_KEY</code> in the <code className="text-neutral-400 bg-white/[0.04] px-1 rounded">x-api-key</code> request header.
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    Pass your <code className="text-muted-foreground bg-muted/40 px-1 rounded">WEBHOOK_API_KEY</code> in the <code className="text-muted-foreground bg-muted/40 px-1 rounded">x-api-key</code> request header.
                                 </p>
                             </div>
                         </div>
@@ -1234,18 +1237,18 @@ function PlaygroundTab({ exportId, toast }) {
                         {/* Request body */}
                         <div>
                             <p className={`${S.label} mb-2`}>Request Body</p>
-                            <div className="bg-neutral-900/80 rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
-                                <div className="flex items-center justify-between px-3.5 py-2 border-b border-white/[0.04]">
-                                    <span className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">JSON</span>
+                            <div className="bg-card rounded-xl border border-border overflow-hidden">
+                                <div className="flex items-center justify-between px-3.5 py-2 border-b border-border">
+                                    <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">JSON</span>
                                     <button onClick={() => {
                                         navigator.clipboard.writeText(JSON.stringify({ exportId, products: [{ code: "SKU-001", name: "Product Name", description: "Optional description" }] }, null, 2));
                                         toast("Copied", "success");
-                                    }} className="text-[10px] text-neutral-600 hover:text-[#01a0be] transition-colors flex items-center gap-1">
+                                    }} className="text-[10px] text-muted-foreground/70 hover:text-accent-brand transition-colors flex items-center gap-1">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                                         Copy
                                     </button>
                                 </div>
-                                <pre className="p-3.5 text-xs font-mono text-neutral-400 leading-relaxed overflow-x-auto">{`{
+                                <pre className="p-3.5 text-xs font-mono text-muted-foreground leading-relaxed overflow-x-auto">{`{
   "exportId": "${exportId}",
   "products": [
     {
@@ -1263,9 +1266,9 @@ function PlaygroundTab({ exportId, toast }) {
                         {/* Product fields table */}
                         <div>
                             <p className={`${S.label} mb-2`}>Product Fields</p>
-                            <div className="bg-white/[0.02] rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
-                                <div className="grid grid-cols-[100px_60px_1fr] gap-x-3 px-3.5 py-2 border-b border-white/[0.06]">
-                                    {["Field", "Required", "Description"].map(h => <span key={h} className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">{h}</span>)}
+                            <div className="bg-muted/40 rounded-xl border border-border overflow-hidden">
+                                <div className="grid grid-cols-[100px_60px_1fr] gap-x-3 px-3.5 py-2 border-b border-border">
+                                    {["Field", "Required", "Description"].map(h => <span key={h} className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">{h}</span>)}
                                 </div>
                                 {[
                                     ["code", true, "Unique product identifier (used to match results)"],
@@ -1276,17 +1279,17 @@ function PlaygroundTab({ exportId, toast }) {
                                     ["price", false, "Price (helps disambiguate categories)"],
                                     ["child_products", false, "Variants — AI reads for context but only categorizes parent"],
                                 ].map(([field, req, desc]) => (
-                                    <div key={field} className="grid grid-cols-[100px_60px_1fr] gap-x-3 px-3.5 py-2.5 border-b border-white/[0.03] last:border-0 items-center">
-                                        <code className="text-xs font-mono text-[#01a0be]">{field}</code>
+                                    <div key={field} className="grid grid-cols-[100px_60px_1fr] gap-x-3 px-3.5 py-2.5 border-b border-border last:border-0 items-center">
+                                        <code className="text-xs font-mono text-accent-brand">{field}</code>
                                         <span>{req
-                                            ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-400 ring-1 ring-red-500/15">YES</span>
-                                            : <span className="text-[10px] text-neutral-700">no</span>
+                                            ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-fg ring-1 ring-red-500/15">YES</span>
+                                            : <span className="text-[10px] text-muted-foreground/40">no</span>
                                         }</span>
-                                        <span className="text-[11px] text-neutral-500">{desc}</span>
+                                        <span className="text-[11px] text-muted-foreground">{desc}</span>
                                     </div>
                                 ))}
                             </div>
-                            <p className="text-[11px] text-neutral-600 mt-2 leading-relaxed">
+                            <p className="text-[11px] text-muted-foreground/70 mt-2 leading-relaxed">
                                 You can include any additional fields on each product — the AI receives the full object, so more context means better categorization.
                             </p>
                         </div>
@@ -1294,11 +1297,11 @@ function PlaygroundTab({ exportId, toast }) {
                         {/* Response */}
                         <div>
                             <p className={`${S.label} mb-2`}>Response</p>
-                            <div className="bg-neutral-900/80 rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
-                                <div className="px-3.5 py-2 border-b border-white/[0.04]">
-                                    <span className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">200 OK</span>
+                            <div className="bg-card rounded-xl border border-border overflow-hidden">
+                                <div className="px-3.5 py-2 border-b border-border">
+                                    <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">200 OK</span>
                                 </div>
-                                <pre className="p-3.5 text-xs font-mono text-neutral-400 leading-relaxed overflow-x-auto">{`{
+                                <pre className="p-3.5 text-xs font-mono text-muted-foreground leading-relaxed overflow-x-auto">{`{
   "results": [
     {
       "code": "SKU-001",
@@ -1313,18 +1316,18 @@ function PlaygroundTab({ exportId, toast }) {
                         {/* curl example */}
                         <div>
                             <p className={`${S.label} mb-2`}>curl Example</p>
-                            <div className="bg-neutral-900/80 rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
-                                <div className="flex items-center justify-between px-3.5 py-2 border-b border-white/[0.04]">
-                                    <span className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">Shell</span>
+                            <div className="bg-card rounded-xl border border-border overflow-hidden">
+                                <div className="flex items-center justify-between px-3.5 py-2 border-b border-border">
+                                    <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Shell</span>
                                     <button onClick={() => {
                                         navigator.clipboard.writeText(`curl -X POST https://your-server.com/api/export/webhooks/categorize \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: YOUR_API_KEY" \\\n  -d '{"exportId":"${exportId}","products":[{"code":"P1","name":"Example Product"}]}'`);
                                         toast("Copied", "success");
-                                    }} className="text-[10px] text-neutral-600 hover:text-[#01a0be] transition-colors flex items-center gap-1">
+                                    }} className="text-[10px] text-muted-foreground/70 hover:text-accent-brand transition-colors flex items-center gap-1">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                                         Copy
                                     </button>
                                 </div>
-                                <pre className="p-3.5 text-xs font-mono text-neutral-400 leading-relaxed overflow-x-auto whitespace-pre-wrap">{`curl -X POST https://your-server.com/api/export/webhooks/categorize \\
+                                <pre className="p-3.5 text-xs font-mono text-muted-foreground leading-relaxed overflow-x-auto whitespace-pre-wrap">{`curl -X POST https://your-server.com/api/export/webhooks/categorize \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{
@@ -1347,8 +1350,8 @@ function PlaygroundTab({ exportId, toast }) {
                                     ["Stateless", "Nothing is saved to the database"],
                                 ].map(([val, desc]) => (
                                     <div key={val} className="flex items-center gap-3 text-xs">
-                                        <span className="px-2 py-0.5 rounded-md bg-white/[0.04] ring-1 ring-white/[0.06] text-neutral-300 font-mono font-medium shrink-0 min-w-[60px] text-center">{val}</span>
-                                        <span className="text-neutral-500">{desc}</span>
+                                        <span className="px-2 py-0.5 rounded-md bg-muted/40 border border-border text-foreground font-mono font-medium shrink-0 min-w-[60px] text-center">{val}</span>
+                                        <span className="text-muted-foreground">{desc}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1357,19 +1360,19 @@ function PlaygroundTab({ exportId, toast }) {
                         {/* Error codes */}
                         <div>
                             <p className={`${S.label} mb-2`}>Error Responses</p>
-                            <div className="bg-white/[0.02] rounded-xl ring-1 ring-white/[0.06] overflow-hidden">
+                            <div className="bg-muted/40 rounded-xl border border-border overflow-hidden">
                                 {[
                                     ["400", "Missing fields, empty products, or exceeds 300 limit"],
                                     ["401", "Missing or invalid x-api-key"],
                                     ["500", "No categories for this exportId, or AI processing error"],
                                 ].map(([code, desc]) => (
-                                    <div key={code} className="flex items-center gap-3 px-3.5 py-2.5 border-b border-white/[0.03] last:border-0">
+                                    <div key={code} className="flex items-center gap-3 px-3.5 py-2.5 border-b border-border last:border-0">
                                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ring-1 ${
-                                            code === "400" ? "bg-amber-500/10 text-amber-400 ring-amber-500/15"
-                                            : code === "401" ? "bg-red-500/10 text-red-400 ring-red-500/15"
-                                            : "bg-red-500/10 text-red-400 ring-red-500/15"
-                                        }`}>{code}</span>
-                                        <span className="text-[11px] text-neutral-500">{desc}</span>
+ code ==="400" ? "bg-amber-500/10 text-amber-fg ring-amber-500/15"
+ : code ==="401" ? "bg-red-500/10 text-red-fg ring-red-500/15"
+ :"bg-red-500/10 text-red-fg ring-red-500/15"
+ }`}>{code}</span>
+                                        <span className="text-[11px] text-muted-foreground">{desc}</span>
                                     </div>
                                 ))}
                             </div>
@@ -1419,61 +1422,61 @@ function ExportSelector({ exports, selected, onSelect, onCreateEdit, onDelete })
     return (
         <div className="flex min-w-0 items-center gap-2">
             <button ref={btnRef} onClick={openDrop}
-                className={`flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3 rounded-2xl ring-1 text-left transition-all sm:max-w-sm sm:px-4
-                    ${open ? "ring-[#01a0be]/40 bg-white/[0.06]" : "ring-white/[0.08] bg-white/[0.03] hover:ring-white/[0.14] hover:bg-white/[0.05]"}`}>
+                className={`flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-1.5 rounded-md border border-input bg-transparent text-left text-sm shadow-xs transition-[color,box-shadow] outline-none sm:max-w-sm dark:bg-input/30 dark:hover:bg-input/50
+${open ? "border-ring ring-[3px] ring-ring/50" : ""}`}>
                 {selected ? (
                     <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-xl bg-[#01a0be]/10 flex items-center justify-center text-[#01a0be] shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-accent-brand/10 flex items-center justify-center text-accent-brand shrink-0">
                             <Ic.Tag />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{selected.name}</p>
-                            {selected.description && <p className="text-xs text-neutral-600 truncate">{selected.description}</p>}
+                            <p className="text-sm font-medium text-foreground truncate">{selected.name}</p>
+                            {selected.description && <p className="text-xs text-muted-foreground/70 truncate">{selected.description}</p>}
                         </div>
                         {selected.aiCategorizationEnabled && (
-                            <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide bg-[#01a0be]/10 text-[#01a0be] ring-1 ring-[#01a0be]/20 shrink-0">AI</span>
+                            <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide bg-accent-brand/10 text-accent-brand ring-1 ring-accent-brand/20 shrink-0">AI</span>
                         )}
                     </div>
                 ) : (
-                    <span className="text-sm text-neutral-600">Select category set…</span>
+                    <span className="text-sm text-muted-foreground/70">Select category set…</span>
                 )}
-                <div className={`text-neutral-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}><Ic.Chevron /></div>
+                <div className={`text-muted-foreground shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}><Ic.Chevron /></div>
             </button>
 
             {selected && (
                 <button onClick={() => onCreateEdit(selected)}
-                    className={`${S.btnOutline} w-10 h-10 px-0 justify-center rounded-xl shrink-0`} title="Edit category set">
+                    className={`${S.btnOutline} w-10 h-10 px-0 justify-center rounded-md shrink-0`} title="Edit category set">
                     <Ic.Settings />
                 </button>
             )}
             <button onClick={() => onCreateEdit(null)}
-                className={`${S.btnPrimary} h-10 w-10 shrink-0 justify-center rounded-xl px-0 sm:w-auto sm:px-4`} title="New category set">
+                className={`${S.btnPrimary} h-10 w-10 shrink-0 justify-center rounded-md px-0 sm:w-auto sm:px-4`} title="New category set">
                 <Ic.Plus /><span className="hidden sm:inline">New</span>
             </button>
 
             {open && (
                 <div ref={menuRef} style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
-                    className="z-[9980] bg-neutral-950 ring-1 ring-white/[0.1] rounded-2xl shadow-2xl shadow-black/60 overflow-hidden py-1.5">
+                    className="z-[9980] bg-popover text-popover-foreground border border-border rounded-md shadow-md overflow-hidden p-1">
                     {exports.length === 0 ? (
-                        <p className="px-4 py-6 text-sm text-neutral-600 text-center">No category sets yet</p>
+                        <p className="px-4 py-6 text-sm text-muted-foreground/70 text-center">No category sets yet</p>
                     ) : exports.map(exp => (
                         <div key={exp._id} className={`group flex items-center gap-2 px-2 mx-1.5 py-2 rounded-xl transition-colors cursor-pointer
-                            ${selected?._id === exp._id ? "bg-[#01a0be]/8" : "hover:bg-white/[0.04]"}`}>
+${selected?._id === exp._id ? "bg-accent-brand/8" : "hover:bg-accent"}`}>
                             <button className="flex items-center gap-3 flex-1 min-w-0 text-left" onClick={() => { onSelect(exp); setOpen(false); }}>
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${selected?._id === exp._id ? "bg-[#01a0be]/15 text-[#01a0be]" : "bg-white/[0.04] text-neutral-600 group-hover:text-neutral-400"}`}>
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${selected?._id === exp._id ? "bg-accent-brand/15 text-accent-brand" : "bg-muted/40 text-muted-foreground/70 group-hover:text-muted-foreground"}`}>
                                     <Ic.Tag />
                                 </div>
                                 <div className="min-w-0">
-                                    <p className={`text-sm font-medium truncate ${selected?._id === exp._id ? "text-[#01a0be]" : "text-neutral-200"}`}>{exp.name}</p>
-                                    {exp.description && <p className="text-xs text-neutral-600 truncate">{exp.description}</p>}
+                                    <p className={`text-sm font-medium truncate ${selected?._id === exp._id ? "text-accent-brand" : "text-foreground"}`}>{exp.name}</p>
+                                    {exp.description && <p className="text-xs text-muted-foreground/70 truncate">{exp.description}</p>}
                                 </div>
                                 {exp.aiCategorizationEnabled && (
-                                    <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#01a0be]/10 text-[#01a0be] ring-1 ring-[#01a0be]/20 shrink-0">AI</span>
+                                    <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-accent-brand/10 text-accent-brand ring-1 ring-accent-brand/20 shrink-0">AI</span>
                                 )}
                             </button>
                             <div className="flex gap-0.5 opacity-100 transition-opacity shrink-0 sm:opacity-0 sm:group-hover:opacity-100">
-                                <button onClick={e => { e.stopPropagation(); setOpen(false); onCreateEdit(exp); }} className={`${S.iconBtn} text-neutral-600 hover:text-[#01a0be] hover:bg-[#01a0be]/10`}><Ic.Pencil /></button>
-                                <button onClick={e => { e.stopPropagation(); setOpen(false); onDelete(exp); }} className={`${S.iconBtn} text-neutral-600 hover:text-red-400 hover:bg-red-500/10`}><Ic.Trash /></button>
+                                <button onClick={e => { e.stopPropagation(); setOpen(false); onCreateEdit(exp); }} className={`${S.iconBtn} text-muted-foreground/70 hover:text-accent-brand hover:bg-accent-brand/10`}><Ic.Pencil /></button>
+                                <button onClick={e => { e.stopPropagation(); setOpen(false); onDelete(exp); }} className={`${S.iconBtn} text-muted-foreground/70 hover:text-red-fg hover:bg-red-500/10`}><Ic.Trash /></button>
                             </div>
                         </div>
                     ))}
@@ -1542,21 +1545,21 @@ export default function CategoriesPage({ initialExports }) {
 
             {/* Help modal — "What is Category Management?" */}
             <Modal open={showHelp} onClose={() => setShowHelp(false)} width="max-w-2xl" fullScreenMobile>
-                <div className="flex min-h-0 flex-1 flex-col bg-neutral-900">
-                    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] px-5 py-4 sm:px-6">
-                        <h2 className="mb-0 text-base font-semibold leading-none text-white">What is Category Management?</h2>
-                        <button onClick={() => setShowHelp(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 ring-1 ring-white/[0.08] transition-colors hover:text-white hover:ring-white/20"><Ic.X /></button>
+                <div className="flex min-h-0 flex-1 flex-col bg-card">
+                    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+                        <h2 className="mb-0 text-[14px] font-semibold leading-none text-foreground">What is Category Management?</h2>
+                        <button onClick={() => setShowHelp(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground border border-border transition-colors hover:text-foreground hover:ring-foreground/20"><Ic.X /></button>
                     </div>
 
                     <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-6 sm:px-6">
-                        <p className="text-[15px] leading-relaxed text-neutral-200">
-                            Organize the catalog into <span className="font-semibold text-white">your own categories</span>, then let
+                        <p className="text-[15px] leading-relaxed text-foreground">
+                            Organize the catalog into <span className="font-semibold text-foreground">your own categories</span>, then let
                             AI sort every product into them automatically. Those categories flow through to your exports and Shopify as
-                            <span className="font-semibold text-white"> tags / collections</span>.
+                            <span className="font-semibold text-foreground"> tags / collections</span>.
                         </p>
 
                         <div>
-                            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">How it works — 4 steps</h3>
+                            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">How it works — 4 steps</h3>
                             <ol className="space-y-3">
                                 {[
                                     ["Create a category set", "Each set is tied to one export. Pick an existing set above or create a new one."],
@@ -1565,53 +1568,47 @@ export default function CategoriesPage({ initialExports }) {
                                     ["Review & refine", "Check or override any product in the Products tab, and test wording in the Playground."],
                                 ].map(([title, desc], i) => (
                                     <li key={title} className="flex gap-3">
-                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 font-orbitron text-sm font-bold text-[#01a0be]">{i + 1}</span>
-                                        <p className="pt-0.5 text-[15px] leading-snug text-neutral-300">
-                                            <span className="font-semibold text-white">{title}.</span> {desc}
+                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-accent-brand/30 bg-accent-brand/10 text-sm font-bold text-accent-brand">{i + 1}</span>
+                                        <p className="pt-0.5 text-[15px] leading-snug text-foreground">
+                                            <span className="font-semibold text-foreground">{title}.</span> {desc}
                                         </p>
                                     </li>
                                 ))}
                             </ol>
                         </div>
 
-                        <div className="flex gap-3 rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] p-4">
-                            <svg className="h-5 w-5 shrink-0 text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
-                            <p className="text-[15px] leading-snug text-neutral-300">
-                                <span className="font-semibold text-white">Why it matters:</span> well-organized categories become clean{" "}
-                                <span className="font-medium text-[#01a0be]">tags</span> on your Shopify sync and exports — so your store&apos;s collections and filtering stay tidy automatically.
+                        <div className="flex gap-3 rounded-xl border border-accent-brand/20 bg-accent-brand/[0.06] p-4">
+                            <svg className="h-5 w-5 shrink-0 text-accent-brand" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                            <p className="text-[15px] leading-snug text-foreground">
+                                <span className="font-semibold text-foreground">Why it matters:</span> well-organized categories become clean{" "}
+                                <span className="font-medium text-accent-brand">tags</span> on your Shopify sync and exports — so your store&apos;s collections and filtering stay tidy automatically.
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex shrink-0 justify-end border-t border-white/[0.08] px-5 py-3.5 sm:px-6">
-                        <button onClick={() => setShowHelp(false)} className="rounded-xl bg-[#01a0be] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#02b5d8]">Got it</button>
+                    <div className="flex shrink-0 justify-end border-t border-border px-5 py-3.5 sm:px-6">
+                        <button onClick={() => setShowHelp(false)} className="rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-9">Got it</button>
                     </div>
                 </div>
             </Modal>
 
-            <div className="space-y-6 pb-16 sm:space-y-8">
-                {/* Compact header — icon + title on the left, Help button on the right. */}
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10 text-[#01a0be]">
-                            <Ic.Tag />
-                        </div>
-                        <div className="min-w-0">
-                            <h1 className="mb-0 text-lg font-bold leading-tight tracking-tight text-white sm:text-xl">Category Management</h1>
-                            <p className="mt-1 hidden text-xs leading-relaxed text-neutral-500 sm:block">Define categories, manage AI assignments and manually override product categorizations.</p>
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => setShowHelp(true)}
-                        aria-label="Open guide"
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
-                    >
-                        <svg className="h-4 w-4 text-[#01a0be]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
-                        Guide
-                    </button>
-                </div>
-
+            <div className="flex flex-col min-h-full">
+                <PageHeader
+                    title="Category Management"
+                    description="Define categories, manage AI assignments and manually override product categorizations."
+                    right={
+                        <button
+                            type="button"
+                            onClick={() => setShowHelp(true)}
+                            aria-label="Open guide"
+                            className={cn(btn.base, btn.variant.outline, btn.size.sm)}
+                        >
+                            <HelpCircle className="text-muted-foreground" />
+                            Guide
+                        </button>
+                    }
+                />
+                <div className="flex-1 p-4 md:p-8 space-y-6 sm:space-y-8">
                 {/* Export selector */}
                 <ExportSelector
                     exports={exports}
@@ -1623,13 +1620,13 @@ export default function CategoriesPage({ initialExports }) {
 
                 {/* Empty state */}
                 {!selected ? (
-                    <div className="rounded-3xl ring-1 ring-white/[0.06] bg-white/[0.01] py-28 flex flex-col items-center gap-5">
-                        <div className="w-16 h-16 rounded-3xl bg-white/[0.03] ring-1 ring-white/[0.06] flex items-center justify-center text-neutral-700">
+                    <div className="rounded-2xl border border-border bg-muted/40 py-28 flex flex-col items-center gap-5">
+                        <div className="w-16 h-16 rounded-2xl bg-muted/40 border border-border flex items-center justify-center text-muted-foreground/40">
                             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2zM17 17h.01M17 13h-2a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2zM7 13H5a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2z" /></svg>
                         </div>
                         <div className="text-center">
-                            <p className="text-sm font-medium text-neutral-300">No category set selected</p>
-                            <p className="text-xs text-neutral-600 mt-1">Pick one above or create a new category set</p>
+                            <p className="text-sm font-medium text-foreground">No category set selected</p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">Pick one above or create a new category set</p>
                         </div>
                         <button onClick={() => setExportForm({ open: true, initial: null })} className={S.btnPrimary}>
                             <Ic.Plus />Create Category Set
@@ -1638,13 +1635,13 @@ export default function CategoriesPage({ initialExports }) {
                 ) : (
                     <div className="space-y-5">
                         {/* Tabs */}
-                        <div className="flex w-full gap-1 p-1 bg-white/[0.03] ring-1 ring-white/[0.06] rounded-2xl sm:w-fit">
+                        <div className="flex w-full gap-1 p-1 bg-muted/40 border border-border rounded-2xl sm:w-fit">
                             {tabs.map(t => (
                                 <button key={t.key} onClick={() => setTab(t.key)}
-                                    className={`flex min-w-0 flex-1 items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 sm:flex-none sm:px-5
-                                        ${tab === t.key
-                                            ? "bg-[#01a0be] text-white shadow-lg shadow-[#01a0be]/25"
-                                            : "text-neutral-500 hover:text-neutral-200"}`}>
+                                    className={`flex min-w-0 flex-1 items-center justify-center gap-2 px-2 rounded-md text-sm font-medium transition-all duration-200 sm:flex-none sm:px-5
+ h-9 ${tab === t.key
+ ? "bg-primary text-primary-foreground shadow-xs"
+ :"text-muted-foreground hover:text-foreground"}`}>
                                     <span className="shrink-0">{t.icon}</span>
                                     <span className="truncate">{t.label}</span>
                                 </button>
@@ -1657,6 +1654,7 @@ export default function CategoriesPage({ initialExports }) {
                         {tab === "playground" && <PlaygroundTab key={selected._id} exportId={selected._id} toast={toast} />}
                     </div>
                 )}
+                </div>
             </div>
         </>
     );

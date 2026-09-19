@@ -64,7 +64,8 @@ Backend proxy endpoints:
 - `ExportPage` (`src/components/ExportPage.js`): Complex export UI; receives `initialProducts`, `apiUrl`, and `allowedExports` (filtered by user role/ID). Handles both preset export formats (Shopify, Simple, Detailed, Inventory) and custom export configs fetched from the backend. The **Inventory preset** has special behavior: it skips the field-selection step (fixed Shopify inventory columns), replaces the Pricelist Priority panel with a Shopify Location Name input, and only offers CSV download (no JSON/XML). The location name is stored as `inventoryLocationName` on the config and must exactly match the Shopify location name (case-sensitive)
 - `CategoriesPage` (`src/components/CategoriesPage.js`): AI category management UI; receives `initialExports` filtered to those the user can access
 - `ShopifyIntegrationPage` (`src/components/ShopifyIntegrationPage.js`): Partner-facing Shopify connect/configure UI. **UI-only** — a single `"use client"` component whose state is seeded from module-level `MOCK_*` constants; no backend calls (see "Shopify Integration" below). Receives `initialExports` (reuses the same role/user export filter) and `ownerEmail`
-- `Navbar` (`src/components/Navbar.js`): Navigation with Auth0 login/logout buttons and user profile; the user dropdown menu uses the `animate-dropdown` keyframe defined in `globals.css`
+- `Navbar` (`src/components/Navbar.js`): Left sidebar — a port of the admin's `components/nav.tsx` (220px / 60px collapsible rail, accordion sections with coloured icon chips persisted in localStorage, theme toggle + user block at the bottom, mobile top bar + slide-out drawer). Sections are gated by the `export` role
+- `PageHeader` (`src/components/ui/PageHeader.js`): the sticky h-14 page title bar (title · count/badge pill · description · right actions) every page starts with; pages then render their body in a `p-4 md:p-8` block
 
 ### Export & Category Access Filtering
 Exports and categories are filtered server-side before passing to client components:
@@ -72,10 +73,18 @@ Exports and categories are filtered server-side before passing to client compone
 - Filtering uses the session's `https://time-4-action.com/roles` claim and `user.sub`
 
 ### Styling
-- Tailwind CSS v4 (using `@tailwindcss/postcss` plugin)
-- Custom CSS variables for fonts: `--font-orbitron` and `--font-montserrat`
-- Animated blob backgrounds defined in root layout
-- Dark theme with cyan/blue accent colors
+- Tailwind CSS v4 (using `@tailwindcss/postcss` plugin); icons from `lucide-react`
+- **Visual system is 1:1 with t4a-admin** (`../t4a-admin`): the same app shell (`body` = `flex h-screen overflow-hidden`, sidebar + one scrolling `<main>`), Geist Sans / Geist Mono, the shadcn-style tokens copied from the admin's `app/globals.css`, the same page header, buttons, inputs, selects, dialogs, tables, badges, skeletons and the light / system / dark toggle. When adding UI, copy what the admin does for the equivalent element — the class recipes live in `src/lib/ui.js` (`btn`, `input`, `textarea`, `badge`, `card`, `dialog`, `popover`, `table`, `countPill` …) and are meant to be used with `cn()` from `src/lib/utils.js`.
+- Page pattern: `<div className="flex flex-col min-h-full"><PageHeader …/><div className="flex-1 p-4 md:p-8">…</div></div>` (see ProductGrid / ExportPage). Buttons are `h-9` (`h-8` small) `rounded-md font-medium`; primary = `bg-primary`, secondary = outline (`border bg-background shadow-xs hover:bg-accent`), destructive = `bg-destructive`. Inputs/selects are `h-9 rounded-md border-input bg-transparent dark:bg-input/30` with the `ring-[3px] ring-ring/50` focus. Dialogs: overlay `bg-black/50`, panel `rounded-lg border bg-background shadow-lg`. Popovers/menus: `rounded-md border bg-popover p-1 shadow-md`. No gradients, glows or translucent surfaces.
+- **Themes:** light is the default; `.dark` on `<html>` switches (Tailwind `dark:` variant is available via `@custom-variant`). Plumbing: `src/lib/theme.js` (storage key `theme` = light|dark|system, inline before-paint bootstrap script), `src/lib/theme-context.js` (`ThemeProvider` / `useTheme`, ported from the admin), `src/components/ThemeToggle.js` (three-way segmented control, lives in the Navbar).
+- **Tokens** (`src/app/globals.css`, exposed through `@theme inline`). Never use raw `neutral-*`, `black`/`white` surfaces or the old `#01a0be` cyan in UI code:
+  - Surfaces: `bg-background` (page), `bg-card` / `bg-surface` (cards, solid), `bg-popover` (menus, modals), `bg-muted` (inputs, hover rows, subtle panels — `/40` etc. for tints), `bg-accent` (hover surface, secondary buttons), `bg-sidebar` (nav chrome), `bg-foreground/[0.03]` (frosted fills), `bg-black/50` (overlays)
+  - Borders: `border-border` (hairlines, also `divide-border`), `border-input` (form controls), `ring-ring` (focus)
+  - Text: `text-foreground`, `text-muted-foreground` (+ `/70`, `/40` for fainter)
+  - Brand: `bg-primary text-primary-foreground` for primary buttons/switch-on/progress (near-black on light, near-white on dark — as in the admin); `text-accent-brand` / `border-accent-brand` / `bg-accent-brand/10` for the teal brand accent (links, active markers, tints)
+  - Status text: `text-{cyan|amber|red|emerald|green|purple|violet|blue|orange|pink}-fg` (+ `-soft`, `-softer`, `-deep`) — 600 on light, 400 on dark like the admin's `text-amber-600 dark:text-amber-400`; tinted backgrounds/borders like `bg-amber-500/10` stay as-is
+  - Shadows: `shadow-sm` cards, `shadow-md` popovers, `shadow-lg` dialogs (no coloured glows); toasts: `bg-emerald-tint` / `bg-red-tint`
+- Loading states use the admin's `.skeleton` shimmer class (not `animate-pulse`); `.reveal` and `.overline` helpers are available too
 
 ### Environment Variables
 Required variables (see `.env`):

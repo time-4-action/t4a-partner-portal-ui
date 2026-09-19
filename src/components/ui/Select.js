@@ -146,15 +146,15 @@ export default function Select({ value, onChange, ariaLabel, disabled, children 
         disabled={disabled}
         onClick={() => !disabled && (open ? setOpen(false) : openMenu())}
         onKeyDown={onKeyDown}
-        className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-neutral-900/60 px-4 py-3.5 text-left text-sm backdrop-blur-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-          open ? "border-[#01a0be]/60 ring-1 ring-[#01a0be]/20" : "border-neutral-700 hover:border-neutral-600"
-        }`}
+        className={`flex w-full items-center justify-between gap-3 rounded-md border bg-transparent dark:bg-input/30 dark:hover:bg-input/50 px-3 h-9 text-left text-sm shadow-xs transition-[color,box-shadow,background-color] outline-none disabled:pointer-events-none disabled:opacity-50 ${
+ open ? "border-ring ring-[3px] ring-ring/50" : "border-input"
+ }`}
       >
-        <span className={`truncate ${isPlaceholder ? "text-neutral-500" : "text-white"}`}>
+        <span className={`truncate ${isPlaceholder ? "text-muted-foreground" : "text-foreground"}`}>
           {selected ? selected.label : options[0]?.label ?? ""}
         </span>
         <ChevronDownIcon
-          className={`h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-200 ${open ? "rotate-180 text-[#01a0be]" : ""}`}
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -170,7 +170,7 @@ export default function Select({ value, onChange, ariaLabel, disabled, children 
             left: rect.left,
             width: rect.width,
           }}
-          className="animate-dropdown z-[999] max-h-64 overflow-auto rounded-xl border border-neutral-700 bg-neutral-900/95 p-1 shadow-2xl shadow-black/50 backdrop-blur-xl"
+          className="animate-dropdown z-[999] max-h-64 overflow-auto rounded-md border border-border bg-popover text-popover-foreground p-1 shadow-md"
         >
           {options.map((o, i) => {
             const isSel = String(o.value) === String(value ?? "");
@@ -183,16 +183,16 @@ export default function Select({ value, onChange, ariaLabel, disabled, children 
                 aria-disabled={o.disabled || undefined}
                 onClick={() => commit(o)}
                 onMouseEnter={() => !o.disabled && setActive(i)}
-                className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                  o.disabled
-                    ? "cursor-default text-neutral-600"
-                    : isActive
-                      ? "bg-[#01a0be]/15 text-white"
-                      : "text-neutral-300"
-                }`}
+                className={`flex cursor-pointer items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors ${
+ o.disabled
+ ? "cursor-default text-muted-foreground/70"
+ : isActive
+ ? "bg-accent text-accent-foreground"
+ :"text-foreground"
+ }`}
               >
                 <span className="truncate">{o.label}</span>
-                {isSel && !o.disabled && <CheckIcon className="h-4 w-4 shrink-0 text-[#01a0be]" />}
+                {isSel && !o.disabled && <CheckIcon className="h-4 w-4 shrink-0 text-accent-brand" />}
               </li>
             );
           })}

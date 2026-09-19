@@ -28,6 +28,10 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Select from "./ui/Select";
+import PageHeader from "@/components/ui/PageHeader";
+import { HelpCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { btn, countPill } from "@/lib/ui";
 import {
   DEFAULT_PRICE_ROUNDING, ROUNDING_PRESETS, STEP_OPTIONS,
   normalizePriceRounding, applyPriceRounding, describePriceRounding,
@@ -428,7 +432,7 @@ const PlusIcon = (p) => (
   </Svg>
 );
 const SpinnerIcon = (p) => (
-  <svg className={`animate-spin ${p.className || ""}`} viewBox="0 0 24 24" fill="none">
+  <svg className={`animate-spin ${p.className ||""}`} viewBox="0 0 24 24" fill="none">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
     <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z" />
   </svg>
@@ -459,11 +463,11 @@ const ShopifyLogo = ({ title = "Shopify", ...p }) => (
 /* -------------------------------------------------------------------------- */
 
 const BADGE_TONES = {
-  cyan: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20",
-  amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  red: "bg-red-500/10 text-red-400 border-red-500/30",
-  green: "bg-green-500/10 text-green-400 border-green-500/20",
-  neutral: "bg-neutral-700/40 text-neutral-300 border-neutral-600/40",
+  cyan: "bg-cyan-500/15 text-cyan-fg border-cyan-500/20",
+  amber: "bg-amber-500/10 text-amber-fg border-amber-500/20",
+  red: "bg-red-500/10 text-red-fg border-red-500/30",
+  green: "bg-green-500/10 text-green-fg border-green-500/20",
+  neutral: "bg-accent/40 text-foreground border-input/40",
 };
 
 function StatusBadge({ tone = "neutral", children }) {
@@ -494,7 +498,7 @@ function ToggleSwitch({ checked, onChange, ariaLabel }) {
       <input type="checkbox" checked={checked} onChange={onChange} aria-label={ariaLabel} className="sr-only peer" />
       <span
         aria-hidden="true"
-        className="w-10 h-6 rounded-full bg-neutral-700 transition-all duration-200 peer-checked:bg-gradient-to-r peer-checked:from-cyan-500 peer-checked:to-blue-500 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:duration-200 peer-checked:after:translate-x-[16px]"
+        className="w-10 h-6 rounded-full bg-accent transition-all duration-200 peer-checked:bg-gradient-to-r peer-checked:from-cyan-500 peer-checked:to-blue-500 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:duration-200 peer-checked:after:translate-x-[16px]"
       />
     </span>
   );
@@ -504,11 +508,11 @@ function SectionHeading({ title, desc, icon, right }) {
   return (
     <div className="mb-5 flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
           {icon}
           {title}
         </h2>
-        {desc && <p className="mt-1 text-sm text-neutral-400">{desc}</p>}
+        {desc && <p className="mt-1 text-sm text-muted-foreground">{desc}</p>}
       </div>
       {right}
     </div>
@@ -723,66 +727,45 @@ export default function ShopifyIntegrationPage({
   };
 
   return (
-    <div className="pb-40 sm:pb-32">
+    <div className="flex flex-col min-h-full pb-40 sm:pb-32">
       {/* ----------------------------- Header ----------------------------- */}
       {/* Compact header — icon + title + badge on the left, Guide button on the right (matches the
           Export / Categories / Own Sources pages). */}
-      <header className="mb-6 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#95BF47]/30 bg-[#95BF47]/10">
-            <ShopifyLogo className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="mb-0 text-xl font-bold leading-none tracking-tight text-white">Shopify</h1>
-              {isPrerelease ? (
-                <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-                  <BagIcon className="h-3 w-3" />
-                  Beta · Deprecated
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-                  <BagIcon className="h-3 w-3" />
-                  Integration
-                </span>
-              )}
-            </div>
-            <p className="mt-1 hidden text-xs text-neutral-500 sm:block">
-              {isPrerelease
-                ? "Deprecated connect — this store uses your own custom Shopify app. New stores should use the standard Shopify Integration."
-                : "One-way push of stock, products, prices and images from the portal straight to your Shopify stores."}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowHelp(true)}
-          aria-label="Open guide"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
-        >
-          <svg className="h-4 w-4 text-[#01a0be]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
-          Guide
-        </button>
-      </header>
+      <PageHeader
+        title="Shopify"
+        badge={<span className={countPill}>{isPrerelease ? "Beta · Deprecated" : "Integration"}</span>}
+        description={
+          isPrerelease
+            ? "Deprecated connect — this store uses your own custom Shopify app. New stores should use the standard Shopify Integration."
+            : "One-way push of stock, products, prices and images from the portal straight to your Shopify stores."
+        }
+        right={
+          <button type="button" onClick={() => setShowHelp(true)} aria-label="Open guide" className={cn(btn.base, btn.variant.outline, btn.size.sm)}>
+            <HelpCircle className="text-muted-foreground" />
+            Guide
+          </button>
+        }
+      />
+      <div className="flex-1 p-4 md:p-8">
 
       {/* ----------------------------- Help modal ----------------------------- */}
       {showHelp && (
-        <div className="fixed inset-0 z-[80] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-4" onClick={() => setShowHelp(false)}>
-          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-2xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
-              <h2 className="mb-0 text-base font-semibold leading-none text-white">How Shopify sync works</h2>
-              <button type="button" onClick={() => setShowHelp(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+        <div className="fixed inset-0 z-[80] flex bg-black/50 sm:items-center sm:justify-center sm:p-4" onClick={() => setShowHelp(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[88vh] sm:max-w-2xl sm:rounded-lg sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
+              <h2 className="mb-0 text-[14px] font-semibold leading-none text-foreground">How Shopify sync works</h2>
+              <button type="button" onClick={() => setShowHelp(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-popover text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-6 sm:px-6">
-              <p className="text-[15px] leading-relaxed text-neutral-200">
+              <p className="text-[15px] leading-relaxed text-foreground">
                 Connect your Shopify store and the portal keeps it stocked with the catalogue{" "}
-                <span className="font-semibold text-white">automatically</span> — stock, products, prices, descriptions and images, pushed one way (portal → your store). Nothing is ever deleted from your store.
+                <span className="font-semibold text-foreground">automatically</span> — stock, products, prices, descriptions and images, pushed one way (portal → your store). Nothing is ever deleted from your store.
               </p>
 
               <div>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">How it works — 4 steps</h3>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">How it works — 4 steps</h3>
                 <ol className="space-y-3">
                   {[
                     ["Connect your store", "One secure click links your Shopify store to the portal."],
@@ -791,24 +774,24 @@ export default function ShopifyIntegrationPage({
                     ["Let it sync", "It pushes automatically on every catalogue update — or hit Sync now any time."],
                   ].map(([title, desc], i) => (
                     <li key={title} className="flex gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 font-orbitron text-sm font-bold text-[#01a0be]">{i + 1}</span>
-                      <p className="pt-0.5 text-[15px] leading-snug text-neutral-300">
-                        <span className="font-semibold text-white">{title}.</span> {desc}
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-accent-brand/30 bg-accent-brand/10 text-sm font-bold text-accent-brand">{i + 1}</span>
+                      <p className="pt-0.5 text-[15px] leading-snug text-foreground">
+                        <span className="font-semibold text-foreground">{title}.</span> {desc}
                       </p>
                     </li>
                   ))}
                 </ol>
               </div>
 
-              <div className="flex gap-3 rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] p-4">
-                <svg className="h-5 w-5 shrink-0 text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
-                <p className="text-[15px] leading-snug text-neutral-300">
-                  <span className="font-semibold text-white">Your edits are safe.</span> In <span className="font-medium text-[#01a0be]">Create, then leave it to you</span>, the portal adds each product once and then only keeps stock current — anything you change in Shopify stays.
+              <div className="flex gap-3 rounded-xl border border-accent-brand/20 bg-accent-brand/[0.06] p-4">
+                <svg className="h-5 w-5 shrink-0 text-accent-brand" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                <p className="text-[15px] leading-snug text-foreground">
+                  <span className="font-semibold text-foreground">Your edits are safe.</span> In <span className="font-medium text-accent-brand">Create, then leave it to you</span>, the portal adds each product once and then only keeps stock current — anything you change in Shopify stays.
                 </p>
               </div>
             </div>
-            <div className="flex shrink-0 justify-end border-t border-neutral-800 px-5 py-3.5 sm:px-6">
-              <button onClick={() => setShowHelp(false)} className="rounded-lg bg-[#01a0be] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">Got it</button>
+            <div className="flex shrink-0 justify-end border-t border-border px-5 py-3.5 sm:px-6">
+              <button onClick={() => setShowHelp(false)} className="rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-9">Got it</button>
             </div>
           </div>
         </div>
@@ -816,7 +799,7 @@ export default function ShopifyIntegrationPage({
 
       {/* --------------------------- Store switcher ---------------------------- */}
       {connections.length > 0 && (
-        <nav aria-label="Connected stores" className="mb-6 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-2 backdrop-blur-sm">
+        <nav aria-label="Connected stores" className="mb-6 rounded-2xl border border-border bg-muted/40 p-2">
           <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {connections.map((c) => {
               const key = connKey(c);
@@ -828,26 +811,26 @@ export default function ShopifyIntegrationPage({
                   key={key}
                   onClick={() => selectStore(key)}
                   aria-current={active ? "page" : undefined}
-                  className={`group relative flex shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-all sm:gap-3 sm:px-3 sm:py-2.5 ${
-                    active
-                      ? "bg-gradient-to-br from-neutral-800 to-neutral-800/30 shadow-lg"
-                      : "hover:bg-neutral-800/50"
-                  }`}
+                  className={`group relative flex shrink-0 items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-all sm:gap-3 sm:px-3 sm:py-2.5 ${
+ active
+ ? "bg-gradient-to-br from-muted to-muted/30 shadow-lg"
+ :"hover:bg-muted/50"
+ }`}
                 >
                   <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold transition-colors ${
-                      active
-                        ? "bg-gradient-to-br from-[#95BF47]/30 to-[#01a0be]/25 text-white"
-                        : "bg-neutral-800 text-neutral-400 group-hover:text-neutral-200"
-                    }`}
+ active
+ ? "bg-gradient-to-br from-[#95BF47]/30 to-accent-brand/25 text-foreground"
+ :"bg-muted text-muted-foreground group-hover:text-foreground"
+ }`}
                   >
                     {label.charAt(0).toUpperCase()}
                   </span>
                   <span className="min-w-0 pr-1">
-                    <span className={`block max-w-[7.5rem] truncate text-sm font-semibold sm:max-w-[12rem] ${active ? "text-white" : "text-neutral-300"}`}>
+                    <span className={`block max-w-[7.5rem] truncate text-sm font-semibold sm:max-w-[12rem] ${active ? "text-foreground" : "text-foreground"}`}>
                       {label}
                     </span>
-                    <span className="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-500">
+                    <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: DOT_COLOR[meta.tone] || DOT_COLOR.neutral }} />
                       {meta.label}
                     </span>
@@ -856,18 +839,18 @@ export default function ShopifyIntegrationPage({
               );
             })}
 
-            <div className="mx-1 h-9 w-px shrink-0 bg-neutral-800" />
+            <div className="mx-1 h-9 w-px shrink-0 bg-muted" />
 
             <button
               onClick={startAddStore}
               aria-label="Add store"
-              className={`group flex shrink-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all sm:gap-3 sm:px-3 sm:py-2.5 ${
-                adding ? "bg-[#01a0be]/10 text-[#01a0be] ring-1 ring-[#01a0be]/40" : "text-neutral-400 hover:bg-neutral-800/50 hover:text-white"
-              }`}
+              className={`group flex shrink-0 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-all sm:gap-3 sm:px-3 sm:py-2.5 h-9 ${
+ adding ? "bg-accent-brand/10 text-accent-brand ring-1 ring-accent-brand/40" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+ }`}
             >
               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed transition-colors ${
-                adding ? "border-[#01a0be]/50" : "border-neutral-700 group-hover:border-[#01a0be]/50"
-              }`}>
+ adding ? "border-accent-brand/50" : "border-input group-hover:border-accent-brand/50"
+ }`}>
                 <PlusIcon className="h-4 w-4" />
               </span>
               <span className="hidden whitespace-nowrap sm:inline">Add store</span>
@@ -879,10 +862,10 @@ export default function ShopifyIntegrationPage({
       {notice && (
         <div
           className={`mb-6 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
-            notice.tone === "success"
-              ? "border-[#95BF47]/30 bg-[#95BF47]/10 text-[#b6df84]"
-              : "border-red-500/30 bg-red-500/10 text-red-300"
-          }`}
+ notice.tone ==="success"
+ ? "border-[#95BF47]/30 bg-[#95BF47]/10 text-shopify-fg"
+ :"border-red-500/30 bg-red-500/10 text-red-fg-soft"
+ }`}
         >
           <span>{notice.text}</span>
           <button
@@ -930,6 +913,7 @@ export default function ShopifyIntegrationPage({
           onPatch={patchConnection}
         />
       )}
+      </div>
     </div>
   );
 }
@@ -976,31 +960,31 @@ function ResumeConnect({ shopDomain, onNotice, onCancel }) {
 
   return (
     <div className="flex min-h-[55vh] items-center justify-center">
-      <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900/60 p-8 text-center backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
         <div className="relative mx-auto mb-6 w-fit">
           <div aria-hidden="true" className="absolute -inset-3 rounded-[1.75rem] bg-[#95BF47]/20 blur-2xl" />
-          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
-            <ShopifyLogo className="h-9 w-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]" />
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-shopify-deep via-card to-popover shadow-xs">
+            <ShopifyLogo className="h-9 w-9 drop-shadow-[0_2px_6px_var(--shade-50)]" />
           </div>
         </div>
 
         {status === "error" ? (
           <>
-            <h2 className="text-xl font-semibold text-white">Couldn&apos;t start the connection</h2>
-            <p className="mt-2 text-sm text-neutral-400">
-              Something went wrong reaching Shopify for <span className="font-semibold text-white">{label}</span>. Try again, or enter the store manually.
+            <h2 className="text-[15px] font-semibold text-foreground">Couldn&apos;t start the connection</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Something went wrong reaching Shopify for <span className="font-semibold text-foreground">{label}</span>. Try again, or enter the store manually.
             </p>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
               <button
                 onClick={launch}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f]"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 h-9"
               >
                 <RefreshIcon className="h-4 w-4" />
                 Try again
               </button>
               <button
                 onClick={onCancel}
-                className="inline-flex items-center justify-center rounded-xl border border-neutral-700 bg-neutral-900/60 px-5 py-2.5 text-sm font-semibold text-neutral-300 transition-all hover:border-neutral-600 hover:text-white"
+                className="inline-flex items-center justify-center rounded-md border border-input bg-card px-5 text-sm font-medium text-foreground transition-all hover:border-input hover:text-foreground h-9"
               >
                 Enter store manually
               </button>
@@ -1008,18 +992,18 @@ function ResumeConnect({ shopDomain, onNotice, onCancel }) {
           </>
         ) : (
           <>
-            <h2 className="text-xl font-semibold text-white">Connecting your store</h2>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            <h2 className="text-[15px] font-semibold text-foreground">Connecting your store</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Taking you to Shopify to approve the install for{" "}
-              <span className="font-semibold text-white">{label}</span>.
+              <span className="font-semibold text-foreground">{label}</span>.
             </p>
-            <div className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-[#01a0be]">
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-accent-brand">
               <SpinnerIcon className="h-4 w-4" />
               {status === "launching" ? "Redirecting to Shopify…" : "Starting…"}
             </div>
             <button
               onClick={onCancel}
-              className="mt-6 text-xs font-medium text-neutral-500 underline-offset-4 transition-colors hover:text-neutral-300 hover:underline"
+              className="mt-6 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
             >
               Cancel
             </button>
@@ -1121,43 +1105,43 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
         title: "Create a NEW app",
         body: (
           <>
-            Go to <span className="font-mono text-neutral-300">dev.shopify.com</span> (the Shopify Dev Dashboard) and sign in.
-            Open <span className="font-medium text-neutral-200">Apps → Create app</span>, create it manually and name it
-            (e.g. <span className="text-neutral-200">&quot;Patrik Portal&quot;</span>). Open the app, then start a new{" "}
-            <span className="font-medium text-neutral-200">version</span> to edit its configuration.
+            Go to <span className="font-mono text-foreground">dev.shopify.com</span> (the Shopify Dev Dashboard) and sign in.
+            Open <span className="font-medium text-foreground">Apps → Create app</span>, create it manually and name it
+            (e.g. <span className="text-foreground">&quot;Patrik Portal&quot;</span>). Open the app, then start a new{" "}
+            <span className="font-medium text-foreground">version</span> to edit its configuration.
           </>
         ),
         warn: "Create your OWN new app. Do NOT reuse our \"time-4-action-integration\" app — that's our public app and you can't install it directly here (use the standard Shopify Integration for the one-click connect instead).",
       },
       {
         title: "Set the App URL",
-        body: (<>In the version&apos;s <span className="font-medium text-neutral-200">URLs</span> section, paste this as the <span className="font-medium text-neutral-200">App URL</span>, and un-tick <span className="font-medium text-neutral-200">Embed app in Shopify admin</span>.</>),
+        body: (<>In the version&apos;s <span className="font-medium text-foreground">URLs</span> section, paste this as the <span className="font-medium text-foreground">App URL</span>, and un-tick <span className="font-medium text-foreground">Embed app in Shopify admin</span>.</>),
         copy: { key: "appUrl", label: "App URL", value: oauth.appUrl },
       },
       {
         title: "Set the Redirect URL",
-        body: (<>In <span className="font-medium text-neutral-200">Access</span>, paste this into <span className="font-medium text-neutral-200">Redirect URLs</span>, and tick <span className="font-medium text-neutral-200">Use legacy install flow</span>.</>),
+        body: (<>In <span className="font-medium text-foreground">Access</span>, paste this into <span className="font-medium text-foreground">Redirect URLs</span>, and tick <span className="font-medium text-foreground">Use legacy install flow</span>.</>),
         copy: { key: "redirect", label: "Redirect URL", value: oauth.redirectUrl },
         warn: "Paste it exactly — this must match, character for character, or the connect will fail.",
       },
       {
         title: "Add the scopes",
-        body: (<>Paste this comma-separated list into <span className="font-medium text-neutral-200">Scopes</span> (leave Optional scopes empty), then click <span className="font-medium text-neutral-200">Release</span> to save the version.</>),
+        body: (<>Paste this comma-separated list into <span className="font-medium text-foreground">Scopes</span> (leave Optional scopes empty), then click <span className="font-medium text-foreground">Release</span> to save the version.</>),
         copy: { key: "scopes", label: "Scopes", value: CUSTOM_APP_SCOPES.join(",") },
       },
       {
         title: "Make it Custom distribution",
-        body: (<>Open <span className="font-medium text-neutral-200">Distribution</span>, choose <span className="font-medium text-neutral-200">Custom distribution</span> and enter your store{domainClean ? <> (<span className="font-mono text-neutral-300">{domainClean}.myshopify.com</span>)</> : ""}.</>),
+        body: (<>Open <span className="font-medium text-foreground">Distribution</span>, choose <span className="font-medium text-foreground">Custom distribution</span> and enter your store{domainClean ? <> (<span className="font-mono text-foreground">{domainClean}.myshopify.com</span>)</> : ""}.</>),
         warn: "This is what avoids the \"app under review\" wall — a custom-distribution app installs on your one store without any Shopify review.",
       },
       {
         title: "Copy your credentials",
-        body: (<>Open the app&apos;s <span className="font-medium text-neutral-200">Client credentials</span> (a.k.a. API credentials). You&apos;ll paste the <span className="font-medium text-neutral-200">Client ID</span> and <span className="font-medium text-neutral-200">Client secret</span> into this page next.</>),
+        body: (<>Open the app&apos;s <span className="font-medium text-foreground">Client credentials</span> (a.k.a. API credentials). You&apos;ll paste the <span className="font-medium text-foreground">Client ID</span> and <span className="font-medium text-foreground">Client secret</span> into this page next.</>),
         warn: "Do NOT click \"Install\" in the Dev Dashboard — that installs the wrong app. The install is started from THIS page (the Connect button below), which uses your app's key.",
       },
       {
         title: "Connect",
-        body: (<>Come back to this page, paste your <span className="font-medium text-neutral-200">store domain</span>, <span className="font-medium text-neutral-200">Client ID</span> and <span className="font-medium text-neutral-200">Client secret</span> into the form, and click <span className="font-medium text-neutral-200">Connect store</span> (not the Dashboard&apos;s Install button). You&apos;ll be sent to Shopify to approve — the consent screen should show YOUR app&apos;s name, not ours.</>),
+        body: (<>Come back to this page, paste your <span className="font-medium text-foreground">store domain</span>, <span className="font-medium text-foreground">Client ID</span> and <span className="font-medium text-foreground">Client secret</span> into the form, and click <span className="font-medium text-foreground">Connect store</span> (not the Dashboard&apos;s Install button). You&apos;ll be sent to Shopify to approve — the consent screen should show YOUR app&apos;s name, not ours.</>),
       },
     ];
     const gStep = guideSteps[guideStep] || guideSteps[0];
@@ -1166,42 +1150,42 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
     return (
       <>
         <div className="mx-auto max-w-2xl space-y-6">
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+          <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 lg:p-8">
             <div className="flex items-start justify-between gap-4">
               <div className="relative mb-6 w-fit">
                 <div aria-hidden="true" className="absolute -inset-2 rounded-2xl bg-[#95BF47]/20 blur-xl" />
-                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
-                  <ShopifyLogo className="h-8 w-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]" />
+                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-shopify-deep via-card to-popover shadow-xs">
+                  <ShopifyLogo className="h-8 w-8 drop-shadow-[0_2px_6px_var(--shade-50)]" />
                 </div>
               </div>
               {canCancel && (
                 <button
                   onClick={onCancel}
-                  className="rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white"
+                  className="rounded-md border border-input bg-card px-3 text-xs font-medium text-foreground transition-colors hover:border-input hover:text-foreground h-7"
                 >
                   Back to stores
                 </button>
               )}
             </div>
 
-            <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-[#01a0be]">
+            <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-accent-brand/30 bg-accent-brand/10 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-accent-brand">
               Beta · Deprecated
             </div>
-            <h2 className="text-xl font-semibold text-white">
+            <h2 className="text-[15px] font-semibold text-foreground">
               {canCancel ? "Connect another store" : "Connect your Shopify store"}
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               This is the deprecated connect flow. It uses your{" "}
-              <span className="font-medium text-neutral-200">own Shopify app</span> — create one in the Shopify Dev
+              <span className="font-medium text-foreground">own Shopify app</span> — create one in the Shopify Dev
               Dashboard, then paste its API key and secret below. New here? Open the guide first.{" "}
               For a new store, prefer the one-click{" "}
-              <a href="/integrations/shopify" className="text-[#01a0be] hover:underline">standard Shopify Integration</a>.
+              <a href="/integrations/shopify" className="text-accent-brand hover:underline">standard Shopify Integration</a>.
             </p>
 
             <button
               type="button"
               onClick={() => { setGuideStep(0); setGuideOpen(true); }}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#01a0be]/40 bg-[#01a0be]/10 px-4 py-2.5 text-sm font-semibold text-[#01a0be] transition-colors hover:bg-[#01a0be]/15"
+              className="mt-4 inline-flex items-center gap-2 rounded-md border border-accent-brand/40 bg-accent-brand/10 px-4 text-sm font-medium text-accent-brand transition-colors hover:bg-accent-brand/15 h-9"
             >
               <BookIcon className="h-4 w-4" />
               Open setup guide
@@ -1209,8 +1193,8 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
 
             <div className="mt-6 space-y-4">
               <div>
-                <label htmlFor="pr-shop-domain" className="mb-2 block text-sm font-medium text-neutral-300">Your store domain</label>
-                <div className="flex overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900/60 transition-colors focus-within:border-[#01a0be]/50">
+                <label htmlFor="pr-shop-domain" className="mb-2 block text-sm font-medium text-foreground">Your store domain</label>
+                <div className="flex overflow-hidden rounded-xl border border-input bg-card transition-colors focus-within:border-accent-brand/50 shadow-sm">
                   <input
                     id="pr-shop-domain"
                     type="text"
@@ -1220,13 +1204,13 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
                     value={domainInput}
                     onChange={(e) => setDomainInput(e.target.value)}
                     placeholder="ruzkrw-7q"
-                    className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground h-9 dark:bg-input/30 shadow-xs border border-input focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   />
-                  <span className="flex select-none items-center whitespace-nowrap border-l border-neutral-700 px-3 text-sm text-neutral-500">
+                  <span className="flex select-none items-center whitespace-nowrap border-l border-input px-3 text-sm text-muted-foreground">
                     .myshopify.com
                   </span>
                 </div>
-                <p className={`mt-2 text-xs ${domainInput && !domainValid ? "text-amber-400" : "text-neutral-500"}`}>
+                <p className={`mt-2 text-xs ${domainInput && !domainValid ? "text-amber-fg" : "text-muted-foreground"}`}>
                   {domainInput && !domainValid
                     ? "Use only lowercase letters, numbers and hyphens — just the store name."
                     : "Use your permanent .myshopify.com name (e.g. ruzkrw-7q) — find it in Shopify admin → Settings → Domains. NOT your custom domain or store title."}
@@ -1234,7 +1218,7 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
               </div>
 
               <div>
-                <label htmlFor="pr-client-id" className="mb-2 block text-sm font-medium text-neutral-300">API key (Client ID)</label>
+                <label htmlFor="pr-client-id" className="mb-2 block text-sm font-medium text-foreground">API key (Client ID)</label>
                 <input
                   id="pr-client-id"
                   type="text"
@@ -1244,12 +1228,12 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
                   value={clientIdInput}
                   onChange={(e) => setClientIdInput(e.target.value)}
                   placeholder="e.g. 7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d"
-                  className="w-full rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-3.5 font-mono text-sm text-white placeholder:text-neutral-600 transition-colors focus:border-[#01a0be]/50 focus:outline-none"
+                  className="w-full rounded-xl border border-input bg-card px-4 py-3.5 font-mono text-sm text-foreground placeholder:text-muted-foreground/70 transition-colors focus:border-accent-brand/50 focus:outline-none shadow-sm"
                 />
               </div>
 
               <div>
-                <label htmlFor="pr-client-secret" className="mb-2 block text-sm font-medium text-neutral-300">API secret key</label>
+                <label htmlFor="pr-client-secret" className="mb-2 block text-sm font-medium text-foreground">API secret key</label>
                 <input
                   id="pr-client-secret"
                   type="password"
@@ -1260,10 +1244,10 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
                   onChange={(e) => setClientSecretInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && connectCustomOAuth()}
                   placeholder="shpss_••••••••••••••••••••••••••••••••"
-                  className="w-full rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-3.5 font-mono text-sm text-white placeholder:text-neutral-600 transition-colors focus:border-[#01a0be]/50 focus:outline-none"
+                  className="w-full rounded-xl border border-input bg-card px-4 py-3.5 font-mono text-sm text-foreground placeholder:text-muted-foreground/70 transition-colors focus:border-accent-brand/50 focus:outline-none shadow-sm"
                 />
-                <p className="mt-2 text-xs text-neutral-500">
-                  Both are on your app&apos;s <span className="text-neutral-300">Client credentials</span> page in the Dev Dashboard.
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Both are on your app&apos;s <span className="text-foreground">Client credentials</span> page in the Dev Dashboard.
                   The secret is stored encrypted and never displayed again.
                 </p>
               </div>
@@ -1271,22 +1255,22 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
               <button
                 onClick={connectCustomOAuth}
                 disabled={!domainValid || !clientIdClean || !clientSecretClean || connecting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-7 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 h-10"
               >
                 {connecting ? <SpinnerIcon className="h-4 w-4" /> : <BagIcon className="h-4 w-4" />}
                 {connecting ? "Redirecting to Shopify…" : "Connect store"}
               </button>
             </div>
 
-            <div className="mt-6 border-t border-neutral-800 pt-5">
+            <div className="mt-6 border-t border-border pt-5">
               <ul className="space-y-2">
                 {[
                   "Your app secret and token are encrypted at rest and never logged or shown again.",
                   "One-way push only — we never read or change your orders.",
                   "Least-privilege scopes; disconnect any time to uninstall from your store.",
                 ].map((t) => (
-                  <li key={t} className="flex items-start gap-2.5 text-xs text-neutral-500">
-                    <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#01a0be]" />
+                  <li key={t} className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                    <CheckIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-brand" />
                     {t}
                   </li>
                 ))}
@@ -1296,59 +1280,59 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
         </div>
 
         {guideOpen && (
-          <div className="fixed inset-0 z-[80] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-4" onClick={() => setGuideOpen(false)}>
-            <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
-              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-5 py-3.5">
+          <div className="fixed inset-0 z-[80] flex bg-black/50 sm:items-center sm:justify-center sm:p-4" onClick={() => setGuideOpen(false)}>
+            <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-lg sm:border" onClick={(e) => e.stopPropagation()}>
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-3.5">
                 <div className="min-w-0">
-                  <h2 className="mb-0 text-base font-semibold leading-none text-white">Set up your app</h2>
-                  <p className="mt-1 text-xs text-neutral-500">Step {guideStep + 1} of {guideSteps.length} · dev.shopify.com</p>
+                  <h2 className="mb-0 text-[14px] font-semibold leading-none text-foreground">Set up your app</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">Step {guideStep + 1} of {guideSteps.length} · dev.shopify.com</p>
                 </div>
-                <button type="button" onClick={() => setGuideOpen(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+                <button type="button" onClick={() => setGuideOpen(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-popover text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
 
               <div className="flex shrink-0 gap-1.5 px-5 pt-4">
                 {guideSteps.map((s, i) => (
-                  <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= guideStep ? "bg-[#01a0be]" : "bg-neutral-800"}`} />
+                  <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= guideStep ? "bg-primary" : "bg-muted"}`} />
                 ))}
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-sm font-bold text-white">{guideStep + 1}</span>
-                  <h3 className="mb-0 text-base font-semibold text-white">{gStep.title}</h3>
+                  <h3 className="mb-0 text-[13px] font-semibold text-foreground">{gStep.title}</h3>
                 </div>
-                <p className="mt-3 text-sm leading-relaxed text-neutral-300">{gStep.body}</p>
+                <p className="mt-3 text-sm leading-relaxed text-foreground">{gStep.body}</p>
 
                 {gStep.warn && (
                   <div className="mt-3 flex gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-3">
-                    <WarningIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                    <p className="text-xs leading-snug text-amber-200/90">{gStep.warn}</p>
+                    <WarningIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-fg" />
+                    <p className="text-xs leading-snug text-amber-fg-softer/90">{gStep.warn}</p>
                   </div>
                 )}
 
                 {gStep.copy && (
                   <div className="mt-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">{gStep.copy.label}</p>
-                      <button type="button" onClick={() => copyText(gStep.copy.value, gStep.copy.key)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900/60 px-2.5 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white">
-                        {copiedKey === gStep.copy.key ? <CheckIcon className="h-3.5 w-3.5 text-[#01a0be]" /> : <ClipboardIcon className="h-3.5 w-3.5" />}
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{gStep.copy.label}</p>
+                      <button type="button" onClick={() => copyText(gStep.copy.value, gStep.copy.key)} className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-input bg-card px-2.5 text-xs font-medium text-foreground transition-colors hover:border-accent-brand/40 hover:text-foreground h-7">
+                        {copiedKey === gStep.copy.key ? <CheckIcon className="h-3.5 w-3.5 text-accent-brand" /> : <ClipboardIcon className="h-3.5 w-3.5" />}
                         {copiedKey === gStep.copy.key ? "Copied" : "Copy"}
                       </button>
                     </div>
-                    <div className="mt-1.5 rounded-lg border border-neutral-800 bg-neutral-950/60 p-2.5">
-                      <code className="block select-all break-words font-mono text-[0.7rem] leading-relaxed text-neutral-300">{gStep.copy.value}</code>
+                    <div className="mt-1.5 rounded-lg border border-border bg-popover p-2.5">
+                      <code className="block select-all break-words font-mono text-[0.7rem] leading-relaxed text-foreground">{gStep.copy.value}</code>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-neutral-800 px-5 py-3.5">
-                <button type="button" onClick={() => setGuideStep((s) => Math.max(0, s - 1))} disabled={guideStep === 0} className="rounded-lg border border-neutral-700 bg-neutral-900/60 px-4 py-2 text-sm font-medium text-neutral-300 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3.5">
+                <button type="button" onClick={() => setGuideStep((s) => Math.max(0, s - 1))} disabled={guideStep === 0} className="rounded-md border border-input bg-card px-4 text-sm font-medium text-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50 h-9">
                   Back
                 </button>
-                <button type="button" onClick={() => { if (isLastStep) setGuideOpen(false); else setGuideStep((s) => s + 1); }} className="rounded-lg bg-[#01a0be] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">
+                <button type="button" onClick={() => { if (isLastStep) setGuideOpen(false); else setGuideStep((s) => s + 1); }} className="rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-9">
                   {isLastStep ? "Got it" : "Next"}
                 </button>
               </div>
@@ -1363,34 +1347,34 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       {/* left: connect + how it works */}
       <div className="space-y-6">
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+        <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 lg:p-8">
           <div className="flex items-start justify-between gap-4">
             <div className="relative mb-6 w-fit">
               <div aria-hidden="true" className="absolute -inset-2 rounded-2xl bg-[#95BF47]/20 blur-xl" />
-              <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-[#16210f] via-neutral-900 to-neutral-950 shadow-lg shadow-[#5E8E3E]/20">
-                <ShopifyLogo className="h-8 w-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#95BF47]/25 bg-gradient-to-br from-shopify-deep via-card to-popover shadow-xs">
+                <ShopifyLogo className="h-8 w-8 drop-shadow-[0_2px_6px_var(--shade-50)]" />
               </div>
             </div>
             {canCancel && (
               <button
                 onClick={onCancel}
-                className="rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white"
+                className="rounded-md border border-input bg-card px-3 text-xs font-medium text-foreground transition-colors hover:border-input hover:text-foreground h-7"
               >
                 Back to stores
               </button>
             )}
           </div>
-          <h2 className="text-xl font-semibold text-white">
+          <h2 className="text-[15px] font-semibold text-foreground">
             {canCancel ? "Connect another store" : "Connect your Shopify store"}
           </h2>
-          <p className="mt-2 max-w-lg text-sm leading-relaxed text-neutral-400">
+          <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
             Install the portal app on your store with a single approval. No API keys to copy, no manual setup — once
             connected, choose what to sync and the portal keeps it current. You can connect as many stores as you like.
           </p>
 
           <div className="mt-6 max-w-lg">
-            <label htmlFor="shop-domain" className="mb-2 block text-sm font-medium text-neutral-300">Your store domain</label>
-            <div className="flex overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900/60 transition-colors focus-within:border-[#01a0be]/50">
+            <label htmlFor="shop-domain" className="mb-2 block text-sm font-medium text-foreground">Your store domain</label>
+            <div className="flex overflow-hidden rounded-xl border border-input bg-card transition-colors focus-within:border-accent-brand/50 shadow-sm">
               <input
                 id="shop-domain"
                 type="text"
@@ -1401,13 +1385,13 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
                 onChange={(e) => setDomainInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && connect()}
                 placeholder="your-store"
-                className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none"
+                className="min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground h-9 dark:bg-input/30 shadow-xs border border-input focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               />
-              <span className="flex select-none items-center whitespace-nowrap border-l border-neutral-700 px-3 text-sm text-neutral-500">
+              <span className="flex select-none items-center whitespace-nowrap border-l border-input px-3 text-sm text-muted-foreground">
                 .myshopify.com
               </span>
             </div>
-            <p className={`mt-2 text-xs ${domainInput && !domainValid ? "text-amber-400" : "text-neutral-500"}`}>
+            <p className={`mt-2 text-xs ${domainInput && !domainValid ? "text-amber-fg" : "text-muted-foreground"}`}>
               {domainInput && !domainValid
                 ? "Use only lowercase letters, numbers and hyphens — just the store name."
                 : "Enter just your store name — we'll add .myshopify.com for you."}
@@ -1416,7 +1400,7 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
             <button
               onClick={connect}
               disabled={!domainValid || connecting}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-7 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 sm:w-auto h-10"
             >
               {connecting ? <SpinnerIcon className="h-4 w-4" /> : <BagIcon className="h-4 w-4" />}
               {connecting ? "Redirecting to Shopify…" : "Connect Shopify"}
@@ -1424,7 +1408,7 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
           </div>
 
           {/* how it works */}
-          <ol className="mt-8 grid grid-cols-1 gap-4 border-t border-neutral-800 pt-6 sm:grid-cols-3">
+          <ol className="mt-8 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-3">
             {[
               "Enter your store domain",
               "Approve the install on Shopify",
@@ -1434,7 +1418,7 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-xs font-bold text-white">
                   {i + 1}
                 </span>
-                <span className="text-sm text-neutral-400">{step}</span>
+                <span className="text-sm text-muted-foreground">{step}</span>
               </li>
             ))}
           </ol>
@@ -1443,30 +1427,30 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
 
       {/* right: trust rail */}
       <aside className="space-y-6 lg:sticky lg:top-20">
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm">
-          <h3 className="text-sm font-semibold text-white">What gets synced</h3>
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h3 className="text-[13px] font-semibold text-foreground">What gets synced</h3>
           <ul className="mt-4 space-y-3">
             {SYNC_FLAGS.map((f) => (
               <li key={f.key} className="flex items-start gap-3">
-                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-neutral-200">{f.label}</span>
+                    <span className="text-sm font-medium text-foreground">{f.label}</span>
                     {f.slow && <StatusBadge tone="amber">Slow</StatusBadge>}
                   </div>
-                  <p className="text-xs text-neutral-500">{f.desc}</p>
+                  <p className="text-xs text-muted-foreground">{f.desc}</p>
                 </div>
               </li>
             ))}
           </ul>
-          <p className="mt-4 border-t border-neutral-800 pt-4 text-xs text-neutral-500">
+          <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
             One-way push only — we never read or change your orders.
           </p>
         </section>
 
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <ShieldIcon className="h-4 w-4 text-[#01a0be]" />
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h3 className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+            <ShieldIcon className="h-4 w-4 text-accent-brand" />
             Secure by design
           </h3>
           <ul className="mt-4 space-y-3">
@@ -1476,13 +1460,13 @@ function ConnectStore({ variant = "standard", oauthConfig = null, canCancel, onC
               "Least-privilege scopes only.",
               "Every callback and webhook is HMAC-verified.",
             ].map((t) => (
-              <li key={t} className="flex items-start gap-3 text-sm text-neutral-400">
-                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
+              <li key={t} className="flex items-start gap-3 text-sm text-muted-foreground">
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
                 {t}
               </li>
             ))}
           </ul>
-          <p className="mt-5 mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Scopes requested</p>
+          <p className="mt-5 mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Scopes requested</p>
           <div className="flex flex-wrap gap-1.5">
             {SCOPES.map((s) => (
               <StatusBadge key={s} tone="cyan">{s}</StatusBadge>
@@ -2357,17 +2341,17 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
   // Renders the needs-attention list — one clean, dense row design for desktop + mobile.
   // Reused by the section (first few) and the "View all" modal (everything).
-  const TONE_DOT = { red: "bg-red-400", amber: "bg-amber-400", cyan: "bg-cyan-400", green: "bg-green-400", neutral: "bg-neutral-500" };
-  const TONE_TXT = { red: "text-red-400/90", amber: "text-amber-400/90", cyan: "text-cyan-400/90", green: "text-green-400/90", neutral: "text-neutral-400" };
+  const TONE_DOT = { red: "bg-red-400", amber: "bg-amber-400", cyan: "bg-cyan-400", green: "bg-green-400", neutral: "bg-muted-foreground" };
+  const TONE_TXT = { red: "text-red-fg/90", amber: "text-amber-fg/90", cyan: "text-cyan-fg/90", green: "text-green-fg/90", neutral: "text-muted-foreground" };
   const renderAttentionList = (list) => (
-    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-700/50">
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-input/50">
       {list.map((r) => (
-        <div key={r.sku} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-800/30">
+        <div key={r.sku} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30">
           <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[r.tone] || TONE_DOT.neutral}`} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2">
-              <span className="font-mono text-sm text-neutral-200">{r.sku}</span>
-              {r.parentCode && <span className="truncate text-xs text-neutral-500">{r.parentCode}</span>}
+              <span className="font-mono text-sm text-foreground">{r.sku}</span>
+              {r.parentCode && <span className="truncate text-xs text-muted-foreground">{r.parentCode}</span>}
             </div>
             <p className={`mt-0.5 text-xs ${TONE_TXT[r.tone] || TONE_TXT.neutral}`}>{r.reason}</p>
           </div>
@@ -2379,25 +2363,25 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   // Renders the removed-in-store list (parent + variants + Recreate action) for a given slice —
   // reused by the section (first few) and its "View all" modal (everything).
   const renderRemovedList = (list) => (
-    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-700/50">
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-input/50">
       {list.map((d) => {
         const busy = recreating.includes(d.parentCode);
         return (
-          <div key={d.parentCode} className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-neutral-800/30 sm:flex-row sm:items-center sm:justify-between">
+          <div key={d.parentCode} className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-mono text-sm text-neutral-200">{d.parentCode || "—"}</span>
-                <span className="text-xs text-neutral-500">{d.skus?.length || 0} {(d.skus?.length || 0) === 1 ? "variant" : "variants"}</span>
+                <span className="font-mono text-sm text-foreground">{d.parentCode || "—"}</span>
+                <span className="text-xs text-muted-foreground">{d.skus?.length || 0} {(d.skus?.length || 0) === 1 ? "variant" : "variants"}</span>
               </div>
-              <p className="mt-0.5 text-xs text-amber-400/90">
+              <p className="mt-0.5 text-xs text-amber-fg/90">
                 Removed in Shopify{d.deletedInStoreAt ? ` ${relTime(d.deletedInStoreAt)}` : ""}
-                {d.deletedInStoreAt && <span className="text-neutral-600"> · </span>}
-                {d.deletedInStoreAt && <span className="text-neutral-500" title={fmtDateTime(d.deletedInStoreAt)}>{fmtDateTime(d.deletedInStoreAt)}</span>}
+                {d.deletedInStoreAt && <span className="text-muted-foreground/70"> · </span>}
+                {d.deletedInStoreAt && <span className="text-muted-foreground" title={fmtDateTime(d.deletedInStoreAt)}>{fmtDateTime(d.deletedInStoreAt)}</span>}
               </p>
             </div>
             {d.recreateRequested ? (
               <div className="flex shrink-0 items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs font-medium text-green-400">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs font-medium text-green-fg">
                   <CheckIcon className="h-3.5 w-3.5" />
                   Queued for next sync
                 </span>
@@ -2406,7 +2390,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   onClick={() => requestRecreate(d.parentCode, true)}
                   disabled={busy}
                   title="Cancel — keep it deleted"
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-700/50 bg-neutral-800/60 px-3 py-2 text-xs font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md border bg-background px-3 text-xs font-medium text-muted-foreground transition-all hover:text-foreground disabled:pointer-events-none disabled:opacity-50 h-8 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                 >
                   {busy ? <SpinnerIcon className="h-3.5 w-3.5" /> : <UndoIcon className="h-3.5 w-3.5" />}
                   Undo
@@ -2417,7 +2401,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 type="button"
                 onClick={() => requestRecreate(d.parentCode)}
                 disabled={busy}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-sm font-medium text-amber-300 transition-all hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3.5 text-sm font-medium text-amber-fg-soft transition-all hover:bg-amber-500/20 disabled:pointer-events-none disabled:opacity-50 h-9"
               >
                 {busy ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
                 Recreate on next sync
@@ -2435,10 +2419,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       {needsReconnect && (
         <div className="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-2.5">
-            <WarningIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <WarningIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-fg" />
             <div>
-              <p className="font-semibold text-amber-300">Reconnect needed</p>
-              <p className="mt-0.5 text-amber-200/80">
+              <p className="font-semibold text-amber-fg-soft">Reconnect needed</p>
+              <p className="mt-0.5 text-amber-fg-softer/80">
                 Shopify retired the older access token for this store. Reconnect to refresh permissions and resume syncing — your store data is untouched.
               </p>
             </div>
@@ -2446,7 +2430,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
           <button
             onClick={reconnect}
             disabled={connecting}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-neutral-950 transition-all hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-amber-500 px-4 text-sm font-medium text-neutral-950 transition-all hover:bg-amber-400 disabled:pointer-events-none disabled:opacity-50 h-9"
           >
             {connecting ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
             {connecting ? "Redirecting…" : "Reconnect Shopify"}
@@ -2457,7 +2441,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       {/* ---------------------- Connection summary --------------------- */}
       {/* Minimal by design — only the live sync status stays here; the rest (install date,
           locations per source, granted scopes) lives behind "View details". */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             {editingName ? (
@@ -2474,19 +2458,19 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   maxLength={60}
                   placeholder={shopLabel(connection.shopDomain)}
                   aria-label="Store name"
-                  className="min-w-0 flex-1 rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-1.5 text-lg font-semibold text-white outline-none focus:border-[#01a0be]"
+                  className="min-w-0 flex-1 rounded-lg border border-input bg-popover px-3 py-1.5 text-lg font-semibold text-foreground outline-none focus:border-accent-brand"
                 />
                 <button
                   type="submit"
                   disabled={savingName}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 h-8"
                 >
                   {savingName ? <SpinnerIcon className="h-4 w-4" /> : "Save"}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setNameDraft(connection.displayName || ""); setEditingName(false); }}
-                  className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:text-white"
+                  className="rounded-md border border-input px-3 text-sm font-medium text-foreground transition-colors hover:text-foreground h-8"
                 >
                   Cancel
                 </button>
@@ -2496,7 +2480,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <PingDot tone={statusMeta.tone} />
                   {connection.displayName ? (
-                    <span className="truncate font-[family-name:var(--font-montserrat)] text-xl font-semibold leading-none text-white">
+                    <span className="truncate text-xl font-semibold leading-none text-foreground">
                       {connection.displayName}
                     </span>
                   ) : (
@@ -2507,10 +2491,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                       title="Open in Shopify admin"
                       className="group inline-flex min-w-0 max-w-full items-center gap-1.5"
                     >
-                      <span className="truncate font-[family-name:var(--font-montserrat)] text-xl font-semibold leading-none text-white transition-colors group-hover:text-[#01a0be]">
+                      <span className="truncate text-xl font-semibold leading-none text-foreground transition-colors group-hover:text-accent-brand">
                         {connection.shopDomain}
                       </span>
-                      <svg className="h-4 w-4 shrink-0 text-neutral-500 transition-colors group-hover:text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                      <svg className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-accent-brand" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                     </a>
                   )}
                   <button
@@ -2518,7 +2502,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                     onClick={() => { setNameDraft(connection.displayName || ""); setEditingName(true); }}
                     title="Rename this store"
                     aria-label="Rename this store"
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:text-white"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:text-foreground"
                   >
                     <PencilIcon className="h-3.5 w-3.5" />
                   </button>
@@ -2530,7 +2514,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Open in Shopify admin"
-                    className="group mt-1 inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-[#01a0be]"
+                    className="group mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-accent-brand"
                   >
                     {connection.shopDomain}
                     <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
@@ -2540,15 +2524,15 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             )}
 
             <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-              <span className="inline-flex items-center gap-2 text-neutral-400">
-                <span className="text-neutral-500">Last sync</span>
-                <span className="text-neutral-200" title={fmtDateTime(connection.lastSyncAt)}>{relTime(connection.lastSyncAt)}</span>
+              <span className="inline-flex items-center gap-2 text-muted-foreground">
+                <span className="text-muted-foreground">Last sync</span>
+                <span className="text-foreground" title={fmtDateTime(connection.lastSyncAt)}>{relTime(connection.lastSyncAt)}</span>
                 <StatusBadge tone={JOB_STATUS_TONE[connection.lastSyncStatus] || "neutral"}>
                   {connection.lastSyncStatus || "—"}
                 </StatusBadge>
               </span>
               {attentionCount > 0 && (
-                <a href="#needs-attention" className="inline-flex items-center gap-2 font-medium text-amber-400 hover:text-amber-300">
+                <a href="#needs-attention" className="inline-flex items-center gap-2 font-medium text-amber-fg hover:text-amber-fg-soft">
                   <WarningIcon className="h-4 w-4" />
                   {attentionCount} {attentionCount === 1 ? "item needs" : "items need"} attention
                 </a>
@@ -2560,7 +2544,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             <button
               type="button"
               onClick={() => setShowDetails(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-800/60 px-4 py-3 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
+              className="inline-flex items-center justify-center gap-2 rounded-md border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:text-foreground h-9 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
               View details
@@ -2569,7 +2553,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               onClick={() => { if (isDirty) { setSaveShake(true); return; } syncNow(); }}
               disabled={isSyncing}
               title={isDirty ? "Save your changes before syncing" : undefined}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50 ${isDirty ? "cursor-not-allowed opacity-50 hover:bg-[#01a0be]" : ""}`}
+              className={`inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 h-9 ${isDirty ? "cursor-not-allowed opacity-50 hover:bg-primary" : ""}`}
             >
               {isSyncing ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
               {isSyncing ? "Syncing…" : "Sync now"}
@@ -2580,11 +2564,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* ---------------------- Connection details modal --------------------- */}
       {showDetails && (
-        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setShowDetails(false)}>
-          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-5 py-4 sm:px-6">
-              <h2 className="mb-0 truncate text-base font-semibold leading-none text-white">Connection details</h2>
-              <button type="button" onClick={() => setShowDetails(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+        <div className="fixed inset-0 z-[60] flex bg-black/50 sm:items-center sm:justify-center sm:p-6" onClick={() => setShowDetails(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-lg sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+              <h2 className="mb-0 truncate text-[14px] font-semibold leading-none text-foreground">Connection details</h2>
+              <button type="button" onClick={() => setShowDetails(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-popover text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -2592,30 +2576,30 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 <div className="col-span-2">
-                  <dt className="text-neutral-500">Store</dt>
-                  <dd className="mt-0.5 truncate text-neutral-200">{connection.shopDomain}</dd>
+                  <dt className="text-muted-foreground">Store</dt>
+                  <dd className="mt-0.5 truncate text-foreground">{connection.shopDomain}</dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-500">Status</dt>
+                  <dt className="text-muted-foreground">Status</dt>
                   <dd className="mt-1"><StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge></dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-500">Sync status</dt>
+                  <dt className="text-muted-foreground">Sync status</dt>
                   <dd className="mt-1"><StatusBadge tone={JOB_STATUS_TONE[connection.lastSyncStatus] || "neutral"}>{connection.lastSyncStatus || "—"}</StatusBadge></dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-500">Installed</dt>
-                  <dd className="mt-0.5 text-neutral-200">{fmtDate(connection.installedAt)}</dd>
+                  <dt className="text-muted-foreground">Installed</dt>
+                  <dd className="mt-0.5 text-foreground">{fmtDate(connection.installedAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-neutral-500">Last sync</dt>
-                  <dd className="mt-0.5 text-neutral-200">{fmtDateTime(connection.lastSyncAt)}</dd>
+                  <dt className="text-muted-foreground">Last sync</dt>
+                  <dd className="mt-0.5 text-foreground">{fmtDateTime(connection.lastSyncAt)}</dd>
                 </div>
               </dl>
 
               {/* Locations — one row per configured source (supports many) */}
               <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Locations</p>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Locations</p>
                 {sourceScopes.length > 0 ? (
                   <ul className="space-y-1.5">
                     {sourceScopes.map((s, i) => {
@@ -2624,22 +2608,22 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                         : (exportOptions.find((x) => x._id === s.exportConfigId)?.name || "Export");
                       const locName = locations.find((l) => l.id === s.locationId)?.name || "—";
                       return (
-                        <li key={i} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2 text-sm">
-                          <span className="min-w-0 truncate text-neutral-300">{name}</span>
-                          <span className="shrink-0 text-neutral-400">{locName}</span>
+                        <li key={i} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+                          <span className="min-w-0 truncate text-foreground">{name}</span>
+                          <span className="shrink-0 text-muted-foreground">{locName}</span>
                         </li>
                       );
                     })}
                   </ul>
                 ) : (
-                  <p className="text-sm text-neutral-400">{savedLocationName}</p>
+                  <p className="text-sm text-muted-foreground">{savedLocationName}</p>
                 )}
               </div>
 
               {/* Granted scopes */}
               {scopes.length > 0 && (
                 <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">Granted scopes</p>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Granted scopes</p>
                   <div className="flex flex-wrap gap-1.5">
                     {scopes.map((s) => <StatusBadge key={s} tone="cyan">{s}</StatusBadge>)}
                   </div>
@@ -2647,29 +2631,29 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               )}
             </div>
 
-            <div className="flex shrink-0 justify-end border-t border-neutral-800 px-5 py-3.5 sm:px-6">
-              <button onClick={() => setShowDetails(false)} className="rounded-lg bg-[#01a0be] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">Done</button>
+            <div className="flex shrink-0 justify-end border-t border-border px-5 py-3.5 sm:px-6">
+              <button onClick={() => setShowDetails(false)} className="rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-9">Done</button>
             </div>
           </div>
         </div>
       )}
 
       {/* --------------------- Sources & locations --------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 lg:p-8">
         <SectionHeading title="Sources & locations" desc="Each source — a Patrik export or one of your own brand feeds — pushes to its own Shopify location, with its own settings. Pick a source to configure it below." />
 
         {(exportOptions.length === 0 && feedOptions.length === 0) ? (
-          <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-6 text-center">
-            <p className="text-sm text-neutral-300">No products to sync yet.</p>
-            <p className="mt-1 text-xs text-neutral-500">
-              Create a <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}${exportFromParam}`} className="text-[#01a0be] hover:underline">Shopify export</a> or register an{" "}
-              <a href="/integrations/own-sources" className="text-[#01a0be] hover:underline">Own Source feed</a> to choose what syncs.
+          <div className="rounded-xl border border-dashed border-input bg-muted/40 px-4 py-6 text-center">
+            <p className="text-sm text-foreground">No products to sync yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Create a <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}${exportFromParam}`} className="text-accent-brand hover:underline">Shopify export</a> or register an{" "}
+              <a href="/integrations/own-sources" className="text-accent-brand hover:underline">Own Source feed</a> to choose what syncs.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
             {sourceScopes.length === 0 && (
-              <p className="rounded-lg border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-4 text-center text-sm text-neutral-400">
+              <p className="rounded-lg border border-dashed border-input bg-muted/40 px-4 py-4 text-center text-sm text-muted-foreground">
                 No sources yet. Add one below.
               </p>
             )}
@@ -2687,10 +2671,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 : (s.aiExportId ? (aiExportOptions.find((x) => x._id === s.aiExportId)?.name || "AI") : null);
               const openEditor = () => { selectScope(i); setEditingScopeIdx(i); };
               return (
-                <div key={i} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
+                <div key={i} className="rounded-xl border border-border bg-muted/40 p-3">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-neutral-400">Source</label>
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Source</label>
                       <Select ariaLabel="Source" value={srcVal} onChange={(e) => setScopeSource(i, e.target.value)}>
                         <option value="" disabled>Select a source…</option>
                         {exportOptions.map((x) => <option key={`e${x._id}`} value={`export:${x._id}`}>{`Patrik · ${x.name}`}</option>)}
@@ -2698,7 +2682,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                       </Select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-neutral-400">Shopify location</label>
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Shopify location</label>
                       <Select ariaLabel="Shopify location" value={s.locationId || ""} disabled={!detailLoaded} onChange={(e) => setScopeLocation(i, e.target.value)}>
                         {!detailLoaded && <option value="">Loading locations…</option>}
                         {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -2708,7 +2692,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                       <button
                         type="button"
                         onClick={openEditor}
-                        className="inline-flex h-[50px] items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 text-sm font-medium text-neutral-200 transition-colors hover:border-[#01a0be]/50 hover:text-white"
+                        className="inline-flex h-[50px] items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:text-foreground shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                       >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                         Configure
@@ -2718,7 +2702,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                         onClick={() => removeScope(i)}
                         aria-label="Remove source"
                         title="Remove source"
-                        className="inline-flex h-[50px] w-[50px] items-center justify-center rounded-lg border border-neutral-700/60 bg-neutral-800/40 text-neutral-500 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                        className="inline-flex h-[50px] w-[50px] items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-fg-soft shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                       >
                         <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 0v12a1 1 0 001 1h6a1 1 0 001-1V7M10 11v6M14 11v6" />
@@ -2727,26 +2711,26 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                     </div>
                   </div>
                   {/* quick summary so each source's setup is legible at a glance */}
-                  <p className="mt-2 text-xs text-neutral-500">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     {modeLabel}{locName ? ` · ${locName}` : ""} · {[s.syncStock && "stock", s.syncPrices && "prices", s.syncDescriptions && "content", s.syncTags && "tags", s.syncImages && "images", s.syncNewProducts && "new"].filter(Boolean).join(", ") || "nothing selected"}
                     {parsePriceFactor(s.priceFactor) !== 1 ? ` · prices ×${formatPriceFactor(s.priceFactor)}` : ""}
                     {normalizePriceRounding(s.priceRounding).enabled ? ` · ${describePriceRounding(s.priceRounding)}` : ""}
-                    {aiName && <span className="text-cyan-500/90"> · AI tags: {aiName}</span>}
+                    {aiName && <span className="text-cyan-fg-deep/90"> · AI tags: {aiName}</span>}
                   </p>
                 </div>
               );
             })}
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <button type="button" onClick={addScope} className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">
+              <button type="button" onClick={addScope} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-8">
                 <PlusIcon className="h-4 w-4" />
                 Add source
               </button>
-              <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}${exportFromParam}`} className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">
+              <a href={`/export?source=shopify&shop=${encodeURIComponent(connection.shopDomain)}${exportFromParam}`} className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:text-foreground h-7 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50">
                 <PlusIcon className="h-3.5 w-3.5" />
                 Create source
               </a>
-              <a href="/integrations/own-sources" className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/50 hover:text-white">Manage feeds</a>
+              <a href="/integrations/own-sources" className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:text-foreground h-7 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50">Manage feeds</a>
             </div>
           </div>
         )}
@@ -2754,19 +2738,19 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* ---------- Per-source config modal (Ownership / What-to-sync / Pricing / Channels) ---------- */}
       {editingScopeIdx !== null && activeScope && (
-        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={cancelEditScope}>
-          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-2xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex bg-black/50 sm:items-center sm:justify-center sm:p-6" onClick={cancelEditScope}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[94vh] sm:max-w-2xl sm:rounded-lg sm:border" onClick={(e) => e.stopPropagation()}>
             {/* header */}
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
               <div className="min-w-0">
-                <h2 className="mb-0 truncate text-base font-semibold leading-tight text-white">
+                <h2 className="mb-0 truncate text-[14px] font-semibold leading-tight text-foreground">
                   Configure {activeScope.type === "own_source"
                     ? (feedOptions.find((f) => f.feedId === activeScope.feedId)?.brand || "feed")
                     : (exportOptions.find((x) => x._id === activeScope.exportConfigId)?.name || "source")}
                 </h2>
-                <p className="mt-1 text-xs text-neutral-500">Settings for this source only · close, then <span className="text-neutral-400">Save</span> on the page</p>
+                <p className="mt-1 text-xs text-muted-foreground">Settings for this source only · close, then <span className="text-muted-foreground">Save</span> on the page</p>
               </div>
-              <button type="button" onClick={cancelEditScope} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+              <button type="button" onClick={cancelEditScope} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-popover text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -2788,22 +2772,22 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               <label
                 key={m.value}
                 className={`flex cursor-pointer gap-3.5 rounded-xl border p-4 transition-colors ${
-                  selected ? "border-[#01a0be] bg-[#01a0be]/5" : "border-neutral-800 bg-neutral-900/40 hover:border-[#01a0be]/40"
-                }`}
+ selected ? "border-accent-brand bg-accent-brand/5" : "border-border bg-muted/40 hover:border-accent-brand/40"
+ }`}
               >
                 <input type="radio" name={`ownership-${myKey}`} value={m.value} checked={selected} onChange={() => setOwnership(m.value)} className="sr-only" />
-                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${selected ? "border-[#01a0be]" : "border-neutral-600"}`}>
-                  {selected && <span className="h-2 w-2 rounded-full bg-[#01a0be]" />}
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${selected ? "border-accent-brand" : "border-input"}`}>
+                  {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
-                    <svg className={`h-4 w-4 shrink-0 ${selected ? "text-[#01a0be]" : "text-neutral-500"}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d={m.icon} /></svg>
-                    <span className="text-sm font-semibold text-white">{m.title}</span>
+                    <svg className={`h-4 w-4 shrink-0 ${selected ? "text-accent-brand" : "text-muted-foreground"}`} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d={m.icon} /></svg>
+                    <span className="text-sm font-semibold text-foreground">{m.title}</span>
                     {m.recommended && <StatusBadge tone="cyan">Recommended</StatusBadge>}
                   </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-neutral-400">{m.desc}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{m.desc}</span>
                   {m.warn && selected && (
-                    <span className="mt-2.5 block rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-400">
+                    <span className="mt-2.5 block rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-fg">
                       <span className="font-semibold">Heads up — </span>{m.warn}
                     </span>
                   )}
@@ -2819,35 +2803,35 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       {!stockOnly && (
       <>
       {/* ------------------------ What to sync ------------------------- */}
-      <section className="border-t border-neutral-800 pt-8">
+      <section className="border-t border-border pt-8">
         <SectionHeading
           title="What to sync"
           desc="Pick the data the portal is allowed to push to this store."
           right={
             <div className="flex shrink-0 items-center gap-1 text-xs">
-              <button type="button" onClick={() => setAllSyncFlags(true)} className="rounded-md px-2 py-1 font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white">All</button>
-              <span className="text-neutral-700">/</span>
-              <button type="button" onClick={() => setAllSyncFlags(false)} className="rounded-md px-2 py-1 font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white">None</button>
+              <button type="button" onClick={() => setAllSyncFlags(true)} className="rounded-md px-2 py-1 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">All</button>
+              <span className="text-muted-foreground/40">/</span>
+              <button type="button" onClick={() => setAllSyncFlags(false)} className="rounded-md px-2 py-1 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">None</button>
             </div>
           }
         />
         {stockOnly && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-            <span><span className="font-medium text-neutral-200">Stock only</span> ownership mode syncs inventory and nothing else — these options don&apos;t apply. Switch ownership mode to enable them.</span>
+          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-input/50 bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
+            <span><span className="font-medium text-foreground">Stock only</span> ownership mode syncs inventory and nothing else — these options don&apos;t apply. Switch ownership mode to enable them.</span>
           </div>
         )}
         <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {SYNC_FLAGS.map((f) => (
               <li key={f.key}>
-                <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+                <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-input/50 bg-muted/50 p-4 transition-colors hover:border-accent-brand/50">
                   <span className="min-w-0">
                     <span className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">{f.label}</span>
+                      <span className="text-sm font-medium text-foreground">{f.label}</span>
                       {f.slow && <StatusBadge tone="amber">Slow</StatusBadge>}
                     </span>
-                    <span className="mt-1 block text-xs text-neutral-500">{f.desc}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{f.desc}</span>
                   </span>
                   <ToggleSwitch checked={!!config[f.key]} onChange={() => toggleFlag(f.key)} ariaLabel={`Sync ${f.label}`} />
                 </label>
@@ -2858,15 +2842,15 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       </section>
 
       {/* ----------------------- Variant option name ------------------- */}
-      <section className="border-t border-neutral-800 pt-8">
+      <section className="border-t border-border pt-8">
         <SectionHeading
           title="What are your sizes called?"
           desc="The label your variants appear under in Shopify — e.g. Size, Sail Size, Volume. Used when the portal creates a product."
         />
         {stockOnly && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-            <span><span className="font-medium text-neutral-200">Stock only</span> ownership never creates products — the option name doesn&apos;t apply. Switch ownership mode to use it.</span>
+          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-input/50 bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
+            <span><span className="font-medium text-foreground">Stock only</span> ownership never creates products — the option name doesn&apos;t apply. Switch ownership mode to use it.</span>
           </div>
         )}
         <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
@@ -2878,21 +2862,21 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             const effectiveDefault = exportDefault || "Size";
             return (
               <>
-                <label className="mb-1 block text-xs font-medium text-neutral-400">Option name</label>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Option name</label>
                 <input
                   type="text"
                   value={config.variantOptionName || ""}
                   onChange={(e) => setVariantOptionName(e.target.value)}
                   placeholder={effectiveDefault}
                   maxLength={255}
-                  className="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2.5 text-sm text-white placeholder-neutral-500 focus:border-[#01a0be] focus:outline-none"
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:border-accent-brand focus:outline-none"
                 />
-                <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   {activeScope?.type === "own_source"
-                    ? <>Leave blank to use <span className="font-medium text-neutral-300">Size</span>.</>
+                    ? <>Leave blank to use <span className="font-medium text-foreground">Size</span>.</>
                     : exportDefault
-                      ? <>Leave blank to use <span className="font-medium text-neutral-300">{exportDefault}</span> — the Variant Option set on the <span className="font-medium text-neutral-300">{srcExport?.name || "export"}</span> export.</>
-                      : <>Leave blank to use <span className="font-medium text-neutral-300">Size</span>. Tip: set a Variant Option on the export itself and it becomes this source&apos;s default.</>}
+                      ? <>Leave blank to use <span className="font-medium text-foreground">{exportDefault}</span> — the Variant Option set on the <span className="font-medium text-foreground">{srcExport?.name || "export"}</span> export.</>
+                      : <>Leave blank to use <span className="font-medium text-foreground">Size</span>. Tip: set a Variant Option on the export itself and it becomes this source&apos;s default.</>}
                 </p>
               </>
             );
@@ -2901,42 +2885,42 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       </section>
 
       {/* ----------------------- Product title prefix ------------------ */}
-      <section className="border-t border-neutral-800 pt-8">
+      <section className="border-t border-border pt-8">
         <SectionHeading
           title="Product title prefix"
           desc="Text put in front of every product title this source pushes — handy for grouping a brand or discipline in your store, e.g. WINDSURF."
         />
         {stockOnly && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-            <span><span className="font-medium text-neutral-200">Stock only</span> ownership never writes titles — the prefix doesn&apos;t apply. Switch ownership mode to use it.</span>
+          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-input/50 bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
+            <span><span className="font-medium text-foreground">Stock only</span> ownership never writes titles — the prefix doesn&apos;t apply. Switch ownership mode to use it.</span>
           </div>
         )}
         <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
-          <label className="mb-1 block text-xs font-medium text-neutral-400">Prefix</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Prefix</label>
           <input
             type="text"
             value={config.titlePrefix || ""}
             onChange={(e) => setTitlePrefix(e.target.value)}
             placeholder="e.g. WINDSURF -"
             maxLength={40}
-            className="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2.5 text-sm text-white placeholder-neutral-500 focus:border-[#01a0be] focus:outline-none"
+            className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:border-accent-brand focus:outline-none"
           />
           {/* Shows exactly how the prefix is joined (one space), so nobody has to guess whether
               to type a trailing space — leading/trailing spaces are trimmed on save. */}
-          <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2.5">
-            <span className="block text-[11px] uppercase tracking-wide text-neutral-500">Title in Shopify</span>
-            <span className="mt-1 block truncate text-sm text-neutral-300">
+          <div className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+            <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">Title in Shopify</span>
+            <span className="mt-1 block truncate text-sm text-foreground">
               {(config.titlePrefix || "").trim() && (
-                <span className="font-medium text-[#01a0be]">{(config.titlePrefix || "").trim()} </span>
+                <span className="font-medium text-accent-brand">{(config.titlePrefix || "").trim()} </span>
               )}
-              <span className="text-neutral-400">Product name</span>
+              <span className="text-muted-foreground">Product name</span>
             </span>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             Leave blank to push titles unchanged. Only the title changes — SKUs, barcodes and product matching are untouched, so you can turn this on or off safely.
             {config.ownership === "create_then_handoff"
-              ? <> In <span className="font-medium text-neutral-300">Create, then hand off</span> the prefix is applied when a product is created; products already in your store keep their current title.</>
+              ? <> In <span className="font-medium text-foreground">Create, then hand off</span> the prefix is applied when a product is created; products already in your store keep their current title.</>
               : <> Titles already in your store are rewritten with the new prefix on the next sync.</>}
           </p>
         </fieldset>
@@ -2944,14 +2928,14 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* --- AI categorization for a FEED: sets come from the feed, choice is per store --- */}
       {isOwnSourceScope && (
-        <section className="border-t border-neutral-800 pt-8">
+        <section className="border-t border-border pt-8">
           <SectionHeading
             title="AI categorization"
             desc="The feed is categorized against the sets chosen in its own settings. Pick which of them this store tags with."
             right={
               <a
                 href="/integrations/own-sources"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-input/50 bg-muted/80 px-3.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:border-input/60 hover:text-foreground"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -2961,9 +2945,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             }
           />
           {activeFeedSets.length === 0 ? (
-            <div className="flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-              <span>Categorization is <span className="font-medium text-neutral-200">off</span> for this feed — tags come from the feed&apos;s own tags and category paths. Turn it on in the feed&apos;s settings to choose a set here.</span>
+            <div className="flex items-start gap-2.5 rounded-xl border border-input/50 bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
+              <span>Categorization is <span className="font-medium text-foreground">off</span> for this feed — tags come from the feed&apos;s own tags and category paths. Turn it on in the feed&apos;s settings to choose a set here.</span>
             </div>
           ) : (
             <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
@@ -2972,22 +2956,22 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   here, next to the picker — otherwise a sync finishes clean and the tags just
                   never change, with nothing on screen explaining why. */}
               {stockOnly ? (
-                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90">
-                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-fg-softer/90">
+                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-fg" />
                   <span><span className="font-medium">Stock only</span> ownership never touches tags — no product gets AI categories in this mode, new or existing. Switch ownership mode above to use them.</span>
                 </div>
               ) : config.ownership === "create_then_handoff" ? (
-                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90">
-                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-fg-softer/90">
+                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-fg" />
                   <span>In <span className="font-medium">Create, then hand off</span> the categories are applied only when a product is <span className="font-medium">created</span>. Products already in your store keep their current tags — that&apos;s the hand-off. Use <span className="font-medium">Portal authoritative</span> if you want tags kept up to date.</span>
                 </div>
               ) : !config.syncTags ? (
-                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90">
-                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-fg-softer/90">
+                  <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-fg" />
                   <span><span className="font-medium">Tags sync is off</span> for this source — categories are applied only when a product is first created. Turn on <span className="font-medium">Tags</span> under What to sync to keep existing products up to date.</span>
                 </div>
               ) : null}
-              <label className="mb-1 block text-xs font-medium text-neutral-400">Tag this store with</label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Tag this store with</label>
               <Select
                 ariaLabel="AI categorization"
                 value={activeFeedAiSet?._id || ""}
@@ -2997,10 +2981,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   <option key={x._id} value={x._id}>{x.name}</option>
                 ))}
               </Select>
-              <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 {activeFeedSets.length > 1
-                  ? <>This feed is categorized against {activeFeedSets.length} sets; this store tags with <span className="font-medium text-cyan-500/90">{activeFeedAiSet?.name}</span> only — the supplier&apos;s own tags are replaced.</>
-                  : <>Categorized by <span className="font-medium text-cyan-500/90">{activeFeedAiSet?.name}</span> — its categories replace the supplier&apos;s own tags. Add another set in the feed&apos;s settings to choose between them here.</>}
+                  ? <>This feed is categorized against {activeFeedSets.length} sets; this store tags with <span className="font-medium text-cyan-fg-deep/90">{activeFeedAiSet?.name}</span> only — the supplier&apos;s own tags are replaced.</>
+                  : <>Categorized by <span className="font-medium text-cyan-fg-deep/90">{activeFeedAiSet?.name}</span> — its categories replace the supplier&apos;s own tags. Add another set in the feed&apos;s settings to choose between them here.</>}
               </p>
             </fieldset>
           )}
@@ -3009,14 +2993,14 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* --------------------- AI categorization (tags) ---------------- */}
       {!isOwnSourceScope && aiExportOptions.length > 0 && (
-        <section className="border-t border-neutral-800 pt-8">
+        <section className="border-t border-border pt-8">
           <SectionHeading
             title="AI categorization"
             desc="Tag pushed products with smart AI categories. Products categorized by the chosen categorization get those categories (full path included) as their Shopify tags; the rest keep the catalogue's categories."
             right={
               <a
                 href="/categories"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-input/50 bg-muted/80 px-3.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:border-input/60 hover:text-foreground"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -3026,19 +3010,19 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             }
           />
           {stockOnly ? (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-              <span><span className="font-medium text-neutral-200">Stock only</span> ownership never touches tags — switch ownership mode to use AI categories.</span>
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-input/50 bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
+              <span><span className="font-medium text-foreground">Stock only</span> ownership never touches tags — switch ownership mode to use AI categories.</span>
             </div>
           ) : activeScope?.aiExportId && !config.syncTags ? (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90">
-              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-fg-softer/90">
+              <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-fg" />
               <span><span className="font-medium">Tags sync is off</span> for this source — AI categories are only applied when a product is first created. Turn on <span className="font-medium">Tags</span> under What to sync to keep them updated.</span>
             </div>
           ) : null}
           <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
             <legend className="sr-only">AI categorization</legend>
-            <label className="mb-1 block text-xs font-medium text-neutral-400">Categorization</label>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Categorization</label>
             <Select
               ariaLabel="AI categorization"
               value={activeScope?.aiExportId || ""}
@@ -3052,9 +3036,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             {(() => {
               const sel = aiExportOptions.find((x) => x._id === activeScope?.aiExportId);
               return (
-                <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   {sel
-                    ? (sel.description || <>Products categorized by <span className="font-medium text-cyan-500/90">{sel.name}</span> get its AI categories as Shopify tags (full path included); the rest keep the catalogue&apos;s categories.</>)
+                    ? (sel.description || <>Products categorized by <span className="font-medium text-cyan-fg-deep/90">{sel.name}</span> get its AI categories as Shopify tags (full path included); the rest keep the catalogue&apos;s categories.</>)
                     : "Tags come from the catalogue's own categories only."}
                 </p>
               );
@@ -3064,23 +3048,23 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       )}
 
       {/* ----------------------------- Pricing ------------------------- */}
-      <section className="border-t border-neutral-800 pt-8">
+      <section className="border-t border-border pt-8">
         <SectionHeading
           title="Pricing"
           desc="Each variant carries several named pricelists — set which one wins and how VAT is handled."
         />
 
         {stockOnly && (
-          <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-4 py-3 text-xs text-neutral-400">
-            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-            <span>Pricing doesn&apos;t apply in <span className="font-medium text-neutral-200">Stock only</span> ownership mode — prices aren&apos;t pushed. Switch ownership mode to edit pricing.</span>
+          <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-input/50 bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+            <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
+            <span>Pricing doesn&apos;t apply in <span className="font-medium text-foreground">Stock only</span> ownership mode — prices aren&apos;t pushed. Switch ownership mode to edit pricing.</span>
           </div>
         )}
         <fieldset disabled={stockOnly} className={`m-0 min-w-0 border-0 p-0 transition-opacity ${stockOnly ? "pointer-events-none opacity-50" : ""}`}>
           {/* pricelist priority — drag to reorder, matching the Export settings */}
-          <p className="mb-2 text-sm font-medium text-neutral-300">Pricelist priority</p>
-          <p className="mb-3 text-xs text-neutral-500">Drag the handle to reorder — the first enabled pricelist with a valid price wins.</p>
-          <div ref={listRef} className="rounded-xl border border-neutral-700/50 bg-neutral-900/30 p-3">
+          <p className="mb-2 text-sm font-medium text-foreground">Pricelist priority</p>
+          <p className="mb-3 text-xs text-muted-foreground">Drag the handle to reorder — the first enabled pricelist with a valid price wins.</p>
+          <div ref={listRef} className="rounded-xl border border-input/50 bg-muted/40 p-3">
             {config.pricelistPriority.map((pl, idx) => {
               const isFuture = nowTs > 0 && new Date(pl.valid_from).getTime() > nowTs;
               const isDragging = draggingIdx === idx;
@@ -3089,41 +3073,41 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   key={pl._id}
                   data-pl-row
                   className={`group mb-2 flex select-none items-center gap-2 rounded-xl p-2.5 transition-shadow duration-150 last:mb-0 sm:gap-3 sm:p-3 ${
-                    isDragging
-                      ? "border-2 border-cyan-500/50 bg-neutral-800/90 shadow-lg shadow-cyan-500/20"
-                      : pl.enabled
-                        ? "border border-neutral-700/50 bg-neutral-800/60"
-                        : "border border-neutral-800/50 bg-neutral-900/40 opacity-60"
-                  }`}
+ isDragging
+ ? "border-2 border-cyan-500/50 bg-muted/90 shadow-xs"
+ : pl.enabled
+ ? "border border-input/50 bg-muted/60"
+ :"border border-border/50 bg-muted/40 opacity-60"
+ }`}
                 >
                   <button
                     type="button"
                     aria-label={`Reorder ${pl.name}`}
                     onPointerDown={(e) => beginDrag(e, idx)}
-                    className="flex h-10 w-10 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg bg-neutral-700/30 text-neutral-500 transition-colors hover:bg-cyan-500/20 hover:text-cyan-400 active:cursor-grabbing sm:h-9 sm:w-9"
+                    className="flex h-10 w-10 shrink-0 touch-none cursor-grab items-center justify-center rounded-md bg-background text-muted-foreground transition-colors hover:bg-cyan-500/20 hover:text-cyan-fg active:cursor-grabbing sm:h-9 sm:w-9 border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                   >
                     <GripIcon className="h-5 w-5" />
                   </button>
 
                   <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums ${
-                    idx === 0 && pl.enabled
-                      ? "bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/30"
-                      : pl.enabled
-                        ? "bg-neutral-700/80 text-neutral-300"
-                        : "bg-neutral-800 text-neutral-500"
-                  }`}>
+ idx === 0 && pl.enabled
+ ? "bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-xs"
+ : pl.enabled
+ ? "bg-accent/80 text-foreground"
+ :"bg-muted text-muted-foreground"
+ }`}>
                     {idx + 1}
                   </span>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className={`truncate text-sm font-medium ${pl.enabled ? "text-white" : "text-neutral-500"}`}>{pl.name}</span>
+                      <span className={`truncate text-sm font-medium ${pl.enabled ? "text-foreground" : "text-muted-foreground"}`}>{pl.name}</span>
                       {idx === 0 && pl.enabled && (
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-cyan-400/80">Primary</span>
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-cyan-fg/80">Primary</span>
                       )}
                       {isFuture && config.futureDatedGuard && <StatusBadge tone="amber">future · skipped</StatusBadge>}
                     </div>
-                    <p className="mt-0.5 text-xs text-neutral-500">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       VAT {pl.vat}% · from {fmtDate(pl.valid_from)}
                     </p>
                   </div>
@@ -3136,16 +3120,16 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             })}
           </div>
           {enabledPricelists === 0 && (
-            <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+            <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-fg">
               Enable at least one pricelist — with none enabled, no price can be resolved.
             </p>
           )}
 
           {/* VAT mode */}
           <div className="mt-8">
-            <p className="mb-1 text-sm font-medium text-neutral-300">Tax (VAT)</p>
-            <p className="mb-3 text-xs text-neutral-500">Your pricelists include VAT (e.g. 22%). Choose whether the price sent to Shopify already includes tax.</p>
-            <div className="inline-flex w-full gap-1 rounded-xl border border-neutral-700/50 bg-neutral-900/60 p-1 sm:w-auto">
+            <p className="mb-1 text-sm font-medium text-foreground">Tax (VAT)</p>
+            <p className="mb-3 text-xs text-muted-foreground">Your pricelists include VAT (e.g. 22%). Choose whether the price sent to Shopify already includes tax.</p>
+            <div className="inline-flex w-full gap-1 rounded-xl border border-input/50 bg-card p-1 sm:w-auto shadow-sm">
               {[
                 { v: "inclusive", label: "Includes VAT" },
                 { v: "exclusive", label: "Excludes VAT" },
@@ -3154,11 +3138,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   key={opt.v}
                   type="button"
                   onClick={() => setVatMode(opt.v)}
-                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all sm:flex-none sm:px-4 sm:text-sm ${
-                    config.priceVatMode === opt.v
-                      ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md shadow-cyan-500/20"
-                      : "text-neutral-400 hover:bg-neutral-800/60 hover:text-white"
-                  }`}
+                  className={`flex-1 rounded-md px-3 text-xs font-medium transition-all sm:flex-none sm:px-4 sm:text-sm h-8 ${
+ config.priceVatMode === opt.v
+ ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-xs"
+ :"text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+ }`}
                 >
                   {opt.label}
                 </button>
@@ -3168,14 +3152,14 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
           {/* price factor — multiplier applied to every pushed price */}
           <div className="mt-8">
-            <p className="mb-1 text-sm font-medium text-neutral-300">Price factor</p>
-            <p className="mb-3 text-xs text-neutral-500">
+            <p className="mb-1 text-sm font-medium text-foreground">Price factor</p>
+            <p className="mb-3 text-xs text-muted-foreground">
               Every price is multiplied by this number before it&apos;s sent to Shopify — for a store selling in another
-              currency, or at a fixed uplift. Leave it at <span className="font-mono text-neutral-400">1</span> to push prices unchanged.
+              currency, or at a fixed uplift. Leave it at <span className="font-mono text-muted-foreground">1</span> to push prices unchanged.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-neutral-500">×</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">×</span>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -3188,7 +3172,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   }}
                   onBlur={() => setFactorText(formatPriceFactor(config.priceFactor))}
                   aria-label="Price factor"
-                  className="w-40 rounded-xl border border-neutral-700/50 bg-neutral-900/60 py-2.5 pl-8 pr-3 font-mono text-sm text-white outline-none transition-colors focus:border-[#01a0be]"
+                  className="w-40 rounded-xl border border-input/50 bg-card py-2.5 pl-8 pr-3 font-mono text-sm text-foreground outline-none transition-colors focus:border-accent-brand shadow-sm"
                   placeholder="1"
                 />
               </div>
@@ -3196,26 +3180,26 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 <button
                   type="button"
                   onClick={() => { setFactorText("1"); setPriceFactor(1); }}
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   Reset to 1
                 </button>
               )}
             </div>
-            <p className="mt-2 text-xs text-neutral-500">
-              Up to {PRICE_FACTOR_DECIMALS} decimals — e.g. <span className="font-mono text-neutral-400">11.456789</span>. A price of{" "}
-              <span className="font-mono text-neutral-400">100.00</span> is pushed as{" "}
-              <span className="font-mono text-cyan-500/90">{(100 * config.priceFactor).toFixed(2)}</span>. Rounding to 2 decimals
+            <p className="mt-2 text-xs text-muted-foreground">
+              Up to {PRICE_FACTOR_DECIMALS} decimals — e.g. <span className="font-mono text-muted-foreground">11.456789</span>. A price of{" "}
+              <span className="font-mono text-muted-foreground">100.00</span> is pushed as{" "}
+              <span className="font-mono text-cyan-fg-deep/90">{(100 * config.priceFactor).toFixed(2)}</span>. Rounding to 2 decimals
               happens once, on the final price.
             </p>
           </div>
 
           {/* price rounding — shelf-price rule applied AFTER the factor */}
           <div className="mt-8">
-            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-input/50 bg-muted/50 p-4 transition-colors hover:border-accent-brand/50">
               <span className="min-w-0">
-                <span className="text-sm font-medium text-white">Round prices</span>
-                <span className="mt-1 block text-xs text-neutral-500">
+                <span className="text-sm font-medium text-foreground">Round prices</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
                   Snap every price to a shelf-friendly figure after the factor — e.g. always ending in 9, or to the nearest 0.05.
                 </span>
               </span>
@@ -3227,9 +3211,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             </label>
 
             {rounding.enabled && (
-              <div className="mt-3 space-y-4 rounded-xl border border-neutral-700/50 bg-neutral-900/40 p-4">
+              <div className="mt-3 space-y-4 rounded-xl border border-input/50 bg-muted/40 p-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-neutral-400">Rule</label>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Rule</label>
                   <Select
                     ariaLabel="Rounding rule"
                     value={roundingPreset}
@@ -3248,7 +3232,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 {showRoundingCustom && (
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-neutral-400">Direction</label>
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Direction</label>
                       <Select ariaLabel="Rounding direction" value={rounding.mode} onChange={(e) => setPriceRounding({ mode: e.target.value })}>
                         <option value="up">Up</option>
                         <option value="down">Down</option>
@@ -3256,7 +3240,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                       </Select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-neutral-400">Step</label>
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Step</label>
                       <Select
                         ariaLabel="Rounding step"
                         value={String(rounding.step)}
@@ -3271,7 +3255,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                       </Select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-neutral-400">Ends in</label>
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Ends in</label>
                       <Select
                         ariaLabel="Price ending"
                         value={String(rounding.offset)}
@@ -3292,12 +3276,12 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                       type="checkbox"
                       checked={rounding.alwaysAdvance}
                       onChange={() => setPriceRounding({ alwaysAdvance: !rounding.alwaysAdvance })}
-                      className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[#01a0be]"
+                      className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent-brand"
                     />
-                    <span className="min-w-0 text-xs text-neutral-400">
+                    <span className="min-w-0 text-xs text-muted-foreground">
                       Always move {rounding.mode === "up" ? "up" : "down"}, even when the price already{" "}
-                      {roundingEnding ? <>ends in <span className="font-mono text-neutral-300">{roundingEnding.replace("…", "")}</span></> : "sits on the step"}.
-                      <span className="mt-0.5 block text-neutral-600">
+                      {roundingEnding ? <>ends in <span className="font-mono text-foreground">{roundingEnding.replace("…", "")}</span></> : "sits on the step"}.
+                      <span className="mt-0.5 block text-muted-foreground/70">
                         Off by default — with this on, a price of{" "}
                         <span className="font-mono">{roundingExamples[1].onTarget}</span> is pushed as{" "}
                         <span className="font-mono">{roundingExamples[1].onTargetOut}</span>.
@@ -3307,19 +3291,19 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 )}
 
                 {/* worked example — three prices, so a coarse rule's effect on a cheap item is visible */}
-                <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
-                  <p className="mb-2 text-xs font-medium text-neutral-400">{describePriceRounding(rounding)}</p>
+                <div className="rounded-lg border border-border bg-card p-3">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">{describePriceRounding(rounding)}</p>
                   <div className="space-y-1">
                     {roundingExamples.map((ex) => (
-                      <p key={ex.from} className="font-mono text-xs text-neutral-500">
-                        {ex.from} <span className="text-neutral-600">→</span>{" "}
-                        <span className={ex.from === ex.to ? "text-neutral-400" : "text-cyan-500/90"}>{ex.to}</span>
+                      <p key={ex.from} className="font-mono text-xs text-muted-foreground">
+                        {ex.from} <span className="text-muted-foreground/70">→</span>{" "}
+                        <span className={ex.from === ex.to ?"text-muted-foreground":"text-cyan-fg-deep/90"}>{ex.to}</span>
                       </p>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-neutral-500">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     Applies to the{" "}
-                    <span className="text-neutral-400">
+                    <span className="text-muted-foreground">
                       {config.priceVatMode === "inclusive" ? "VAT-inclusive" : "VAT-exclusive (net)"}
                     </span>{" "}
                     price sent to Shopify
@@ -3334,10 +3318,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
           {/* future-dated guard */}
           <div className="mt-6">
-            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
+            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-input/50 bg-muted/50 p-4 transition-colors hover:border-accent-brand/50">
               <span className="min-w-0">
-                <span className="text-sm font-medium text-white">Ignore prices that haven&apos;t started yet</span>
-                <span className="mt-1 block text-xs text-neutral-500">
+                <span className="text-sm font-medium text-foreground">Ignore prices that haven&apos;t started yet</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
                   Only use a price once its start date has arrived — upcoming pricelists are skipped until then.
                 </span>
               </span>
@@ -3348,39 +3332,39 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       </section>
 
       {/* --------------------------- Sales channels -------------------- */}
-      <section className="border-t border-neutral-800 pt-8">
+      <section className="border-t border-border pt-8">
         <SectionHeading
           title="Sales channels"
           desc="Where newly-created products are published — e.g. Online Store, Point of Sale."
         />
         {!detailLoaded ? (
-          <div className="h-16 animate-pulse rounded-xl border border-neutral-800 bg-neutral-800/40" />
+          <div className="h-16 rounded-xl skeleton" />
         ) : !publishingEnabled ? (
           <div className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-2.5">
-              <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-              <span className="text-amber-200/90">
+              <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-fg" />
+              <span className="text-amber-fg-softer/90">
                 Reconnect this store to grant publishing permission, then choose which channels new products go live on.
               </span>
             </div>
             <button
               onClick={reconnect}
               disabled={connecting}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-neutral-950 transition-all hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-amber-500 px-4 text-sm font-medium text-neutral-950 transition-all hover:bg-amber-400 disabled:pointer-events-none disabled:opacity-50 h-9"
             >
               {connecting ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
               {connecting ? "Redirecting…" : "Reconnect"}
             </button>
           </div>
         ) : publications.length === 0 ? (
-          <p className="text-sm text-neutral-500">No sales channels found in this store.</p>
+          <p className="text-sm text-muted-foreground">No sales channels found in this store.</p>
         ) : (
           <>
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {publications.map((p) => (
                 <li key={p.id}>
-                  <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4 transition-colors hover:border-[#01a0be]/50">
-                    <span className="text-sm font-medium text-white">{p.name}</span>
+                  <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-input/50 bg-muted/50 p-4 transition-colors hover:border-accent-brand/50">
+                    <span className="text-sm font-medium text-foreground">{p.name}</span>
                     <ToggleSwitch
                       checked={(config.publicationIds || []).includes(p.id)}
                       onChange={() => togglePublication(p.id)}
@@ -3390,8 +3374,8 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-neutral-500">
-              New products are published to these channels. In <span className="font-medium text-neutral-300">Keep everything in sync</span> mode, existing products are kept in step too (channels added or removed on the next sync). In <span className="font-medium text-neutral-300">Create, then leave it to you</span>, only newly-created products are published.
+            <p className="mt-3 text-xs text-muted-foreground">
+              New products are published to these channels. In <span className="font-medium text-foreground">Keep everything in sync</span> mode, existing products are kept in step too (channels added or removed on the next sync). In <span className="font-medium text-foreground">Create, then leave it to you</span>, only newly-created products are published.
             </p>
           </>
         )}
@@ -3401,9 +3385,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             </div>{/* /scrollable body */}
 
             {/* footer */}
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-800 bg-neutral-900/40 px-4 py-3 sm:px-6 sm:py-4">
-              <button type="button" onClick={cancelEditScope} className="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/60 px-5 py-2.5 text-sm font-semibold text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white sm:flex-none sm:py-2">Cancel</button>
-              <button type="button" onClick={saveEditScope} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:py-2">
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-muted/40 px-4 py-3 sm:px-6 sm:py-4">
+              <button type="button" onClick={cancelEditScope} className="flex-1 rounded-md border border-input bg-card px-5 text-sm font-medium text-foreground transition-colors hover:border-input hover:text-foreground sm:flex-none sm:py-2 h-9">Cancel</button>
+              <button type="button" onClick={saveEditScope} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 sm:flex-none h-9">
                 {saving ? <SpinnerIcon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
                 {saving ? "Saving…" : "Save changes"}
               </button>
@@ -3413,7 +3397,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       )}
 
       {/* --------------------------- Sync activity --------------------- */}
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 lg:p-8">
         <SectionHeading
           title="Sync activity"
           desc="The most recent push jobs and the overall state of your mapped catalog."
@@ -3421,7 +3405,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
             <button
               onClick={refreshActivity}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl border border-input/50 bg-muted/80 px-3.5 py-2 text-sm font-medium text-muted-foreground transition-all hover:border-input/60 hover:text-foreground disabled:opacity-50"
             >
               {refreshing ? <SpinnerIcon className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
               Refresh
@@ -3432,44 +3416,44 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         {/* counts */}
         <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
           {[
-            { label: "Synced", value: counts.synced, tone: "text-cyan-400" },
-            { label: "Pending", value: counts.pending, tone: "text-amber-400" },
-            { label: "Error", value: counts.error, tone: "text-red-400" },
+            { label: "Synced", value: counts.synced, tone: "text-cyan-fg" },
+            { label: "Pending", value: counts.pending, tone: "text-amber-fg" },
+            { label: "Error", value: counts.error, tone: "text-red-fg" },
           ].map((s) => (
-            <div key={s.label} className="rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-3 py-2.5 sm:px-4 sm:py-3">
+            <div key={s.label} className="rounded-xl border border-input/50 bg-muted/40 px-3 py-2.5 sm:px-4 sm:py-3">
               <div className={`text-xl font-semibold tabular-nums sm:text-2xl ${s.tone}`}>{fmtNum(s.value)}</div>
-              <div className="mt-0.5 text-xs text-neutral-500">{s.label}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{s.label}</div>
             </div>
           ))}
         </div>
 
         {syncJobs.length === 0 && (
-          <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-4 py-8 text-center">
-            <p className="text-sm text-neutral-300">No sync runs yet.</p>
-            <p className="mt-1 text-xs text-neutral-500">Hit <span className="font-medium text-neutral-300">Sync now</span> to push live stock to your store.</p>
+          <div className="rounded-xl border border-dashed border-input bg-muted/40 px-4 py-8 text-center">
+            <p className="text-sm text-foreground">No sync runs yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Hit <span className="font-medium text-foreground">Sync now</span> to push live stock to your store.</p>
           </div>
         )}
 
         {/* desktop table */}
-        <div className={`${syncJobs.length === 0 ? "hidden" : "hidden md:block"} overflow-x-auto rounded-xl border border-neutral-700/50`}>
+        <div className={`${syncJobs.length === 0 ? "hidden" : "hidden md:block"} overflow-x-auto rounded-xl border border-input/50`}>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Item</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 text-right font-medium">Attempts</th>
-                <th className="px-4 py-3 font-medium">Time</th>
-                <th className="px-4 py-3 font-medium">Detail</th>
+              <tr className="border-b border-input/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 font-semibold h-9">Type</th>
+                <th className="px-4 font-semibold h-9">Item</th>
+                <th className="px-4 font-semibold h-9">Status</th>
+                <th className="px-4 text-right font-semibold h-9">Attempts</th>
+                <th className="px-4 font-semibold h-9">Time</th>
+                <th className="px-4 font-semibold h-9">Detail</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800">
+            <tbody className="divide-y divide-border">
               {syncJobs.slice(0, 5).map((j) => (
-                <tr key={j.id} onClick={() => setDetailJob(j)} className="cursor-pointer hover:bg-neutral-800/30">
+                <tr key={j.id} onClick={() => setDetailJob(j)} className="cursor-pointer hover:bg-muted/30">
                   <td className="px-4 py-3"><StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge></td>
                   <td className="px-4 py-3">
-                    <span className="font-mono text-neutral-200">{jobItem(j)}</span>
-                    {jobSub(j) && <span className="ml-2 text-xs text-neutral-500">{jobSub(j)}</span>}
+                    <span className="font-mono text-foreground">{jobItem(j)}</span>
+                    {jobSub(j) && <span className="ml-2 text-xs text-muted-foreground">{jobSub(j)}</span>}
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5">
@@ -3477,9 +3461,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                       <StatusBadge tone={JOB_STATUS_TONE[j.status] || "neutral"}>{j.status}</StatusBadge>
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-neutral-400">{j.attempts}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-neutral-400">{fmtDateTime(j.time)}</td>
-                  <td className="max-w-[240px] truncate px-4 py-3 text-neutral-500" title={jobDetail(j) || ""}>{jobDetail(j) || "—"}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{j.attempts}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmtDateTime(j.time)}</td>
+                  <td className="max-w-[240px] truncate px-4 py-3 text-muted-foreground" title={jobDetail(j) || ""}>{jobDetail(j) || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -3489,7 +3473,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         {/* mobile cards */}
         <div className="space-y-3 md:hidden">
           {syncJobs.slice(0, 5).map((j) => (
-            <div key={j.id} role="button" tabIndex={0} onClick={() => setDetailJob(j)} className="cursor-pointer rounded-xl border border-neutral-700/50 bg-neutral-800/40 p-4">
+            <div key={j.id} role="button" tabIndex={0} onClick={() => setDetailJob(j)} className="cursor-pointer rounded-xl border border-input/50 bg-muted/40 p-4">
               <div className="flex items-center justify-between gap-2">
                 <StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge>
                 <span className="inline-flex items-center gap-1.5">
@@ -3497,13 +3481,13 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                   <StatusBadge tone={JOB_STATUS_TONE[j.status]}>{j.status}</StatusBadge>
                 </span>
               </div>
-              <p className="mt-2 font-mono text-sm text-neutral-200">{jobItem(j)}</p>
-              {jobSub(j) && <p className="text-xs text-neutral-500">{jobSub(j)}</p>}
+              <p className="mt-2 font-mono text-sm text-foreground">{jobItem(j)}</p>
+              {jobSub(j) && <p className="text-xs text-muted-foreground">{jobSub(j)}</p>}
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <div className="flex justify-between"><dt className="text-neutral-500">Attempts</dt><dd className="tabular-nums text-neutral-300">{j.attempts}</dd></div>
-                <div className="flex justify-between"><dt className="text-neutral-500">Time</dt><dd className="text-neutral-300">{fmtDateTime(j.time).replace(" UTC", "")}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Attempts</dt><dd className="tabular-nums text-foreground">{j.attempts}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Time</dt><dd className="text-foreground">{fmtDateTime(j.time).replace(" UTC", "")}</dd></div>
               </dl>
-              {jobDetail(j) && j.status === "failed" && <p className="mt-2 break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">{jobDetail(j)}</p>}
+              {jobDetail(j) && j.status === "failed" && <p className="mt-2 break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-fg">{jobDetail(j)}</p>}
             </div>
           ))}
         </div>
@@ -3511,12 +3495,12 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         {/* latest-5 window + full history */}
         {syncJobs.length > 0 && (
           <div className="mt-4 flex items-center justify-between gap-3">
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-muted-foreground">
               Showing the {Math.min(syncJobs.length, 5)} most recent {syncJobs.length === 1 ? "run" : "runs"} · click a run for details
             </p>
             <button
               onClick={openHistory}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+              className="inline-flex shrink-0 items-center gap-2 rounded-md border bg-background px-3.5 text-sm font-medium text-muted-foreground transition-all hover:text-foreground h-9 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
             >
               View all runs
             </button>
@@ -3526,42 +3510,42 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* ----------------------- Run history modal --------------------- */}
       {historyOpen && (
-        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setHistoryOpen(false)}>
-          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[85vh] sm:max-w-3xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+        <div className="fixed inset-0 z-[60] flex bg-black/50 sm:items-center sm:justify-center sm:p-6" onClick={() => setHistoryOpen(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[85vh] sm:max-w-3xl sm:rounded-lg sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-6 py-4">
               <div className="min-w-0">
-                <h2 className="text-base font-semibold text-white">Sync history</h2>
-                <p className="mt-0.5 text-xs text-neutral-500">
+                <h2 className="text-[14px] font-semibold text-foreground">Sync history</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {historyLoading ? "Loading…" : `${historyJobs?.length ?? 0} ${(historyJobs?.length ?? 0) === 1 ? "run" : "runs"}`} · click a run for details
                 </p>
               </div>
-              <button type="button" onClick={() => setHistoryOpen(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+              <button type="button" onClick={() => setHistoryOpen(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-6">
               {historyLoading ? (
                 <div className="space-y-2 py-2">
-                  {[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-11 animate-pulse rounded-lg bg-neutral-800/40" />)}
+                  {[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-11 rounded-lg skeleton" />)}
                 </div>
               ) : !historyJobs?.length ? (
-                <p className="py-10 text-center text-sm text-neutral-500">No sync runs yet.</p>
+                <p className="py-10 text-center text-sm text-muted-foreground">No sync runs yet.</p>
               ) : (
-                <ul className="divide-y divide-neutral-800/70">
+                <ul className="divide-y divide-border/70">
                   {historyJobs.map((j) => (
                     <li key={j.id}>
                       <button
                         type="button"
                         onClick={() => setDetailJob(j)}
-                        className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-neutral-800/30"
+                        className="flex w-full items-center gap-3 rounded-md px-2 py-3 text-left transition-colors hover:bg-muted/30"
                       >
                         <StatusBadge tone="neutral">{JOB_TYPE_LABEL[j.type] || j.type}</StatusBadge>
                         <span className="inline-flex shrink-0 items-center gap-1.5">
                           {j.status === "running" && <PingDot tone="cyan" />}
                           <StatusBadge tone={JOB_STATUS_TONE[j.status] || "neutral"}>{j.status}</StatusBadge>
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-xs text-neutral-500">{jobDetail(j) || jobItem(j)}</span>
-                        <span className="shrink-0 whitespace-nowrap text-xs text-neutral-400">{fmtDateTime(j.time)}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{jobDetail(j) || jobItem(j)}</span>
+                        <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">{fmtDateTime(j.time)}</span>
                       </button>
                     </li>
                   ))}
@@ -3574,18 +3558,18 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* ------------------------ Run detail modal --------------------- */}
       {detailJob && (
-        <div className="fixed inset-0 z-[70] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setDetailJob(null)}>
-          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[85vh] sm:max-w-2xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+        <div className="fixed inset-0 z-[70] flex bg-black/50 sm:items-center sm:justify-center sm:p-6" onClick={() => setDetailJob(null)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[85vh] sm:max-w-2xl sm:rounded-lg sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-6 py-4">
               <div className="flex min-w-0 items-center gap-2.5">
-                <h2 className="text-base font-semibold text-white">Run details</h2>
+                <h2 className="text-[14px] font-semibold text-foreground">Run details</h2>
                 <StatusBadge tone="neutral">{JOB_TYPE_LABEL[detailJob.type] || detailJob.type}</StatusBadge>
                 <span className="inline-flex items-center gap-1.5">
                   {detailJob.status === "running" && <PingDot tone="cyan" />}
                   <StatusBadge tone={JOB_STATUS_TONE[detailJob.status] || "neutral"}>{detailJob.status}</StatusBadge>
                 </span>
               </div>
-              <button type="button" onClick={() => setDetailJob(null)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+              <button type="button" onClick={() => setDetailJob(null)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -3593,37 +3577,37 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               {/* run meta */}
               <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
                 <div>
-                  <dt className="text-xs text-neutral-500">Trigger</dt>
-                  <dd className="mt-0.5 capitalize text-neutral-200">{detailJob.trigger || "—"}</dd>
+                  <dt className="text-xs text-muted-foreground">Trigger</dt>
+                  <dd className="mt-0.5 capitalize text-foreground">{detailJob.trigger || "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-neutral-500">Started</dt>
-                  <dd className="mt-0.5 text-neutral-200">{fmtDateTime(detailJob.startedAt || detailJob.time)}</dd>
+                  <dt className="text-xs text-muted-foreground">Started</dt>
+                  <dd className="mt-0.5 text-foreground">{fmtDateTime(detailJob.startedAt || detailJob.time)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-neutral-500">Duration</dt>
-                  <dd className="mt-0.5 text-neutral-200">{fmtDuration(detailJob.startedAt, detailJob.finishedAt) || "—"}</dd>
+                  <dt className="text-xs text-muted-foreground">Duration</dt>
+                  <dd className="mt-0.5 text-foreground">{fmtDuration(detailJob.startedAt, detailJob.finishedAt) || "—"}</dd>
                 </div>
               </dl>
 
               {detailJob.error && (
-                <p className="break-words rounded-lg bg-red-500/10 px-3 py-2.5 text-sm text-red-400">{detailJob.error}</p>
+                <p className="break-words rounded-lg bg-red-500/10 px-3 py-2.5 text-sm text-red-fg">{detailJob.error}</p>
               )}
 
               {/* per-source breakdown — which sources ran, where, and in which ownership mode */}
               {detailJob.scopes?.length > 0 && (
                 <div>
-                  <p className="mb-2 text-sm font-medium text-neutral-300">Sources in this run</p>
+                  <p className="mb-2 text-sm font-medium text-foreground">Sources in this run</p>
                   <ul className="space-y-2">
                     {detailJob.scopes.map((s, i) => {
                       const modeLabel = OWNERSHIP_MODES.find((m) => m.value === s.ownership)?.title || s.ownership || "—";
                       const locName = locations.find((l) => l.id === s.locationId)?.name || (s.locationId ? `…${String(s.locationId).slice(-6)}` : "—");
                       return (
-                        <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-neutral-700/50 bg-neutral-800/40 px-3 py-2.5">
-                          <span className="text-sm font-medium text-neutral-100">{s.source || "—"}</span>
+                        <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-input/50 bg-muted/40 px-3 py-2.5">
+                          <span className="text-sm font-medium text-foreground">{s.source || "—"}</span>
                           <StatusBadge tone="neutral">{s.type === "own_source" ? "Own source" : "Patrik export"}</StatusBadge>
-                          <span className="text-xs text-neutral-500">{modeLabel}</span>
-                          <span className="ml-auto text-xs text-neutral-500">
+                          <span className="text-xs text-muted-foreground">{modeLabel}</span>
+                          <span className="ml-auto text-xs text-muted-foreground">
                             {locName}
                             {typeof s.products === "number" ? ` · ${fmtNum(s.products)} items` : ""}
                           </span>
@@ -3637,15 +3621,15 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               {/* full counts */}
               {detailJob.counts && (
                 <div>
-                  <p className="mb-2 text-sm font-medium text-neutral-300">What this run did</p>
+                  <p className="mb-2 text-sm font-medium text-foreground">What this run did</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {RUN_COUNT_LABELS.map(([key, label]) => {
                       const v = detailJob.counts[key] || 0;
                       const danger = (key === "failed" || key === "unmatched") && v > 0;
                       return (
-                        <div key={key} className={`rounded-xl border px-3 py-2.5 ${v ? "border-neutral-700/50 bg-neutral-800/40" : "border-neutral-800/50 bg-neutral-900/30 opacity-50"}`}>
-                          <div className={`text-lg font-semibold tabular-nums ${danger ? "text-red-400" : v ? "text-neutral-100" : "text-neutral-500"}`}>{fmtNum(v)}</div>
-                          <div className="mt-0.5 text-xs text-neutral-500">{label}</div>
+                        <div key={key} className={`rounded-xl border px-3 py-2.5 ${v ? "border-input/50 bg-muted/40" : "border-border/50 bg-muted/40 opacity-50"}`}>
+                          <div className={`text-lg font-semibold tabular-nums ${danger ? "text-red-fg": v ? "text-foreground" : "text-muted-foreground"}`}>{fmtNum(v)}</div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
                         </div>
                       );
                     })}
@@ -3656,11 +3640,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               {/* per-product errors */}
               {detailJob.errors?.length > 0 && (
                 <div>
-                  <p className="mb-2 text-sm font-medium text-neutral-300">Errors ({detailJob.errors.length})</p>
+                  <p className="mb-2 text-sm font-medium text-foreground">Errors ({detailJob.errors.length})</p>
                   <ul className="space-y-1.5">
                     {detailJob.errors.map((e, i) => (
-                      <li key={i} className="break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                        {e.parentCode && <span className="mr-2 font-mono text-red-200">{e.parentCode}</span>}
+                      <li key={i} className="break-words rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-fg-soft">
+                        {e.parentCode && <span className="mr-2 font-mono text-red-fg-softer">{e.parentCode}</span>}
                         {e.error || String(e)}
                       </li>
                     ))}
@@ -3669,11 +3653,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               )}
 
               {!detailJob.counts && jobDetail(detailJob) && (
-                <p className="text-sm text-neutral-400">{jobDetail(detailJob)}</p>
+                <p className="text-sm text-muted-foreground">{jobDetail(detailJob)}</p>
               )}
             </div>
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
-              <button type="button" onClick={() => setDetailJob(null)} className="rounded-lg bg-[#01a0be] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]">Done</button>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-muted/40 px-6 py-4">
+              <button type="button" onClick={() => setDetailJob(null)} className="rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-9">Done</button>
             </div>
           </div>
         </div>
@@ -3683,9 +3667,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       {/* Handed-off products the merchant deleted in Shopify. We deliberately do NOT recreate them
           (that's the whole point of "create, then hand off") — the partner opts each one back in. */}
       {deletedInStore.length > 0 && (
-        <section id="removed-in-store" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+        <section id="removed-in-store" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-card p-4 sm:p-6 lg:p-8 shadow-sm">
           <SectionHeading
-            icon={<WarningIcon className="h-5 w-5 text-amber-400" />}
+            icon={<WarningIcon className="h-5 w-5 text-amber-fg" />}
             title="Removed in store"
             desc="These products were created by the portal and then deleted in Shopify. They won't be recreated automatically — choose “Recreate on next sync” to bring one back."
             right={<StatusBadge tone="amber">{deletedInStore.length}</StatusBadge>}
@@ -3695,11 +3679,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
           {deletedInStore.length > 5 && (
             <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-xs text-neutral-500">Showing the first 5 of {deletedInStore.length}</p>
+              <p className="text-xs text-muted-foreground">Showing the first 5 of {deletedInStore.length}</p>
               <button
                 type="button"
                 onClick={() => setShowAllRemoved(true)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+                className="inline-flex shrink-0 items-center gap-2 rounded-md border bg-background px-3.5 text-sm font-medium text-muted-foreground transition-all hover:text-foreground h-9 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
               >
                 View all
               </button>
@@ -3710,15 +3694,15 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* ----------------- Removed-in-store "view all" modal ----------------- */}
       {showAllRemoved && (
-        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setShowAllRemoved(false)}>
-          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+        <div className="fixed inset-0 z-[60] flex bg-black/50 sm:items-center sm:justify-center sm:p-6" onClick={() => setShowAllRemoved(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[88vh] sm:max-w-3xl sm:rounded-lg sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
               <div className="flex min-w-0 items-center gap-2.5">
-                <WarningIcon className="h-5 w-5 shrink-0 text-amber-400" />
-                <h2 className="mb-0 truncate text-base font-semibold leading-none text-white">Removed in store</h2>
+                <WarningIcon className="h-5 w-5 shrink-0 text-amber-fg" />
+                <h2 className="mb-0 truncate text-[14px] font-semibold leading-none text-foreground">Removed in store</h2>
                 <StatusBadge tone="amber">{deletedInStore.length}</StatusBadge>
               </div>
-              <button type="button" onClick={() => setShowAllRemoved(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+              <button type="button" onClick={() => setShowAllRemoved(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-popover text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -3731,9 +3715,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* --------------------- Needs attention ------------------------- */}
       {attentionCount > 0 && (
-        <section id="needs-attention" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+        <section id="needs-attention" className="scroll-mt-20 rounded-2xl border border-amber-500/30 bg-card p-4 sm:p-6 lg:p-8 shadow-sm">
           <SectionHeading
-            icon={<WarningIcon className="h-5 w-5 text-amber-400" />}
+            icon={<WarningIcon className="h-5 w-5 text-amber-fg" />}
             title="Needs attention"
             desc="Variants we couldn't push on the last run. Resolve the cause, or let the next sync retry."
             right={<StatusBadge tone="red">{attentionCount}</StatusBadge>}
@@ -3743,13 +3727,13 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
           {attentionCount > 5 && (
             <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 Showing the first 5 of {attentionCount} items
               </p>
               <button
                 type="button"
                 onClick={() => setShowAllAttention(true)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-neutral-700/50 bg-neutral-800/80 px-3.5 py-2 text-sm font-medium text-neutral-400 transition-all hover:border-neutral-600/60 hover:text-white"
+                className="inline-flex shrink-0 items-center gap-2 rounded-md border bg-background px-3.5 text-sm font-medium text-muted-foreground transition-all hover:text-foreground h-9 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
               >
                 View all items
               </button>
@@ -3760,15 +3744,15 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* ----------------- Needs-attention "view all" modal ----------------- */}
       {showAllAttention && (
-        <div className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6" onClick={() => setShowAllAttention(false)}>
-          <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-3xl sm:rounded-2xl sm:border" onClick={(e) => e.stopPropagation()}>
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+        <div className="fixed inset-0 z-[60] flex bg-black/50 sm:items-center sm:justify-center sm:p-6" onClick={() => setShowAllAttention(false)}>
+          <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[88vh] sm:max-w-3xl sm:rounded-lg sm:border" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
               <div className="flex min-w-0 items-center gap-2.5">
-                <WarningIcon className="h-5 w-5 shrink-0 text-amber-400" />
-                <h2 className="mb-0 truncate text-base font-semibold leading-none text-white">Needs attention</h2>
+                <WarningIcon className="h-5 w-5 shrink-0 text-amber-fg" />
+                <h2 className="mb-0 truncate text-[14px] font-semibold leading-none text-foreground">Needs attention</h2>
                 <StatusBadge tone="red">{attentionCount}</StatusBadge>
               </div>
-              <button type="button" onClick={() => setShowAllAttention(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white">
+              <button type="button" onClick={() => setShowAllAttention(false)} aria-label="Close" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-popover text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -3781,26 +3765,26 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* ---------------- Unsaved-changes leave guard modal ---------------- */}
       {leaveTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setLeaveTarget(null)}>
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={() => setLeaveTarget(null)}>
+          <div className="w-full max-w-md overflow-hidden rounded-lg border border-border bg-background shadow-lg" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 pt-6 pb-5">
               <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-fg">
                   <WarningIcon className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-white">Unsaved changes</h2>
-                  <p className="mt-1.5 text-sm leading-relaxed text-neutral-400">
+                  <h2 className="text-[15px] font-semibold text-foreground">Unsaved changes</h2>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                     You have unsaved changes to{" "}
-                    <span className="font-medium text-neutral-200">{shopLabel(connection.shopDomain)}</span>. Save them before you leave?
+                    <span className="font-medium text-foreground">{shopLabel(connection.shopDomain)}</span>. Save them before you leave?
                   </p>
                 </div>
               </div>
             </div>
-            <div className="flex flex-col gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4 sm:flex-row sm:justify-end">
-              <button onClick={() => setLeaveTarget(null)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-neutral-300 transition-colors hover:bg-neutral-800 hover:text-white">Stay</button>
-              <button onClick={discardAndLeave} className="whitespace-nowrap rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-2.5 text-sm font-semibold text-neutral-300 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300">Don&apos;t save</button>
-              <button onClick={saveAndLeave} disabled={saving} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#01a0be] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50">
+            <div className="flex flex-col gap-2 border-t border-border bg-muted/40 px-6 py-4 sm:flex-row sm:justify-end">
+              <button onClick={() => setLeaveTarget(null)} className="rounded-md px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted hover:text-foreground h-9">Stay</button>
+              <button onClick={discardAndLeave} className="whitespace-nowrap rounded-md border border-input bg-card px-4 text-sm font-medium text-foreground transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-fg-soft h-9">Don&apos;t save</button>
+              <button onClick={saveAndLeave} disabled={saving} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 h-9">
                 {saving ? <SpinnerIcon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
                 {saving ? "Saving…" : "Save & leave"}
               </button>
@@ -3810,25 +3794,25 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       )}
 
       {/* ------------------------ Danger zone -------------------------- */}
-      <section className="rounded-2xl border border-red-500/30 bg-neutral-900/60 p-4 backdrop-blur-sm sm:p-6 lg:p-8">
+      <section className="rounded-2xl border border-red-500/30 bg-card p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-white">Disconnect store</h2>
-            <p className="mt-1 text-sm text-neutral-400">
-              Stops all syncing and revokes access for <span className="font-medium text-neutral-200">{shopLabel(connection.shopDomain)}</span>. Your Shopify products stay exactly as they are — nothing is deleted.
+            <h2 className="text-[15px] font-semibold text-foreground">Disconnect store</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Stops all syncing and revokes access for <span className="font-medium text-foreground">{shopLabel(connection.shopDomain)}</span>. Your Shopify products stay exactly as they are — nothing is deleted.
             </p>
           </div>
           {confirmDisconnect ? (
             <div className="flex w-full shrink-0 gap-2 sm:w-auto">
               <button
                 onClick={() => setConfirmDisconnect(false)}
-                className="flex-1 justify-center rounded-xl border border-neutral-700 bg-neutral-900/60 px-4 py-2.5 text-sm font-semibold text-neutral-300 transition-all hover:border-neutral-600 hover:text-white sm:flex-none"
+                className="flex-1 justify-center rounded-md border border-input bg-card px-4 text-sm font-medium text-foreground transition-all hover:border-input hover:text-foreground sm:flex-none h-9"
               >
                 Cancel
               </button>
               <button
                 onClick={disconnect}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500/90 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-red-500 sm:flex-none"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-destructive px-4 text-sm font-medium text-white transition-all hover:bg-destructive/90 sm:flex-none h-9 dark:bg-destructive/60"
               >
                 <TrashIcon className="h-4 w-4" />
                 Yes, disconnect
@@ -3837,7 +3821,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
           ) : (
             <button
               onClick={() => setConfirmDisconnect(true)}
-              className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/5 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all hover:border-red-500/60 hover:bg-red-500/10 sm:w-auto"
+              className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-md border border-red-500/40 bg-red-500/5 px-4 text-sm font-medium text-red-fg transition-all hover:border-red-500/60 hover:bg-red-500/10 sm:w-auto h-9"
             >
               <TrashIcon className="h-4 w-4" />
               Disconnect
@@ -3848,15 +3832,15 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
 
       {/* --------------------------- Sticky save bar --------------------------- */}
       {isDirty && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-black/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-md animate-fade-in">
-          <div className="mx-auto flex max-w-screen-2xl flex-col-reverse gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-            <p className="text-sm text-neutral-400">
-              Unsaved changes for <span className="font-medium text-neutral-200">{shopLabel(connection.shopDomain)}</span>.
+        <div className="sticky bottom-0 z-40 -mx-4 -mb-4 md:-mx-8 md:-mb-8 border-t border-border bg-background/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)] animate-fade-in">
+          <div className="flex flex-col-reverse gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-8">
+            <p className="text-sm text-muted-foreground">
+              Unsaved changes for <span className="font-medium text-foreground">{shopLabel(connection.shopDomain)}</span>.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={discard}
-                className="flex-1 justify-center rounded-xl border border-neutral-700 bg-neutral-900/60 px-5 py-2.5 text-sm font-semibold text-neutral-300 transition-all hover:border-neutral-600 hover:text-white sm:flex-none"
+                className="flex-1 justify-center rounded-md border border-input bg-card px-5 text-sm font-medium text-foreground transition-all hover:border-input hover:text-foreground sm:flex-none h-9"
               >
                 Discard
               </button>
@@ -3864,7 +3848,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                 onClick={saveConfig}
                 disabled={saving}
                 onAnimationEnd={() => setSaveShake(false)}
-                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#01a0be]/20 transition-all hover:bg-[#018a9f] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none ${saveShake ? "animate-shake ring-2 ring-[#01a0be] ring-offset-2 ring-offset-black" : ""}`}
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 sm:flex-none h-9 ${saveShake ? "animate-shake ring-2 ring-accent-brand" : ""}`}
               >
                 {saving ? <SpinnerIcon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
                 {saving ? "Saving…" : "Save changes"}

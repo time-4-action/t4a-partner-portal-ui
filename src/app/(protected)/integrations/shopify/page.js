@@ -114,14 +114,14 @@ export default async function ShopifyIntegrationRoute({ searchParams }) {
 
   if (!roles.includes("export")) {
     return (
-      <div className="relative py-6 lg:py-8">
-        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-          <div className="p-6 bg-neutral-800/50 border border-neutral-700/50 rounded-2xl text-center sm:p-8">
-            <svg className="w-12 h-12 text-neutral-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="p-4 md:p-8">
+        <div className="contents">
+          <div className="p-6 bg-muted/50 border border-input/50 rounded-2xl text-center sm:p-8">
+            <svg className="w-12 h-12 text-muted-foreground mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
-            <h2 className="text-xl font-semibold text-white mb-2">Access Restricted</h2>
-            <p className="text-neutral-400">You do not have access to the Shopify Integration feature. Contact your administrator to request access.</p>
+            <h2 className="text-[15px] font-semibold text-foreground mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground">You do not have access to the Shopify Integration feature. Contact your administrator to request access.</p>
           </div>
         </div>
       </div>
@@ -132,8 +132,8 @@ export default async function ShopifyIntegrationRoute({ searchParams }) {
   // the page shows the join-the-program screen instead of the integration.
   if (!hasTierAccess(roles, FEATURE_TIERS.shopify.tier)) {
     return (
-      <div className="relative bg-transparent py-6 lg:py-8">
-        <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+      <div className="p-4 md:p-8">
+        <div className="contents">
           <TierGate
             featureKey="shopify"
             userEmail={session?.user?.email}
@@ -162,8 +162,8 @@ export default async function ShopifyIntegrationRoute({ searchParams }) {
     : allConnections.filter((c) => c.authMethod !== "custom_oauth" && c.authMethod !== "custom_app");
 
   return (
-    <div className="relative bg-transparent py-6 lg:py-8">
-      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full">
+      <div className="contents">
         <ShopifyIntegrationPage
           initialExports={shopifyExports ?? []}
           ownerEmail={session?.user?.email}

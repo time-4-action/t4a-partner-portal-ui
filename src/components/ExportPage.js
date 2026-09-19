@@ -24,6 +24,10 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import ProductDetailModal from "./ProductDetailModal";
+import PageHeader from "@/components/ui/PageHeader";
+import { HelpCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { btn, countPill } from "@/lib/ui";
 
 /**
  * Export preset configurations.
@@ -293,7 +297,7 @@ const FORMAT_META = {
         label: 'CSV',
         color: 'emerald',
         bg: 'bg-emerald-500/15 hover:bg-emerald-500/25',
-        text: 'text-emerald-400',
+        text: 'text-emerald-fg',
         activeBg: 'bg-emerald-500/20',
         icon: (
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -305,7 +309,7 @@ const FORMAT_META = {
         label: 'JSON',
         color: 'amber',
         bg: 'bg-amber-500/15 hover:bg-amber-500/25',
-        text: 'text-amber-400',
+        text: 'text-amber-fg',
         activeBg: 'bg-amber-500/20',
         icon: (
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,7 +321,7 @@ const FORMAT_META = {
         label: 'XML',
         color: 'orange',
         bg: 'bg-orange-500/15 hover:bg-orange-500/25',
-        text: 'text-orange-400',
+        text: 'text-orange-fg',
         activeBg: 'bg-orange-500/20',
         icon: (
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -329,10 +333,10 @@ const FORMAT_META = {
 
 // Per-preset accent styling shared by the Saved list and the export detail modal
 const PRESET_STYLE = {
-    shopify: { gradient: 'from-emerald-500 to-green-400', badge: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20', iconBg: 'bg-emerald-500/15 text-emerald-400' },
-    simple:  { gradient: 'from-cyan-500 to-blue-400',    badge: 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20',       iconBg: 'bg-cyan-500/15 text-cyan-400' },
-    detailed:{ gradient: 'from-violet-500 to-purple-400', badge: 'bg-violet-500/15 text-violet-400 border border-violet-500/20', iconBg: 'bg-violet-500/15 text-violet-400' },
-    inventory:{ gradient: 'from-amber-500 to-orange-400', badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/20',   iconBg: 'bg-amber-500/15 text-amber-400' },
+    shopify: { gradient: 'from-emerald-500 to-green-400', badge: 'bg-emerald-500/15 text-emerald-fg border border-emerald-500/20', iconBg: 'bg-emerald-500/15 text-emerald-fg' },
+    simple:  { gradient: 'from-cyan-500 to-blue-400',    badge: 'bg-cyan-500/15 text-cyan-fg border border-cyan-500/20',       iconBg: 'bg-cyan-500/15 text-cyan-fg' },
+    detailed:{ gradient: 'from-violet-500 to-purple-400', badge: 'bg-violet-500/15 text-violet-fg border border-violet-500/20', iconBg: 'bg-violet-500/15 text-violet-fg' },
+    inventory:{ gradient: 'from-amber-500 to-orange-400', badge: 'bg-amber-500/15 text-amber-fg border border-amber-500/20',   iconBg: 'bg-amber-500/15 text-amber-fg' },
 };
 
 // Count active filters on a saved config (backwards-compatible: handles legacy string or new array)
@@ -1747,56 +1751,43 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
     }, [filters]);
 
     return (
-        <div className="min-h-screen">
+        <div className="flex flex-col min-h-full">
             {/* ----------------------------- Header ----------------------------- */}
             {/* Compact header — icon + title + badge on one line, Help button on the right. */}
-            <header className="mb-6 flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
-                        <svg className="h-5 w-5 text-[#3fd0ea]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                    </div>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <h1 className="mb-0 text-xl font-bold leading-none tracking-tight text-white">Export</h1>
-                            <span className="inline-flex items-center gap-1 rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
-                                Products
-                            </span>
-                        </div>
-                        <p className="mt-1.5 hidden text-xs leading-relaxed text-neutral-500 sm:block">
-                            Build, save and share custom product exports — Shopify CSV, inventory, or your own field set.
-                        </p>
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    onClick={() => setShowHelp(true)}
-                    aria-label="Open guide"
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-[#01a0be]/40 hover:text-white"
-                >
-                    <svg className="h-4 w-4 text-[#01a0be]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
-                    Guide
-                </button>
-            </header>
+            <PageHeader
+                title="Export"
+                badge={<span className={countPill}>Products</span>}
+                description="Build, save and share custom product exports — Shopify CSV, inventory, or your own field set."
+                right={
+                    <button
+                        type="button"
+                        onClick={() => setShowHelp(true)}
+                        aria-label="Open guide"
+                        className={cn(btn.base, btn.variant.outline, btn.size.sm)}
+                    >
+                        <HelpCircle className="text-muted-foreground" />
+                        Guide
+                    </button>
+                }
+            />
+            <div className="flex-1 p-4 md:p-8">
 
             {/* ── Help modal — "What is this page?" ── */}
             {showHelp && (
                 <div
-                    className="fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6"
+                    className="fixed inset-0 z-[60] flex bg-black/50 sm:items-center sm:justify-center sm:p-6"
                     onClick={() => setShowHelp(false)}
                 >
                     <div
-                        className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl sm:border"
+                        className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-lg sm:border"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-5 py-4 sm:px-6">
-                            <h2 className="mb-0 text-base font-semibold leading-none text-white">What is the Export page?</h2>
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+                            <h2 className="mb-0 text-[14px] font-semibold leading-none text-foreground">What is the Export page?</h2>
                             <button
                                 onClick={() => setShowHelp(false)}
                                 aria-label="Close"
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
@@ -1804,28 +1795,28 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6 sm:px-6">
                             {/* Lead */}
-                            <p className="text-[15px] leading-relaxed text-neutral-200">
+                            <p className="text-[15px] leading-relaxed text-foreground">
                                 It turns the live Patrik catalog into a{" "}
-                                <span className="font-semibold text-white">downloadable file</span> — or a{" "}
-                                <span className="font-semibold text-white">live link</span> — that you can use anywhere.
+                                <span className="font-semibold text-foreground">downloadable file</span> — or a{" "}
+                                <span className="font-semibold text-foreground">live link</span> — that you can use anywhere.
                                 Build it once, then download or re-share it whenever you need.
                             </p>
 
                             {/* What you can do with it */}
                             <div>
-                                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">What you can do with it</h3>
+                                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">What you can do with it</h3>
                                 <div className="space-y-2.5">
                                     {[
                                         ["Import into a webshop", "Get a ready-made Shopify product CSV — variants, prices, images and tags included."],
                                         ["Update your stock", "Export just inventory levels for a Shopify location for a quick re-stock."],
                                         ["Feed another system", "Hand a clean product file (CSV, JSON or XML) to an ERP, marketplace or spreadsheet."],
                                     ].map(([title, desc]) => (
-                                        <div key={title} className="flex gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3.5">
-                                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#01a0be]/15 text-[#01a0be]">
+                                        <div key={title} className="flex gap-3 rounded-xl border border-border bg-muted/40 p-3.5">
+                                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-brand/15 text-accent-brand">
                                                 <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                                             </span>
-                                            <p className="text-[15px] leading-snug text-neutral-300">
-                                                <span className="font-semibold text-white">{title}.</span> {desc}
+                                            <p className="text-[15px] leading-snug text-foreground">
+                                                <span className="font-semibold text-foreground">{title}.</span> {desc}
                                             </p>
                                         </div>
                                     ))}
@@ -1834,7 +1825,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                             {/* How it works */}
                             <div>
-                                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">How it works — 3 steps</h3>
+                                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">How it works — 3 steps</h3>
                                 <ol className="space-y-3">
                                     {[
                                         ["Choose a format", "Shopify, Inventory, Simple or Detailed — each comes with sensible columns."],
@@ -1842,9 +1833,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         ["Download or save", "Grab it as CSV / JSON / XML, or save it and create an API key so another system pulls it automatically."],
                                     ].map(([title, desc], i) => (
                                         <li key={title} className="flex gap-3">
-                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#01a0be]/30 bg-[#01a0be]/10 font-orbitron text-sm font-bold text-[#01a0be]">{i + 1}</span>
-                                            <p className="pt-0.5 text-[15px] leading-snug text-neutral-300">
-                                                <span className="font-semibold text-white">{title}.</span> {desc}
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-accent-brand/30 bg-accent-brand/10 text-sm font-bold text-accent-brand">{i + 1}</span>
+                                            <p className="pt-0.5 text-[15px] leading-snug text-foreground">
+                                                <span className="font-semibold text-foreground">{title}.</span> {desc}
                                             </p>
                                         </li>
                                     ))}
@@ -1852,20 +1843,20 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
 
                             {/* Tip */}
-                            <div className="flex gap-3 rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] p-4">
-                                <svg className="h-5 w-5 shrink-0 text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
-                                <p className="text-[15px] leading-snug text-neutral-300">
-                                    <span className="font-semibold text-white">Syncing to Shopify?</span> Create a{" "}
-                                    <span className="font-medium text-[#01a0be]">Shopify</span> export here first — it defines exactly which products and fields get pushed to your store. The{" "}
-                                    <span className="font-medium text-[#01a0be]">Shopify sync</span> integration then keeps your store up to date based on it.
+                            <div className="flex gap-3 rounded-xl border border-accent-brand/20 bg-accent-brand/[0.06] p-4">
+                                <svg className="h-5 w-5 shrink-0 text-accent-brand" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                                <p className="text-[15px] leading-snug text-foreground">
+                                    <span className="font-semibold text-foreground">Syncing to Shopify?</span> Create a{" "}
+                                    <span className="font-medium text-accent-brand">Shopify</span> export here first — it defines exactly which products and fields get pushed to your store. The{" "}
+                                    <span className="font-medium text-accent-brand">Shopify sync</span> integration then keeps your store up to date based on it.
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex shrink-0 justify-end border-t border-neutral-800 px-5 py-3.5 sm:px-6">
+                        <div className="flex shrink-0 justify-end border-t border-border px-5 py-3.5 sm:px-6">
                             <button
                                 onClick={() => setShowHelp(false)}
-                                className="rounded-lg bg-[#01a0be] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#018a9f]"
+                                className="rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-9"
                             >
                                 Got it
                             </button>
@@ -1876,42 +1867,42 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
             {/* ── Configurator modal — create a new export or edit a saved one ── */}
             {activeTab === "configure" && (
-                <div className="fixed inset-0 z-50 flex bg-black/80 backdrop-blur-md sm:items-center sm:justify-center sm:p-6">
-                    <div className="flex h-full w-full flex-col overflow-hidden border-neutral-800 bg-neutral-950 shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-6xl sm:rounded-2xl sm:border">
+                <div className="fixed inset-0 z-50 flex bg-black/50 sm:items-center sm:justify-center sm:p-6">
+                    <div className="flex h-full w-full flex-col overflow-hidden border-border bg-background shadow-lg sm:h-auto sm:max-h-[94vh] sm:max-w-6xl sm:rounded-lg sm:border">
                         {/* Modal header */}
-                        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-neutral-800 px-4 py-3 sm:px-6 sm:py-4">
+                        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3 sm:px-6 sm:py-4">
                             <div className="flex min-w-0 items-center gap-3">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10 sm:hidden">
-                                    <svg className="h-4 w-4 text-[#3fd0ea]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-accent-brand/30 bg-accent-brand/10 sm:hidden">
+                                    <svg className="h-4 w-4 text-accent-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                 </div>
                                 <div className="min-w-0">
-                                    <h2 className="mb-0 truncate text-base font-semibold leading-tight text-white">
+                                    <h2 className="mb-0 truncate text-[14px] font-semibold leading-tight text-foreground">
                                         {currentConfigId
                                             ? `Edit ${savedExports.find(e => e._id === currentConfigId)?.name || exportName || "export"}`
                                             : "New export"}
                                     </h2>
-                                    <p className="mt-0.5 hidden truncate text-xs text-neutral-500 sm:block">Pick a format, filter products, choose fields — then download or save.</p>
+                                    <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block">Pick a format, filter products, choose fields — then download or save.</p>
                                 </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
                                 <button
                                     onClick={() => { setPreviewConfig(null); setPreviewSearch(''); setShowPreview(true); }}
                                     aria-label="Preview products"
-                                    className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white sm:px-3 sm:py-1.5"
+                                    className="flex items-center gap-2 rounded-md border bg-background px-2.5 text-sm font-medium text-foreground transition-colors hover:text-foreground sm:px-3 sm:py-1.5 h-9 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                     <span className="hidden sm:inline">Preview</span>
-                                    <span className="rounded-md bg-neutral-700/60 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-neutral-400">
+                                    <span className="rounded-md bg-accent/60 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
                                         {filteredProducts.length}
                                     </span>
                                 </button>
                                 <button
                                     onClick={closeConfigurator}
                                     aria-label="Close"
-                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white sm:h-8 sm:w-8"
+                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground sm:h-8 sm:w-8"
                                 >
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
@@ -1964,16 +1955,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         return (
                             <div>
                                 {/* Mobile progress — clear "where am I" header */}
-                                <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 sm:hidden">
+                                <div className="rounded-2xl border border-border bg-card p-4 sm:hidden">
                                     <div className="mb-3 flex items-center justify-between gap-2">
-                                        <span className="font-orbitron text-xs font-bold tracking-wide text-[#01a0be]">Step {currentIdx + 1} / {stepsOrder.length}</span>
-                                        <span className="truncate text-[11px] text-neutral-500">{currentStep.sub}</span>
+                                        <span className="text-xs font-bold tracking-wide text-accent-brand">Step {currentIdx + 1} / {stepsOrder.length}</span>
+                                        <span className="truncate text-[11px] text-muted-foreground">{currentStep.sub}</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#01a0be] text-white shadow-lg shadow-cyan-500/25">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
                                             {currentStep.icon}
                                         </div>
-                                        <p className="text-sm font-semibold text-white">{currentStep.label}</p>
+                                        <p className="text-sm font-semibold text-foreground">{currentStep.label}</p>
                                     </div>
                                     <div className="mt-3.5 flex gap-1.5">
                                         {stepsOrder.map((id, i) => (
@@ -1981,15 +1972,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 key={id}
                                                 onClick={() => setExportStep(id)}
                                                 aria-label={`Go to step ${i + 1}`}
-                                                className={`h-1.5 flex-1 rounded-full transition-colors ${i < currentIdx ? 'bg-[#01a0be]/50' : i === currentIdx ? 'bg-[#01a0be]' : 'bg-neutral-700'}`}
+                                                className={`h-1.5 flex-1 rounded-full transition-colors ${i < currentIdx ? 'bg-accent-brand/50': i === currentIdx ? 'bg-primary' : 'bg-background border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50'}`}
                                             />
                                         ))}
                                     </div>
                                 </div>
 
                                 {/* Desktop stepper */}
-                                <div className="hidden overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60 sm:block">
-                                <div className="flex divide-x divide-neutral-800">
+                                <div className="hidden overflow-hidden rounded-2xl border border-border bg-card sm:block shadow-sm">
+                                <div className="flex divide-x divide-border">
                                     {STEP_META.map(({ id, label, sub, icon }, i) => {
                                         const thisIdx = stepsOrder.indexOf(id);
                                         const isDone = thisIdx < currentIdx;
@@ -1999,27 +1990,27 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 key={id}
                                                 onClick={() => setExportStep(id)}
                                                 className={`relative flex-1 flex items-center gap-3 px-4 py-3.5 text-left transition-all min-w-0 ${
-                                                    isActive ? 'bg-gradient-to-b from-cyan-950/60 to-transparent'
-                                                    : isDone ? 'hover:bg-neutral-800/40 cursor-pointer'
-                                                    : 'cursor-pointer hover:bg-neutral-800/20'
-                                                }`}
+ isActive ? 'bg-gradient-to-b from-cyan-tint to-transparent'
+ : isDone ? 'hover:bg-muted/40 cursor-pointer'
+ :'cursor-pointer hover:bg-muted/20'
+ }`}
                                             >
                                                 {isActive && (
-                                                    <div className="absolute top-0 inset-x-0 h-[2px] bg-[#01a0be]" />
+                                                    <div className="absolute top-0 inset-x-0 h-[2px] bg-primary" />
                                                 )}
                                                 <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                                                    isActive ? 'bg-[#01a0be] text-white shadow-lg shadow-cyan-500/25'
-                                                    : isDone ? 'bg-green-500/10 text-green-400 ring-1 ring-green-500/20'
-                                                    : 'bg-neutral-800 text-neutral-600'
-                                                }`}>
+ isActive ? 'bg-primary text-primary-foreground shadow-xs'
+ : isDone ? 'bg-green-500/10 text-green-fg ring-1 ring-green-500/20'
+ :'bg-muted text-muted-foreground/70'
+ }`}>
                                                     {isDone
                                                         ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                                                         : icon
                                                     }
                                                 </div>
                                                 <div className="min-w-0 hidden sm:block">
-                                                    <p className={`text-xs font-semibold truncate ${isActive ? 'text-white' : isDone ? 'text-neutral-300' : 'text-neutral-600'}`}>{label}</p>
-                                                    <p className={`text-[11px] truncate mt-0.5 ${isActive ? 'text-cyan-400/70' : isDone ? 'text-neutral-500' : 'text-neutral-700'}`}>{sub}</p>
+                                                    <p className={`text-xs font-semibold truncate ${isActive ? 'text-foreground': isDone ? 'text-foreground' : 'text-muted-foreground/70'}`}>{label}</p>
+                                                    <p className={`text-[11px] truncate mt-0.5 ${isActive ? 'text-cyan-fg/70': isDone ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}>{sub}</p>
                                                 </div>
                                             </button>
                                         );
@@ -2034,27 +2025,27 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     {exportStep === 'format' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Preset Cards */}
-                            <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 backdrop-blur-sm sm:p-6">
-                                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-neutral-300 sm:mb-5">Export Format</h2>
+                            <div className="rounded-2xl border border-border bg-muted/40 p-4 sm:p-6">
+                                <h2 className="mb-4 text-[13px] font-semibold uppercase tracking-wider text-foreground sm:mb-5">Export Format</h2>
                                 <div className="grid grid-cols-2 gap-3">
                                     {Object.entries(EXPORT_PRESETS).map(([key, preset]) => (
                                         <button
                                             key={key}
                                             onClick={() => handlePresetChange(key)}
-                                            className={`flex flex-col items-start gap-3 rounded-2xl border p-4 text-left transition-all duration-200 sm:p-5 ${selectedPreset === key
-                                                ? 'bg-[#01a0be]/10 border-[#01a0be]/50 shadow-lg shadow-[#01a0be]/10'
-                                                : 'bg-neutral-800/50 border-neutral-700/40 hover:bg-neutral-700/50 hover:border-neutral-600/60'
-                                            }`}
+                                            className={`flex flex-col items-start gap-3 rounded-md border p-4 text-left transition-all duration-200 sm:p-5 ${selectedPreset === key
+ ? 'bg-accent-brand/10 border-accent-brand/50 shadow-xs'
+ :'bg-background border hover:bg-accent shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50'
+ }`}
                                         >
-                                            <div className={`p-2.5 rounded-xl ${selectedPreset === key ? 'bg-cyan-500/20 text-cyan-400' : 'bg-neutral-700/50 text-neutral-400'}`}>
+                                            <div className={`p-2.5 rounded-xl ${selectedPreset === key ? 'bg-cyan-500/20 text-cyan-fg' : 'bg-accent/50 text-muted-foreground'}`}>
                                                 {preset.icon}
                                             </div>
                                             <div>
-                                                <div className={`font-semibold text-sm ${selectedPreset === key ? 'text-white' : 'text-neutral-300'}`}>{preset.name}</div>
-                                                <div className="mt-0.5 hidden text-xs leading-relaxed text-neutral-500 sm:block">{preset.description}</div>
+                                                <div className={`font-semibold text-sm ${selectedPreset === key ? 'text-foreground' : 'text-foreground'}`}>{preset.name}</div>
+                                                <div className="mt-0.5 hidden text-xs leading-relaxed text-muted-foreground sm:block">{preset.description}</div>
                                             </div>
                                             {selectedPreset === key && (
-                                                <span className="text-xs text-cyan-400 font-medium">Selected ✓</span>
+                                                <span className="text-xs text-cyan-fg font-medium">Selected ✓</span>
                                             )}
                                         </button>
                                     ))}
@@ -2063,16 +2054,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                             {/* Right column: Shopify Location (inventory) or Pricelist Priority (others) */}
                             {selectedPreset === 'inventory' ? (
-                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden flex flex-col">
-                                    <div className="px-6 py-5 border-b border-neutral-800">
+                                <div className="bg-muted/40 rounded-2xl border border-border overflow-hidden flex flex-col">
+                                    <div className="px-6 py-5 border-b border-border">
                                         <div className="flex items-center gap-2">
-                                            <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-4 h-4 text-cyan-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                             </svg>
-                                            <h2 className="text-sm font-semibold text-white">Shopify Location</h2>
+                                            <h2 className="text-[13px] font-semibold text-foreground">Shopify Location</h2>
                                         </div>
-                                        <p className="text-xs text-neutral-500 mt-1.5">Inventory column header in export</p>
+                                        <p className="text-xs text-muted-foreground mt-1.5">Inventory column header in export</p>
                                     </div>
                                     <div className="p-5 flex flex-col gap-4 flex-1">
                                         <input
@@ -2080,33 +2071,33 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             value={inventoryLocationName}
                                             onChange={(e) => setInventoryLocationName(e.target.value)}
                                             placeholder="e.g. pATRIK"
-                                            className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-800 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
+                                            className="w-full px-3 bg-transparent border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground h-9 dark:bg-input/30 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                         />
                                         <div className="flex items-start gap-2.5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                                            <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-4 h-4 text-amber-fg shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                                             </svg>
-                                            <p className="text-xs text-amber-300/80 leading-relaxed">
-                                                Must be an <strong className="text-amber-200">exact case-sensitive match</strong> of your Shopify location name.
-                                                Find it in <strong className="text-amber-200">Settings &rarr; Locations</strong> in Shopify Admin.
+                                            <p className="text-xs text-amber-fg-soft/80 leading-relaxed">
+                                                Must be an <strong className="text-amber-fg-softer">exact case-sensitive match</strong> of your Shopify location name.
+                                                Find it in <strong className="text-amber-fg-softer">Settings &rarr; Locations</strong> in Shopify Admin.
                                             </p>
                                         </div>
                                     </div>
                                 </div>
                             ) : pricelistPriority.length > 0 ? (
-                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden flex flex-col">
-                                    <div className="px-6 py-5 border-b border-neutral-800">
+                                <div className="bg-muted/40 rounded-2xl border border-border overflow-hidden flex flex-col">
+                                    <div className="px-6 py-5 border-b border-border">
                                         <div className="flex items-center gap-2">
-                                            <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-4 h-4 text-cyan-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                                             </svg>
-                                            <h2 className="text-sm font-semibold text-white">Pricelist Priority</h2>
+                                            <h2 className="text-[13px] font-semibold text-foreground">Pricelist Priority</h2>
                                         </div>
-                                        <p className="text-xs text-neutral-500 mt-1.5">Drag to reorder · First enabled pricelist wins</p>
+                                        <p className="text-xs text-muted-foreground mt-1.5">Drag to reorder · First enabled pricelist wins</p>
                                     </div>
                                     <div className="p-4 flex-1">
                                         {dropIndicator === 0 && draggedIndex !== 0 && (
-                                            <div className="h-1 bg-[#01a0be] rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
+                                            <div className="h-1 bg-primary rounded-full mb-2 shadow-xs animate-pulse" />
                                         )}
                                         {pricelistPriority.map((pl, idx) => (
                                             <div key={pl.name}>
@@ -2117,19 +2108,19 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     onDragEnd={onDragEnd}
                                                     onDragLeave={onDragLeave}
                                                     className={`
-                          flex items-center gap-3 p-3 rounded-xl mb-2 last:mb-0
-                          transition-all duration-150 ease-out
-                          cursor-grab active:cursor-grabbing select-none
-                          ${draggedIndex === idx
-                                                        ? "opacity-50 scale-95 bg-neutral-900/50 border-2 border-dashed border-cyan-500/50"
-                                                        : pl.enabled
-                                                            ? "bg-neutral-800/60 border border-neutral-800 hover:border-cyan-500/30 hover:bg-neutral-800/80"
-                                                            : "bg-neutral-900/40 border border-neutral-800/50 opacity-50"
-                                                    }
-                          group
-                        `}
+ flex items-center gap-3 p-3 rounded-xl mb-2 last:mb-0
+ transition-all duration-150 ease-out
+ cursor-grab active:cursor-grabbing select-none
+${draggedIndex === idx
+ ? "opacity-50 scale-95 bg-muted/40 border-2 border-dashed border-cyan-500/50"
+ : pl.enabled
+ ? "bg-muted/60 border border-border hover:border-cyan-500/30 hover:bg-muted/80"
+ :"bg-muted/40 border border-border/50 opacity-50"
+ }
+ group
+`}
                                                 >
-                                                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-neutral-700/30 text-neutral-500 group-hover:bg-cyan-500/20 group-hover:text-cyan-400 transition-colors">
+                                                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-accent/30 text-muted-foreground group-hover:bg-cyan-500/20 group-hover:text-cyan-fg transition-colors">
                                                         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                                                             <circle cx="9" cy="6" r="1.5" />
                                                             <circle cx="15" cy="6" r="1.5" />
@@ -2140,22 +2131,22 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         </svg>
                                                     </div>
                                                     <div className={`
-                          flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold transition-all
-                          ${idx === 0 && pl.enabled
-                                                        ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30"
-                                                        : pl.enabled
-                                                            ? "bg-neutral-700/80 text-neutral-300"
-                                                            : "bg-neutral-800 text-neutral-500"
-                                                    }
-                        `}>
+ flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold transition-all
+${idx === 0 && pl.enabled
+ ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-xs"
+ : pl.enabled
+ ? "bg-accent/80 text-foreground"
+ :"bg-muted text-muted-foreground"
+ }
+ `}>
                                                         {idx + 1}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-medium text-white truncate">
+                                                        <div className="text-sm font-medium text-foreground truncate">
                                                             {pl.name}
                                                         </div>
                                                         {idx === 0 && pl.enabled && (
-                                                            <div className="text-[10px] text-amber-400/80 font-medium uppercase tracking-wider mt-0.5">
+                                                            <div className="text-[10px] text-amber-fg/80 font-medium uppercase tracking-wider mt-0.5">
                                                                 Primary
                                                             </div>
                                                         )}
@@ -2172,39 +2163,39 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                             className="sr-only peer"
                                                         />
                                                         <div className={`
-                            w-10 h-6 rounded-full transition-all duration-200
-                            after:content-[''] after:absolute after:top-[3px] after:left-[3px]
-                            after:bg-white after:rounded-full after:h-[18px] after:w-[18px]
-                            after:transition-all after:duration-200 after:shadow-sm
-                            peer-checked:after:translate-x-[16px]
-                            ${pl.enabled
-                                                            ? "bg-[#01a0be]"
-                                                            : "bg-neutral-700"
-                                                        }
-                          `} />
+ w-10 h-6 rounded-full transition-all duration-200
+ after:content-[''] after:absolute after:top-[3px] after:left-[3px]
+ after:bg-white after:rounded-full after:h-[18px] after:w-[18px]
+ after:transition-all after:duration-200 after:shadow-sm
+ peer-checked:after:translate-x-[16px]
+${pl.enabled
+ ? "bg-primary"
+ :"bg-accent"
+ }
+ `} />
                                                     </label>
                                                 </div>
                                                 {dropIndicator === idx + 1 && draggedIndex !== idx && draggedIndex !== idx + 1 && (
-                                                    <div className="h-1 bg-[#01a0be] rounded-full mb-2 shadow-lg shadow-cyan-500/50 animate-pulse" />
+                                                    <div className="h-1 bg-primary rounded-full mb-2 shadow-xs animate-pulse" />
                                                 )}
                                             </div>
                                         ))}
                                     </div>
                                     {pricelistPriority.filter(p => p.enabled).length === 0 && (
                                         <div className="px-5 py-3 bg-amber-500/10 border-t border-amber-500/20">
-                                            <p className="text-xs text-amber-400">
+                                            <p className="text-xs text-amber-fg">
                                                 Enable at least one pricelist to export prices
                                             </p>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 flex items-center justify-center p-12">
+                                <div className="bg-muted/40 rounded-2xl border border-border flex items-center justify-center p-12">
                                     <div className="text-center">
-                                        <svg className="w-10 h-10 text-neutral-700 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
-                                        <p className="text-sm text-neutral-600">No pricelists found in product data</p>
+                                        <p className="text-sm text-muted-foreground/70">No pricelists found in product data</p>
                                     </div>
                                 </div>
                             )}
@@ -2215,11 +2206,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     {exportStep === 'filters' && (
                         <div className="space-y-5">
                             {/* Unified filter card */}
-                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
+                            <div className="bg-muted/40 rounded-2xl border border-border overflow-hidden">
                                 {/* Header */}
-                                <div className="flex items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
                                     <div className="flex min-w-0 items-center gap-2.5">
-                                        <h2 className="text-sm font-semibold text-white">Filters</h2>
+                                        <h2 className="text-[13px] font-semibold text-foreground">Filters</h2>
                                         {(() => {
                                             const n = [
                                                 filters.stockStatus !== 'all' && filters.stockStatus,
@@ -2231,16 +2222,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 filters.showNew, filters.showRecommended, filters.excludeCloseOut,
                                             ].filter(Boolean).length;
                                             return n > 0 ? (
-                                                <span className="shrink-0 rounded-full border border-cyan-500/20 bg-cyan-500/15 px-2 py-0.5 text-xs font-medium text-cyan-400">{n} active</span>
+                                                <span className="shrink-0 rounded-full border border-cyan-500/20 bg-cyan-500/15 px-2 py-0.5 text-xs font-medium text-cyan-fg">{n} active</span>
                                             ) : null;
                                         })()}
                                     </div>
                                     <div className="flex shrink-0 items-center gap-4">
                                         <span className="hidden text-xs tabular-nums sm:inline">
-                                            <span className="text-white font-semibold">{filteredProducts.length}</span>
-                                            <span className="text-neutral-600"> / {initialProducts.length} products</span>
+                                            <span className="text-foreground font-semibold">{filteredProducts.length}</span>
+                                            <span className="text-muted-foreground/70"> / {initialProducts.length} products</span>
                                         </span>
-                                        <button onClick={clearFilters} className="text-xs font-medium text-neutral-500 transition-colors hover:text-red-400">Reset all</button>
+                                        <button onClick={clearFilters} className="text-xs font-medium text-muted-foreground transition-colors hover:text-red-fg">Reset all</button>
                                     </div>
                                 </div>
 
@@ -2248,7 +2239,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     {/* Stock + Images */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Stock</p>
+                                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Stock</p>
                                             <div className="grid grid-cols-3 gap-1.5">
                                                 {[
                                                     { value: "all", label: "All", icon: "M4 6h16M4 10h16M4 14h8" },
@@ -2256,7 +2247,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     { value: "out_of_stock", label: "No Stock", icon: "M6 18L18 6M6 6l12 12" },
                                                 ].map(({ value, label, icon }) => (
                                                     <button key={value} onClick={() => setFilters(prev => ({ ...prev, stockStatus: value }))}
-                                                        className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-medium transition-all ${filters.stockStatus === value ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
+                                                        className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-md text-xs font-medium transition-all ${filters.stockStatus === value ? "bg-cyan-500/20 text-cyan-fg-soft border border-cyan-500/40 shadow-sm" : "bg-background text-muted-foreground border hover:text-foreground shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"}`}>
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} /></svg>
                                                         {label}
                                                     </button>
@@ -2264,7 +2255,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Images</p>
+                                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Images</p>
                                             <div className="grid grid-cols-3 gap-1.5">
                                                 {[
                                                     { value: "all", label: "All", icon: "M4 6h16M4 10h16M4 14h8" },
@@ -2272,7 +2263,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     { value: "without_images", label: "No Images", icon: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" },
                                                 ].map(({ value, label, icon }) => (
                                                     <button key={value} onClick={() => setFilters(prev => ({ ...prev, imageFilter: value }))}
-                                                        className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-medium transition-all ${filters.imageFilter === value ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
+                                                        className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-md text-xs font-medium transition-all ${filters.imageFilter === value ? "bg-cyan-500/20 text-cyan-fg-soft border border-cyan-500/40 shadow-sm" : "bg-background text-muted-foreground border hover:text-foreground shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"}`}>
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} /></svg>
                                                         {label}
                                                     </button>
@@ -2284,23 +2275,23 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     {/* Price + Tags */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Price Range</p>
+                                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Price Range</p>
                                             <div className="flex items-center gap-2">
                                                 <div className="relative flex-1">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600 text-xs font-mono">€</span>
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 text-xs font-mono">€</span>
                                                     <input type="number" value={filters.minPrice} onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))} placeholder="Min"
-                                                        className="w-full pl-7 pr-3 py-2.5 bg-neutral-900/60 border border-neutral-700/40 rounded-xl text-white text-sm placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all" />
+                                                        className="w-full pl-7 pr-3 bg-transparent border border-input rounded-md text-foreground text-sm placeholder:text-muted-foreground transition-all h-9 dark:bg-input/30 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
                                                 </div>
-                                                <span className="text-neutral-700 text-sm shrink-0">—</span>
+                                                <span className="text-muted-foreground/40 text-sm shrink-0">—</span>
                                                 <div className="relative flex-1">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600 text-xs font-mono">€</span>
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 text-xs font-mono">€</span>
                                                     <input type="number" value={filters.maxPrice} onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))} placeholder="Max"
-                                                        className="w-full pl-7 pr-3 py-2.5 bg-neutral-900/60 border border-neutral-700/40 rounded-xl text-white text-sm placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all" />
+                                                        className="w-full pl-7 pr-3 bg-transparent border border-input rounded-md text-foreground text-sm placeholder:text-muted-foreground transition-all h-9 dark:bg-input/30 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest">Tags</p>
+                                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Tags</p>
                                             <div className="grid grid-cols-3 gap-1.5">
                                                 {[
                                                     { key: "showNew", label: "New", icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" },
@@ -2308,7 +2299,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     { key: "excludeCloseOut", label: "Excl. Close Out", icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" },
                                                 ].map(({ key, label, icon }) => (
                                                     <button key={key} onClick={() => setFilters(prev => ({ ...prev, [key]: !prev[key] }))}
-                                                        className={`flex flex-col items-center justify-center gap-1.5 px-1 py-3 rounded-xl text-center text-[11px] font-medium leading-tight transition-all ${filters[key] ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10" : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"}`}>
+                                                        className={`flex flex-col items-center justify-center gap-1.5 px-1 py-3 rounded-md text-center text-[11px] font-medium leading-tight transition-all ${filters[key] ? "bg-cyan-500/20 text-cyan-fg-soft border border-cyan-500/40 shadow-sm" : "bg-background text-muted-foreground border hover:text-foreground shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"}`}>
                                                         <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} /></svg>
                                                         <span className="whitespace-nowrap">{label}</span>
                                                     </button>
@@ -2322,16 +2313,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                         {/* Custom Categories Tree — full width */}
                         {availableAiExports.length > 0 && (
-                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                                <div className="border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                            <div className="bg-muted/40 rounded-2xl border border-border overflow-hidden">
+                                <div className="border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex min-w-0 items-center gap-2.5">
-                                            <svg className="w-4 h-4 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-4 h-4 text-purple-fg shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                                             </svg>
-                                            <h2 className="truncate text-sm font-semibold text-white">Custom Categories</h2>
+                                            <h2 className="truncate text-[13px] font-semibold text-foreground">Custom Categories</h2>
                                             {filters.aiCategory.length > 0 && (
-                                                <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
+                                                <span className="text-xs bg-purple-500/20 text-purple-fg-soft border border-purple-500/30 px-2 py-0.5 rounded-full">
                                                     {filters.aiCategory.length === 1
                                                         ? filters.aiCategory[0].split(" / ").pop()
                                                         : `${filters.aiCategory.length} selected`}
@@ -2341,7 +2332,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         {filters.aiCategory.length > 0 && (
                                             <button
                                                 onClick={() => setFilters(prev => ({ ...prev, aiCategory: [] }))}
-                                                className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+                                                className="text-xs text-muted-foreground hover:text-red-fg transition-colors"
                                             >
                                                 Clear
                                             </button>
@@ -2355,11 +2346,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     <button
                                                         key={exp.exportId}
                                                         onClick={() => setFilters(prev => ({ ...prev, aiExportId: isActive ? "all" : exp.exportId, aiCategory: [] }))}
-                                                        className={`flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-medium transition-all ${
-                                                            isActive
-                                                                ? "bg-purple-500/20 text-purple-300 border border-purple-500/50"
-                                                                : "bg-neutral-800/50 text-neutral-400 border border-neutral-800 hover:border-neutral-600 hover:text-white"
-                                                        }`}
+                                                        className={`flex items-center gap-1.5 px-3 rounded-full text-xs font-medium transition-all h-7 ${
+ isActive
+ ? "bg-purple-500/20 text-purple-fg-soft border border-purple-500/50"
+ :"bg-background text-muted-foreground border hover:text-foreground shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
+ }`}
                                                     >
                                                         {exp.logo && <img src={exp.logo} alt="" className="w-3.5 h-3.5 object-contain rounded-sm" />}
                                                         {exp.name}
@@ -2370,11 +2361,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     )}
                                 </div>
                                 {filters.aiExportId === "all" && availableAiExports.length > 1 ? (
-                                    <div className="py-10 text-center text-neutral-500 text-sm">
+                                    <div className="py-10 text-center text-muted-foreground text-sm">
                                         Select a category set above to browse categories
                                     </div>
                                 ) : Object.keys(categoryTree).length === 0 ? (
-                                    <div className="py-10 text-center text-neutral-500 text-sm">
+                                    <div className="py-10 text-center text-muted-foreground text-sm">
                                         No custom categories found for this export
                                     </div>
                                 ) : (
@@ -2390,8 +2381,8 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     <div key={path}>
                                                         <div
                                                             className={`flex items-center gap-1 py-1.5 rounded-xl transition-all group ${
-                                                                isActive ? "bg-purple-500/10" : "hover:bg-neutral-700/40"
-                                                            } ${hasChildren ? "cursor-pointer" : "cursor-default"}`}
+ isActive ? "bg-purple-500/10" : "hover:bg-accent/40"
+ } ${hasChildren ? "cursor-pointer" : "cursor-default"}`}
                                                             style={{ paddingLeft: `${8 + depth * 20}px`, paddingRight: "10px" }}
                                                             onClick={() => {
                                                                 if (hasChildren) {
@@ -2405,7 +2396,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         >
                                                             {/* Expand/collapse chevron */}
                                                             {hasChildren ? (
-                                                                <span className="w-6 h-6 shrink-0 flex items-center justify-center text-neutral-500 group-hover:text-neutral-300">
+                                                                <span className="w-6 h-6 shrink-0 flex items-center justify-center text-muted-foreground group-hover:text-foreground">
                                                                     <svg className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                                                     </svg>
@@ -2420,20 +2411,20 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                                     setFilters(prev => ({ ...prev, aiCategory: isActive ? prev.aiCategory.filter(p => p !== path) : [...prev.aiCategory, path] }));
                                                                 }}
                                                                 className={`w-4 h-4 shrink-0 rounded border-2 flex items-center justify-center transition-all mr-1 cursor-pointer ${
-                                                                    isActive
-                                                                        ? "bg-purple-500 border-purple-500"
-                                                                        : "border-neutral-600 hover:border-purple-400 bg-transparent"
-                                                                }`}
+ isActive
+ ? "bg-purple-500 border-purple-500"
+ :"border-input hover:border-purple-400 bg-transparent"
+ }`}
                                                             >
                                                                 {isActive && (
-                                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <svg className="w-2.5 h-2.5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                                                     </svg>
                                                                 )}
                                                             </div>
-                                                            <span className={`text-sm flex-1 truncate select-none ${isActive ? "text-purple-300 font-medium" : "text-neutral-300 group-hover:text-white"}`}>{name}</span>
+                                                            <span className={`text-sm flex-1 truncate select-none ${isActive ? "text-purple-fg-soft font-medium" : "text-foreground group-hover:text-foreground"}`}>{name}</span>
                                                             {count > 0 && (
-                                                                <span className={`text-xs tabular-nums shrink-0 ml-1.5 ${isActive ? "text-purple-400/70" : "text-neutral-600 group-hover:text-neutral-500"}`}>
+                                                                <span className={`text-xs tabular-nums shrink-0 ml-1.5 ${isActive ? "text-purple-fg/70" : "text-muted-foreground/70 group-hover:text-muted-foreground"}`}>
                                                                     {count}
                                                                 </span>
                                                             )}
@@ -2451,27 +2442,27 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                         {/* Product Category chips — dynamic, only categories still present after other filters */}
                         {availableCategories.length > 0 && (
-                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                                <div className="flex items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                            <div className="bg-muted/40 rounded-2xl border border-border overflow-hidden">
+                                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
                                     <div className="flex min-w-0 items-center gap-2.5">
-                                        <svg className="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-4 h-4 text-cyan-fg shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                         </svg>
-                                        <h2 className="text-sm font-semibold text-white">Category</h2>
+                                        <h2 className="text-[13px] font-semibold text-foreground">Category</h2>
                                         {filters.category.length > 0 && (
-                                            <span className="text-xs bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium">
+                                            <span className="text-xs bg-cyan-500/15 text-cyan-fg border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium">
                                                 {filters.category.length === 1 ? filters.category[0] : `${filters.category.length} selected`}
                                             </span>
                                         )}
                                     </div>
                                     {filters.category.length > 0 && (
                                         <button onClick={() => setFilters(prev => ({ ...prev, category: [] }))}
-                                            className="text-xs text-neutral-500 hover:text-red-400 transition-colors">Clear</button>
+                                            className="text-xs text-muted-foreground hover:text-red-fg transition-colors">Clear</button>
                                     )}
                                 </div>
                                 <div className="p-4 flex flex-wrap gap-1.5">
                                     {dynamicCategories.length === 0 ? (
-                                        <span className="text-xs text-neutral-600 italic">No categories match current filters</span>
+                                        <span className="text-xs text-muted-foreground/70 italic">No categories match current filters</span>
                                     ) : (
                                         dynamicCategories.map(cat => {
                                             const count = categoryProductCounts.get(cat) || 0;
@@ -2480,14 +2471,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 <button
                                                     key={cat}
                                                     onClick={() => setFilters(prev => ({ ...prev, category: isActive ? prev.category.filter(c => c !== cat) : [...prev.category, cat] }))}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                                        isActive
-                                                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                                                            : "bg-neutral-900/50 text-neutral-500 border border-neutral-700/40 hover:border-neutral-600 hover:text-neutral-300"
-                                                    }`}
+                                                    className={`flex items-center gap-1.5 px-3 rounded-md text-xs font-medium transition-all h-7 ${
+ isActive
+ ? "bg-cyan-500/20 text-cyan-fg-soft border border-cyan-500/40"
+ :"bg-background text-muted-foreground border hover:text-foreground shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
+ }`}
                                                 >
                                                     {cat}
-                                                    <span className={`tabular-nums text-[10px] ${isActive ? "text-cyan-400/60" : "text-neutral-700"}`}>{count}</span>
+                                                    <span className={`tabular-nums text-[10px] ${isActive ? "text-cyan-fg/60" : "text-muted-foreground/40"}`}>{count}</span>
                                                 </button>
                                             );
                                         })
@@ -2504,26 +2495,26 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             preset defaults so the generated CSV always matches Shopify's import schema.
                             Only the Variant Option Name (below) stays editable. */}
                         {selectedPreset !== 'shopify' && (
-                        <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                            <div className="border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-5">
+                        <div className="bg-muted/40 rounded-2xl border border-border overflow-hidden">
+                            <div className="border-b border-border px-4 py-3.5 sm:px-6 sm:py-5">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
-                                        <h2 className="text-sm font-semibold text-white">Select Fields</h2>
-                                        <p className="mt-0.5 hidden text-xs text-neutral-500 sm:block">Choose which columns to include in your export</p>
+                                        <h2 className="text-[13px] font-semibold text-foreground">Select Fields</h2>
+                                        <p className="mt-0.5 hidden text-xs text-muted-foreground sm:block">Choose which columns to include in your export</p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-                                        <span className="whitespace-nowrap text-xs text-neutral-500">
-                                            <span className="font-medium text-neutral-300">{selectedFields.length}</span> / {currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]).length}
+                                        <span className="whitespace-nowrap text-xs text-muted-foreground">
+                                            <span className="font-medium text-foreground">{selectedFields.length}</span> / {currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]).length}
                                         </span>
                                         <button
                                             onClick={() => setSelectedFields(currentPreset.fields.flatMap((f) => f.group ? f.group.map(g => g.key) : [f.key]))}
-                                            className="whitespace-nowrap text-xs font-medium text-cyan-400 transition-colors hover:text-cyan-300"
+                                            className="whitespace-nowrap text-xs font-medium text-cyan-fg transition-colors hover:text-cyan-fg-soft"
                                         >
                                             Select all
                                         </button>
                                         <button
                                             onClick={() => setSelectedFields([])}
-                                            className="text-xs text-neutral-500 transition-colors hover:text-neutral-300"
+                                            className="text-xs text-muted-foreground transition-colors hover:text-foreground"
                                         >
                                             Clear
                                         </button>
@@ -2540,12 +2531,12 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         <div key={field.key} className="relative group/field">
                                             <button
                                                 onClick={() => toggleField(field)}
-                                                className={`w-full flex items-center gap-2 px-3 py-2.5 pr-3 sm:pr-8 rounded-xl text-sm transition-all ${isSelected
-                                                        ? "bg-[#01a0be]/15 border border-[#01a0be]/50 text-white"
-                                                        : "bg-neutral-800/50 border border-neutral-700/30 text-neutral-400 hover:text-white hover:border-neutral-600"
-                                                    }`}
+                                                className={`w-full flex items-center gap-2 px-3 pr-3 sm:pr-8 rounded-md text-sm transition-all h-9 ${isSelected
+ ? "bg-accent-brand/15 border border-accent-brand/50 text-foreground"
+ :"bg-background border text-muted-foreground hover:text-foreground shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
+ }`}
                                             >
-                                                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${isSelected ? "bg-cyan-500" : "bg-neutral-700"}`}>
+                                                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${isSelected ? "bg-cyan-500" : "bg-accent"}`}>
                                                     {isSelected && (
                                                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -2557,7 +2548,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             {/* Info button */}
                                             <button
                                                 onClick={e => { e.stopPropagation(); setFieldInfoModal(field); }}
-                                                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md hidden sm:flex items-center justify-center text-neutral-700 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all opacity-0 group-hover/field:opacity-100"
+                                                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md hidden sm:flex items-center justify-center text-muted-foreground/40 hover:text-cyan-fg hover:bg-cyan-500/10 transition-all opacity-0 group-hover/field:opacity-100"
                                                 title="Field details"
                                             >
                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -2572,16 +2563,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                         {/* Option1 Name customization — shown when option1 fields are selected */}
                         {selectedFields.includes('option1_name') && (
-                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                                <div className="border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                            <div className="bg-muted/40 rounded-2xl border border-border overflow-hidden">
+                                <div className="border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
                                     <div className="flex items-center gap-2">
-                                        <svg className="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-4 h-4 text-cyan-fg shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                         </svg>
-                                        <h2 className="text-sm font-semibold text-white">Variant Option Name</h2>
+                                        <h2 className="text-[13px] font-semibold text-foreground">Variant Option Name</h2>
                                     </div>
-                                    <p className="text-xs text-neutral-500 mt-1.5 leading-relaxed">
-                                        This is Shopify&apos;s <span className="text-neutral-400 font-medium">Option1 Name</span> — the label for the attribute that tells your variants apart (e.g. <span className="text-neutral-400">Size</span>, <span className="text-neutral-400">Length</span>, <span className="text-neutral-400">Color</span>). Shopify pairs it with each variant&apos;s own value (its size or model), so one product reads like <span className="text-neutral-400">Size: 77</span>. It applies to every product in this export.
+                                    <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                                        This is Shopify&apos;s <span className="text-muted-foreground font-medium">Option1 Name</span> — the label for the attribute that tells your variants apart (e.g. <span className="text-muted-foreground">Size</span>, <span className="text-muted-foreground">Length</span>, <span className="text-muted-foreground">Color</span>). Shopify pairs it with each variant&apos;s own value (its size or model), so one product reads like <span className="text-muted-foreground">Size: 77</span>. It applies to every product in this export.
                                     </p>
                                 </div>
                                 <div className="p-4 sm:p-5">
@@ -2590,9 +2581,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         value={option1Name}
                                         onChange={(e) => setOption1Name(e.target.value)}
                                         placeholder="Variant"
-                                        className="w-full px-4 py-2.5 bg-neutral-900/80 border border-neutral-800 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
+                                        className="w-full px-3 bg-transparent border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground h-9 dark:bg-input/30 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                     />
-                                    <p className="text-xs text-neutral-500 mt-2">Leave empty to use the generic default: <span className="text-neutral-400 font-medium">Variant</span>.</p>
+                                    <p className="text-xs text-muted-foreground mt-2">Leave empty to use the generic default: <span className="text-muted-foreground font-medium">Variant</span>.</p>
                                 </div>
                             </div>
                         )}
@@ -2603,28 +2594,28 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         <div className="space-y-6">
                             {/* Stats Bar */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-5 border border-neutral-800">
-                                    <div className="text-3xl font-bold text-cyan-400">{filteredProducts.length}</div>
-                                    <div className="text-xs text-neutral-500 mt-1">Products</div>
+                                <div className="bg-muted/40 rounded-2xl p-5 border border-border">
+                                    <div className="text-3xl font-bold text-cyan-fg">{filteredProducts.length}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Products</div>
                                 </div>
-                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-5 border border-neutral-800">
-                                    <div className="text-3xl font-bold text-blue-400">{totalRows}</div>
-                                    <div className="text-xs text-neutral-500 mt-1">Export Rows</div>
+                                <div className="bg-muted/40 rounded-2xl p-5 border border-border">
+                                    <div className="text-3xl font-bold text-blue-fg">{totalRows}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Export Rows</div>
                                 </div>
-                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-5 border border-neutral-800">
-                                    <div className="text-3xl font-bold text-purple-400">{selectedPreset === 'inventory' ? 12 : selectedFields.length}</div>
-                                    <div className="text-xs text-neutral-500 mt-1">{selectedPreset === 'inventory' ? 'Fixed Columns' : 'Fields'}</div>
+                                <div className="bg-muted/40 rounded-2xl p-5 border border-border">
+                                    <div className="text-3xl font-bold text-purple-fg">{selectedPreset === 'inventory' ? 12 : selectedFields.length}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{selectedPreset === 'inventory' ? 'Fixed Columns' : 'Fields'}</div>
                                 </div>
-                                <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl p-5 border border-neutral-800">
+                                <div className="bg-muted/40 rounded-2xl p-5 border border-border">
                                     {selectedPreset === 'inventory' ? (
                                         <>
-                                            <div className="text-lg font-bold text-pink-400 truncate" title={inventoryLocationName || 'Not set'}>{inventoryLocationName || 'No location'}</div>
-                                            <div className="text-xs text-neutral-500 mt-1">Location</div>
+                                            <div className="text-lg font-bold text-pink-fg truncate" title={inventoryLocationName || 'Not set'}>{inventoryLocationName || 'No location'}</div>
+                                            <div className="text-xs text-muted-foreground mt-1">Location</div>
                                         </>
                                     ) : (
                                         <>
-                                            <div className="text-2xl font-bold text-pink-400">{currentPreset.name}</div>
-                                            <div className="text-xs text-neutral-500 mt-1">Format</div>
+                                            <div className="text-2xl font-bold text-pink-fg">{currentPreset.name}</div>
+                                            <div className="text-xs text-muted-foreground mt-1">Format</div>
                                         </>
                                     )}
                                 </div>
@@ -2632,14 +2623,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                             {/* Download — hidden when creating a source from the Shopify integration */}
                             {!fromIntegration && (
-                            <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 overflow-hidden">
-                                <div className="flex items-center justify-between gap-3 border-b border-neutral-800 px-4 py-3.5 sm:px-6 sm:py-4">
+                            <div className="bg-muted/40 rounded-2xl border border-border overflow-hidden">
+                                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-6 sm:py-4">
                                     <div className="min-w-0">
-                                        <h2 className="text-sm font-semibold text-white">Download</h2>
-                                        <p className="truncate text-xs text-neutral-500 mt-0.5">{filteredProducts.length} products · {totalRows} rows{selectedPreset === 'inventory' ? ` · ${inventoryLocationName || 'No location'}` : ` · ${selectedFields.length} fields`}</p>
+                                        <h2 className="text-[13px] font-semibold text-foreground">Download</h2>
+                                        <p className="truncate text-xs text-muted-foreground mt-0.5">{filteredProducts.length} products · {totalRows} rows{selectedPreset === 'inventory' ? ` · ${inventoryLocationName || 'No location'}` : ` · ${selectedFields.length} fields`}</p>
                                     </div>
                                     {exportStatus && (
-                                        <span className={`text-sm font-medium px-3 py-1.5 rounded-lg ${exportStatus.includes("!") ? "bg-green-500/15 text-green-400" : "bg-amber-500/15 text-amber-400"}`}>
+                                        <span className={`text-sm font-medium px-3 py-1.5 rounded-lg ${exportStatus.includes("!") ? "bg-green-500/15 text-green-fg" : "bg-amber-500/15 text-amber-fg"}`}>
                                             {exportStatus}
                                         </span>
                                     )}
@@ -2654,11 +2645,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                 key={fmt}
                                                 onClick={() => handleDownload(fmt)}
                                                 disabled={disabled}
-                                                className={`flex flex-col items-center gap-2.5 py-5 px-4 rounded-xl font-medium text-sm transition-all ${
-                                                    disabled
-                                                        ? 'bg-neutral-800/50 text-neutral-600 cursor-not-allowed'
-                                                        : `${meta.bg} ${meta.text} hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] cursor-pointer`
-                                                }`}
+                                                className={`flex flex-col items-center gap-2.5 py-5 px-4 rounded-md font-medium text-sm transition-all ${
+ disabled
+ ? 'bg-background text-muted-foreground/70 cursor-not-allowed border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50'
+ :`${meta.bg} ${meta.text} hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] cursor-pointer`
+ }`}
                                             >
                                                 <div className="w-7 h-7 flex items-center justify-center">
                                                     {isLoading ? (
@@ -2682,7 +2673,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     )}
 
                     {/* Bottom Navigation — sticky so it's always reachable, full-width on mobile */}
-                    <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex items-center justify-between gap-3 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:-mb-5 sm:px-6 sm:py-4">
+                    <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex items-center justify-between gap-3 border-t border-border bg-popover px-4 py-3 sm:-mx-6 sm:-mb-5 sm:px-6 sm:py-4">
                         <button
                             onClick={() => {
                                 const steps = stepsFor(selectedPreset);
@@ -2690,7 +2681,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 if (idx > 0) setExportStep(steps[idx - 1]);
                             }}
                             disabled={exportStep === stepsFor(selectedPreset)[0]}
-                            className="flex shrink-0 items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-800/80 px-4 py-2.5 text-sm font-medium text-neutral-300 transition-all hover:bg-neutral-700/80 hover:text-white disabled:pointer-events-none disabled:opacity-0"
+                            className="flex shrink-0 items-center gap-2 rounded-md border bg-background px-4 text-sm font-medium text-foreground transition-all hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-0 h-9 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -2705,7 +2696,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     const idx = steps.indexOf(exportStep);
                                     if (idx < steps.length - 1) setExportStep(steps[idx + 1]);
                                 }}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01a0be] px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-cyan-500/20 transition-all hover:bg-[#0bb6d4] sm:flex-none"
+                                className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 sm:flex-none h-9"
                             >
                                 {exportStep === 'format' && 'Set Filters'}
                                 {exportStep === 'filters' && selectedPreset === 'inventory' ? 'Review & Export' : ''}
@@ -2718,7 +2709,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         ) : (
                             <div className="flex flex-1 items-center justify-end gap-2 sm:flex-none">
                                 {currentConfigId && (
-                                    <span className="hidden items-center gap-1.5 rounded-lg border border-[#01a0be]/25 bg-[#01a0be]/10 px-2.5 py-1.5 text-xs font-medium text-[#01a0be] sm:inline-flex">
+                                    <span className="hidden items-center gap-1.5 rounded-lg border border-accent-brand/25 bg-accent-brand/10 px-2.5 py-1.5 text-xs font-medium text-accent-brand sm:inline-flex">
                                         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
@@ -2728,7 +2719,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         <button
                                             onClick={() => { setCurrentConfigId(null); setExportName(""); setExportDescription(""); }}
                                             title="Stop editing — next save creates a new export"
-                                            className="ml-0.5 rounded p-0.5 text-[#01a0be]/70 transition-colors hover:bg-[#01a0be]/15 hover:text-[#01a0be]"
+                                            className="ml-0.5 rounded p-0.5 text-accent-brand/70 transition-colors hover:bg-accent-brand/15 hover:text-accent-brand"
                                         >
                                             <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
@@ -2737,7 +2728,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <button
                                     onClick={() => setShowSaveModal(true)}
                                     disabled={selectedPreset !== 'inventory' && selectedFields.length === 0}
-                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:border-neutral-600 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-800/50 sm:flex-none"
+                                    className="flex flex-1 items-center justify-center gap-2 rounded-md border bg-background px-4 text-sm font-medium text-foreground transition-all hover:bg-accent disabled:pointer-events-none disabled:bg-muted/50 sm:flex-none h-9 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                                 >
                                     <SaveIcon /> Save Config
                                 </button>
@@ -2754,24 +2745,24 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 <div className="space-y-6">
                     {/* Header Bar */}
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <h2 className="text-lg font-semibold text-white">Saved exports</h2>
+                        <h2 className="text-[15px] font-semibold text-foreground">Saved exports</h2>
                         <div className="flex w-full items-center gap-2 sm:w-auto">
                             {exportStatus && (
-                                <span className={`mr-auto text-sm font-medium sm:mr-0 ${exportStatus.includes("!") ? "text-green-400" : "text-amber-400"}`}>
+                                <span className={`mr-auto text-sm font-medium sm:mr-0 ${exportStatus.includes("!") ? "text-green-fg" : "text-amber-fg"}`}>
                                     {exportStatus}
                                 </span>
                             )}
                             <button
                                 onClick={loadSavedExports}
                                 disabled={isLoadingExports}
-                                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-2 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:py-1.5"
+                                className="flex flex-1 items-center justify-center gap-2 rounded-md border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50 sm:flex-none sm:py-1.5 h-9 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                             >
                                 <RefreshIcon />
                                 {isLoadingExports ? "Loading..." : "Refresh"}
                             </button>
                             <button
                                 onClick={startNewExport}
-                                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#0bb6d4] sm:flex-none sm:py-1.5"
+                                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:flex-none h-9"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2782,32 +2773,32 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     </div>
 
                     {isLoadingExports ? (
-                        <div className="bg-neutral-900/40 backdrop-blur-sm rounded-2xl border border-neutral-800 p-16">
+                        <div className="bg-muted/40 rounded-2xl border border-border p-16">
                             <div className="flex flex-col items-center justify-center gap-4">
                                 <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-                                <p className="text-neutral-400">Loading saved exports...</p>
+                                <p className="text-muted-foreground">Loading saved exports...</p>
                             </div>
                         </div>
                     ) : savedExports.length === 0 ? (
-                        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 px-6 py-12 backdrop-blur-sm sm:py-16">
+                        <div className="rounded-2xl border border-border bg-muted/40 px-6 py-12 sm:py-16">
                             <div className="mx-auto flex max-w-sm flex-col items-center justify-center text-center">
                                 <div className="relative mb-6">
-                                    <div className="w-20 h-20 bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl flex items-center justify-center border border-neutral-800 shadow-xl">
-                                        <svg className="w-9 h-9 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div className="w-20 h-20 bg-gradient-to-br from-muted to-card rounded-2xl flex items-center justify-center border border-border shadow-xl">
+                                        <svg className="w-9 h-9 text-muted-foreground/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                                         </svg>
                                     </div>
-                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#01a0be] rounded-lg flex items-center justify-center shadow-lg">
-                                        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary rounded-lg flex items-center justify-center shadow-lg">
+                                        <svg className="w-3.5 h-3.5 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                                         </svg>
                                     </div>
                                 </div>
-                                <h3 className="text-lg font-semibold text-white mb-2">No saved exports yet</h3>
-                                <p className="text-sm text-neutral-500 mb-6 leading-relaxed">Configure an export with your preferred settings, then save it for quick access and shareable API links.</p>
+                                <h3 className="text-[13px] font-semibold text-foreground mb-2">No saved exports yet</h3>
+                                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Configure an export with your preferred settings, then save it for quick access and shareable API links.</p>
                                 <button
                                     onClick={startNewExport}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-[#01a0be] hover:bg-[#0bb6d4] text-white rounded-xl font-semibold transition-all shadow-lg shadow-cyan-500/25 text-sm"
+                                    className="flex items-center gap-2 px-5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md font-medium transition-all shadow-xs text-sm h-9"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2818,19 +2809,19 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         </div>
                     ) : (
                         /* Minimal list — one row per export, details & actions live in the modal */
-                        <div className="overflow-x-auto rounded-2xl border border-neutral-800">
+                        <div className="overflow-x-auto rounded-2xl border border-border">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b border-neutral-800 bg-neutral-900/60 text-left text-xs uppercase tracking-wider text-neutral-500">
-                                        <th className="px-4 py-3 font-medium">Export</th>
-                                        <th className="font-medium">Format</th>
-                                        <th className="hidden font-medium md:table-cell">Fields</th>
-                                        <th className="hidden font-medium md:table-cell">Filters</th>
-                                        <th className="hidden font-medium lg:table-cell">Created</th>
-                                        <th className="px-4 text-right font-medium">Actions</th>
+                                    <tr className="border-b border-border bg-card text-left text-xs uppercase tracking-wider text-muted-foreground">
+                                        <th className="px-4 font-semibold h-9">Export</th>
+                                        <th className="font-semibold h-9">Format</th>
+                                        <th className="hidden font-semibold md:table-cell h-9">Fields</th>
+                                        <th className="hidden font-semibold md:table-cell h-9">Filters</th>
+                                        <th className="hidden font-semibold lg:table-cell h-9">Created</th>
+                                        <th className="px-4 text-right font-semibold h-9">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-neutral-800">
+                                <tbody className="divide-y divide-border">
                                     {savedExports.map((config) => {
                                         const style = PRESET_STYLE[config.preset] || PRESET_STYLE.simple;
                                         const preset = EXPORT_PRESETS[config.preset];
@@ -2839,7 +2830,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             <tr
                                                 key={config._id}
                                                 onClick={() => setDetailConfig(config)}
-                                                className="cursor-pointer bg-neutral-900/20 transition-colors hover:bg-neutral-800/40"
+                                                className="cursor-pointer bg-muted/40 transition-colors hover:bg-muted/30"
                                             >
                                                 <td className="px-4 py-3">
                                                     <div className="flex min-w-0 items-center gap-3">
@@ -2851,9 +2842,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                             )}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <p className="truncate font-medium text-white">{config.name}</p>
+                                                            <p className="truncate font-medium text-foreground">{config.name}</p>
                                                             {config.description && (
-                                                                <p className="max-w-[320px] truncate text-xs text-neutral-500">{config.description}</p>
+                                                                <p className="max-w-[320px] truncate text-xs text-muted-foreground">{config.description}</p>
                                                             )}
                                                         </div>
                                                     </div>
@@ -2863,16 +2854,16 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         {preset?.name || config.preset}
                                                     </span>
                                                 </td>
-                                                <td className="hidden text-neutral-400 md:table-cell">{config.selectedFields?.length || 0}</td>
-                                                <td className="hidden text-neutral-400 md:table-cell">{filterCount > 0 ? filterCount : "—"}</td>
-                                                <td className="hidden text-xs text-neutral-500 lg:table-cell">{formatDate(config.createdAt)}</td>
+                                                <td className="hidden text-muted-foreground md:table-cell">{config.selectedFields?.length || 0}</td>
+                                                <td className="hidden text-muted-foreground md:table-cell">{filterCount > 0 ? filterCount : "—"}</td>
+                                                <td className="hidden text-xs text-muted-foreground lg:table-cell">{formatDate(config.createdAt)}</td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex justify-end gap-1.5">
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); loadExportConfig(config); }}
                                                             title="Edit this export in the configurator"
                                                             aria-label="Edit"
-                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white sm:px-3"
+                                                            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 text-sm font-medium text-foreground transition-colors hover:text-foreground sm:px-3 h-8 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                                                         >
                                                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -2882,7 +2873,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); setDetailConfig(config); }}
                                                             aria-label="Details"
-                                                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/60 px-2.5 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white sm:px-3"
+                                                            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 text-sm font-medium text-foreground transition-colors hover:text-foreground sm:px-3 h-8 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                                                         >
                                                             <span className="hidden sm:inline">Details</span>
                                                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2904,34 +2895,34 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             {showPreview && (
                 <div className="fixed inset-0 z-50 flex" style={{ fontFamily: 'inherit' }}>
                     {/* Backdrop */}
-                    <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowPreview(false)} />
+                    <div className="flex-1 bg-black/40" onClick={() => setShowPreview(false)} />
                     {/* Drawer */}
-                    <div className="w-full max-w-4xl bg-neutral-950 border-l border-neutral-700/60 flex flex-col shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-4xl bg-background border-l border-border flex flex-col shadow-xl overflow-hidden">
                         {/* Panel header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800/80 bg-neutral-900/80 shrink-0">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-card shrink-0">
                             <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 bg-[#01a0be] rounded-lg flex items-center justify-center shrink-0">
-                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
+                                    <svg className="w-4 h-4 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                 </div>
                                 <div className="min-w-0">
-                                    <h2 className="text-base font-semibold text-white truncate">
+                                    <h2 className="text-[14px] font-semibold text-foreground truncate">
                                         {previewConfig ? previewConfig.name : 'Current Export Preview'}
                                     </h2>
-                                    <p className="text-xs text-neutral-500 mt-0.5">
-                                        <span className="text-cyan-400 font-medium">{previewDisplayProducts.length}</span>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        <span className="text-cyan-fg font-medium">{previewDisplayProducts.length}</span>
                                         {previewSearch.trim() ? ` of ${previewBaseProducts.length} products` : ` product${previewBaseProducts.length !== 1 ? 's' : ''}`} match this export
                                     </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 {/* Grid / List toggle */}
-                                <div className="flex bg-neutral-800/80 border border-neutral-800 rounded-lg p-0.5">
+                                <div className="flex bg-muted/80 border border-border rounded-lg p-0.5">
                                     <button
                                         onClick={() => setPreviewView('grid')}
-                                        className={`p-1.5 rounded-md transition-all ${previewView === 'grid' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                                        className={`p-1.5 rounded-md transition-all ${previewView ==='grid' ? 'bg-background text-foreground border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50' : 'text-muted-foreground hover:text-foreground'}`}
                                         title="Grid view"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2940,7 +2931,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     </button>
                                     <button
                                         onClick={() => setPreviewView('list')}
-                                        className={`p-1.5 rounded-md transition-all ${previewView === 'list' ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                                        className={`p-1.5 rounded-md transition-all ${previewView ==='list' ? 'bg-background text-foreground border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50' : 'text-muted-foreground hover:text-foreground'}`}
                                         title="List view"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2950,7 +2941,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 </div>
                                 <button
                                     onClick={() => setShowPreview(false)}
-                                    className="p-2 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all"
+                                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-all"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2960,9 +2951,9 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         </div>
 
                         {/* Search bar */}
-                        <div className="px-4 py-3 border-b border-neutral-800/60 shrink-0">
+                        <div className="px-4 py-3 border-b border-border/60 shrink-0">
                             <div className="relative">
-                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                                 <input
@@ -2970,10 +2961,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     value={previewSearch}
                                     onChange={e => setPreviewSearch(e.target.value)}
                                     placeholder="Search within preview..."
-                                    className="w-full pl-9 pr-4 py-2.5 bg-neutral-800/60 border border-neutral-700/40 rounded-xl text-sm text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 transition-all"
+                                    className="w-full pl-9 pr-4 bg-transparent border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground transition-all h-9 dark:bg-input/30 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 />
                                 {previewSearch && (
-                                    <button onClick={() => setPreviewSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-300">
+                                    <button onClick={() => setPreviewSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 hover:text-foreground">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                         </svg>
@@ -2985,7 +2976,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         {/* Product list */}
                         <div className="flex-1 overflow-y-auto p-4">
                             {previewDisplayProducts.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-neutral-600">
+                                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground/70">
                                     <svg className="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                     </svg>
@@ -3000,33 +2991,33 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         const minPrice = allPrices.length ? Math.min(...allPrices) : null;
                                         const hasStock = variants.some(v => v.stock_amount > 0);
                                         return (
-                                            <div key={product._id || product.token} role="button" tabIndex={0} onClick={() => setDetailProduct(product)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailProduct(product); } }} className="group cursor-pointer bg-neutral-900/70 border border-neutral-800/60 rounded-xl overflow-hidden hover:border-[#01a0be]/40 hover:shadow-lg hover:shadow-black/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#01a0be]/50">
-                                                <div className="relative aspect-square bg-neutral-800">
+                                            <div key={product._id || product.token} role="button" tabIndex={0} onClick={() => setDetailProduct(product)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailProduct(product); } }} className="group cursor-pointer bg-card border border-border/60 rounded-xl overflow-hidden hover:border-accent-brand/40 hover:shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-brand/50">
+                                                <div className="relative aspect-square bg-muted">
                                                     {imgSrc ? (
                                                         <img src={imgSrc} alt={product.product_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
-                                                            <svg className="w-10 h-10 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <svg className="w-10 h-10 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                             </svg>
                                                         </div>
                                                     )}
                                                     <div className="absolute top-2 right-2">
-                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${hasStock ? 'bg-emerald-500/90 text-white' : 'bg-neutral-700/90 text-neutral-400'}`}>
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${hasStock ? 'bg-emerald-500/90 text-white' : 'bg-accent/90 text-muted-foreground'}`}>
                                                             {hasStock ? '● In Stock' : '○ No Stock'}
                                                         </span>
                                                     </div>
                                                 </div>
                                                 <div className="p-2.5">
-                                                    <p className="text-xs font-semibold text-white line-clamp-2 leading-snug mb-1.5">{product.product_name}</p>
+                                                    <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug mb-1.5">{product.product_name}</p>
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-[11px] text-neutral-500">{variants.length} variant{variants.length !== 1 ? 's' : ''}</span>
-                                                        {minPrice !== null && <span className="text-xs font-semibold text-cyan-400">€{minPrice.toFixed(2)}</span>}
+                                                        <span className="text-[11px] text-muted-foreground">{variants.length} variant{variants.length !== 1 ? 's' : ''}</span>
+                                                        {minPrice !== null && <span className="text-xs font-semibold text-cyan-fg">€{minPrice.toFixed(2)}</span>}
                                                     </div>
                                                     {product.categories?.length > 0 && (
                                                         <div className="mt-1.5 flex flex-wrap gap-1">
                                                             {product.categories.slice(0, 2).map(cat => (
-                                                                <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-500 rounded-md border border-neutral-800 truncate max-w-[80px]">{cat}</span>
+                                                                <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded-md border border-border truncate max-w-[80px]">{cat}</span>
                                                             ))}
                                                         </div>
                                                     )}
@@ -3044,30 +3035,30 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         const minPrice = allPrices.length ? Math.min(...allPrices) : null;
                                         const hasStock = variants.some(v => v.stock_amount > 0);
                                         return (
-                                            <div key={product._id || product.token} role="button" tabIndex={0} onClick={() => setDetailProduct(product)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailProduct(product); } }} className="flex items-center gap-3 p-2.5 bg-neutral-900/60 border border-neutral-800/50 rounded-xl cursor-pointer hover:border-[#01a0be]/40 hover:bg-neutral-800/40 transition-all group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#01a0be]/50">
-                                                <div className="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-neutral-800">
+                                            <div key={product._id || product.token} role="button" tabIndex={0} onClick={() => setDetailProduct(product)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailProduct(product); } }} className="flex items-center gap-3 p-2.5 bg-card border border-border/50 rounded-xl cursor-pointer hover:border-accent-brand/40 hover:bg-muted/40 transition-all group focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-brand/50 shadow-sm">
+                                                <div className="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-muted">
                                                     {imgSrc ? (
                                                         <img src={imgSrc} alt={product.product_name} className="w-full h-full object-cover" />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
-                                                            <svg className="w-5 h-5 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <svg className="w-5 h-5 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                             </svg>
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-white truncate">{product.product_name}</p>
+                                                    <p className="text-sm font-medium text-foreground truncate">{product.product_name}</p>
                                                     <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-[11px] text-neutral-600">{variants.length} var.</span>
-                                                        {minPrice !== null && <span className="text-[11px] font-semibold text-cyan-400">€{minPrice.toFixed(2)}</span>}
+                                                        <span className="text-[11px] text-muted-foreground/70">{variants.length} var.</span>
+                                                        {minPrice !== null && <span className="text-[11px] font-semibold text-cyan-fg">€{minPrice.toFixed(2)}</span>}
                                                         {product.categories?.slice(0, 2).map(cat => (
-                                                            <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-600 rounded border border-neutral-700/40 truncate max-w-[100px]">{cat}</span>
+                                                            <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground/70 rounded border border-input/40 truncate max-w-[100px]">{cat}</span>
                                                         ))}
                                                     </div>
                                                 </div>
                                                 <div className="shrink-0">
-                                                    <span className={`text-[10px] font-semibold px-2 py-1 rounded-lg ${hasStock ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-neutral-800 text-neutral-600 border border-neutral-700/40'}`}>
+                                                    <span className={`text-[10px] font-semibold px-2 py-1 rounded-lg ${hasStock ? 'bg-emerald-500/15 text-emerald-fg border border-emerald-500/20' : 'bg-muted text-muted-foreground/70 border border-input/40'}`}>
                                                         {hasStock ? 'In Stock' : 'No Stock'}
                                                     </span>
                                                 </div>
@@ -3088,13 +3079,13 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                 const filterCount = countConfigFilters(detailConfig);
                 const enabledPricelists = detailConfig.pricelistPriority?.filter(p => p.enabled) || [];
                 return (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onClick={() => setDetailConfig(null)}>
-                        <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDetailConfig(null)}>
+                        <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg" onClick={(e) => e.stopPropagation()}>
                             {/* Top gradient accent bar — same per-preset accent as the old cards */}
                             <div className={`h-[3px] shrink-0 bg-gradient-to-r ${style.gradient}`} />
 
                             {/* Header */}
-                            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+                            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-6 py-4">
                                 <div className="flex min-w-0 items-center gap-3">
                                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${style.iconBg}`}>
                                         {preset?.icon || (
@@ -3105,22 +3096,22 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     </div>
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <h3 className="truncate text-base font-semibold text-white">{detailConfig.name}</h3>
+                                            <h3 className="truncate text-[13px] font-semibold text-foreground">{detailConfig.name}</h3>
                                             <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${style.badge}`}>
                                                 {preset?.name || detailConfig.preset}
                                             </span>
                                         </div>
                                         {detailConfig.description ? (
-                                            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-neutral-500">{detailConfig.description}</p>
+                                            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{detailConfig.description}</p>
                                         ) : (
-                                            <p className="mt-0.5 text-xs italic text-neutral-600">No description</p>
+                                            <p className="mt-0.5 text-xs italic text-muted-foreground/70">No description</p>
                                         )}
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setDetailConfig(null)}
                                     aria-label="Close"
-                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground"
                                 >
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
@@ -3129,7 +3120,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             {/* Body */}
                             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5">
                                 {/* Configuration summary */}
-                                <dl className="divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+                                <dl className="divide-y divide-border rounded-xl border border-border">
                                     {[
                                         ["Format", preset?.name || detailConfig.preset],
                                         ["Fields", `${detailConfig.selectedFields?.length || 0} selected`],
@@ -3139,15 +3130,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         ["Created", formatDate(detailConfig.createdAt) || "—"],
                                     ].map(([k, v]) => (
                                         <div key={k} className="grid grid-cols-[7.5rem_1fr] gap-2 px-4 py-2.5">
-                                            <dt className="text-xs font-medium text-neutral-500">{k}</dt>
-                                            <dd className="text-xs leading-relaxed text-neutral-300">{v}</dd>
+                                            <dt className="text-xs font-medium text-muted-foreground">{k}</dt>
+                                            <dd className="text-xs leading-relaxed text-foreground">{v}</dd>
                                         </div>
                                     ))}
                                 </dl>
 
                                 {/* Download */}
                                 <div>
-                                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Download</p>
+                                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Download</p>
                                     <div className="grid grid-cols-3 gap-1.5">
                                         {['csv', 'json', 'xml'].map((fmt) => {
                                             const meta = FORMAT_META[fmt];
@@ -3159,11 +3150,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                     onClick={() => downloadFromAPI(detailConfig._id, fmt)}
                                                     disabled={!!downloadingId}
                                                     title={`Download as ${meta.label}`}
-                                                    className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-all ${
-                                                        isLoading
-                                                            ? 'bg-neutral-800 text-neutral-500 cursor-wait'
-                                                            : `${meta.bg} ${meta.text} disabled:opacity-40 disabled:cursor-not-allowed`
-                                                    }`}
+                                                    className={`flex items-center justify-center gap-1.5 rounded-md py-2.5 text-xs font-medium transition-all ${
+ isLoading
+ ? 'bg-background text-muted-foreground cursor-wait border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50'
+ :`${meta.bg} ${meta.text} disabled:opacity-50 disabled:pointer-events-none`
+ }`}
                                                 >
                                                     {isLoading ? <SpinnerIcon /> : meta.icon}
                                                     {meta.label}
@@ -3175,11 +3166,11 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                                 {/* Manage */}
                                 <div>
-                                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Manage</p>
+                                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Manage</p>
                                     <div className="grid grid-cols-3 gap-1.5">
                                         <button
                                             onClick={() => { setDetailConfig(null); setPreviewConfig(detailConfig); setPreviewSearch(''); setShowPreview(true); }}
-                                            className="flex items-center justify-center gap-1.5 rounded-xl border border-neutral-700 bg-neutral-800/60 py-2.5 text-xs font-semibold text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                            className="flex items-center justify-center gap-1.5 rounded-md border bg-background py-2.5 text-xs font-medium text-foreground transition-colors hover:text-foreground shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                                             title="Preview products for this export"
                                         >
                                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3190,7 +3181,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         </button>
                                         <button
                                             onClick={() => openKeysModal(detailConfig._id)}
-                                            className="flex items-center justify-center gap-1.5 rounded-xl border border-purple-500/20 bg-purple-500/10 py-2.5 text-xs font-semibold text-purple-400 transition-colors hover:bg-purple-500/20"
+                                            className="flex items-center justify-center gap-1.5 rounded-md border border-purple-500/20 bg-purple-500/10 py-2.5 text-xs font-medium text-purple-fg transition-colors hover:bg-purple-500/20"
                                             title="API Keys"
                                         >
                                             <KeyIcon />
@@ -3198,7 +3189,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         </button>
                                         <button
                                             onClick={() => openAccessModal(detailConfig._id)}
-                                            className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-500/20 bg-blue-500/10 py-2.5 text-xs font-semibold text-blue-400 transition-colors hover:bg-blue-500/20"
+                                            className="flex items-center justify-center gap-1.5 rounded-md border border-blue-500/20 bg-blue-500/10 py-2.5 text-xs font-medium text-blue-fg transition-colors hover:bg-blue-500/20"
                                             title="Manage access"
                                         >
                                             <UsersIcon />
@@ -3209,7 +3200,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             </div>
 
                             {/* Footer */}
-                            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+                            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-muted/40 px-6 py-4">
                                 <button
                                     onClick={() => {
                                         if (confirm(`Delete "${detailConfig.name}"? This also removes its API keys and shared access.`)) {
@@ -3217,7 +3208,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             setDetailConfig(null);
                                         }
                                     }}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/20"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-red-500/40 bg-red-500/10 px-3 text-sm font-medium text-red-fg-soft transition-colors hover:bg-red-500/20 h-8"
                                 >
                                     <TrashIcon />
                                     Delete
@@ -3225,14 +3216,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => setDetailConfig(null)}
-                                        className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                        className="inline-flex items-center rounded-md border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:text-foreground h-8 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                                     >
                                         Close
                                     </button>
                                     <button
                                         onClick={() => { loadExportConfig(detailConfig); setDetailConfig(null); }}
                                         title="Open in the configurator — change filters or fields, then Update or Save as new"
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#0bb6d4]"
+                                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-8"
                                     >
                                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -3253,21 +3244,21 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
             {/* Field Info Modal */}
             {fieldInfoModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setFieldInfoModal(null)}>
-                    <div className="bg-neutral-900 rounded-2xl w-full max-w-md border border-neutral-700/60 overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="h-0.5 w-full bg-[#01a0be]" />
+                <div className="fixed inset-0 bg-background/60 flex items-center justify-center z-50 p-4" onClick={() => setFieldInfoModal(null)}>
+                    <div className="bg-background rounded-lg w-full max-w-md border border-input/60 overflow-hidden shadow-lg" onClick={e => e.stopPropagation()}>
+                        <div className="h-0.5 w-full bg-primary" />
                         <div className="p-6 space-y-5">
 
                             {/* Header */}
                             <div className="flex items-start justify-between gap-3">
                                 <div className="space-y-1.5">
-                                    <h3 className="text-base font-semibold text-white">{fieldInfoModal.label}</h3>
+                                    <h3 className="text-[13px] font-semibold text-foreground">{fieldInfoModal.label}</h3>
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-neutral-500 uppercase tracking-wider">Column</span>
-                                        <code className="text-[11px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md font-mono border border-cyan-500/15">{fieldInfoModal.label}</code>
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Column</span>
+                                        <code className="text-[11px] text-cyan-fg bg-cyan-500/10 px-2 py-0.5 rounded-md font-mono border border-cyan-500/15">{fieldInfoModal.label}</code>
                                     </div>
                                 </div>
-                                <button onClick={() => setFieldInfoModal(null)} className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-white hover:bg-white/[0.06] transition-all shrink-0 mt-0.5">
+                                <button onClick={() => setFieldInfoModal(null)} className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all shrink-0 mt-0.5">
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -3275,23 +3266,23 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                             {/* AI source notice */}
                             {AI_FIELD_KEYS.has(fieldInfoModal.key) && fieldInfoModal.key !== "ai_export_ids" && (
                                 <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-purple-500/[0.07] border border-purple-500/20">
-                                    <svg className="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                                    <p className="text-xs text-neutral-400">
-                                        Populated by <span className="text-purple-300 font-medium">Claude AI</span> based on your export&apos;s custom category tree
-                                        {fieldInfoModal.key === "ai_tags" && <> · used as <span className="text-white font-medium">Collection</span> in Shopify</>}
+                                    <svg className="w-3.5 h-3.5 text-purple-fg shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                    <p className="text-xs text-muted-foreground">
+                                        Populated by <span className="text-purple-fg-soft font-medium">Claude AI</span> based on your export&apos;s custom category tree
+                                        {fieldInfoModal.key === "ai_tags" && <> · used as <span className="text-foreground font-medium">Collection</span> in Shopify</>}
                                     </p>
                                 </div>
                             )}
 
                             {/* Description — only for non-Collection fields (Collection gets the toggle instead) */}
                             {fieldInfoModal.description && fieldInfoModal.key !== "ai_tags" && fieldInfoModal.key !== "ai_category_names" && (
-                                <p className="text-sm text-neutral-400 leading-relaxed">{fieldInfoModal.description}</p>
+                                <p className="text-sm text-muted-foreground leading-relaxed">{fieldInfoModal.description}</p>
                             )}
 
                             {/* Output format toggle — Collection fields only */}
                             {(fieldInfoModal.key === "ai_tags" || fieldInfoModal.key === "ai_category_names") && (
                                 <div className="space-y-2.5">
-                                    <p className="text-xs font-semibold text-neutral-500 uppercase tracking-widest">Output format</p>
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Output format</p>
                                     <div className="space-y-2">
                                         {[
                                             {
@@ -3314,18 +3305,18 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                             const active = aiLeafMode[fieldInfoModal.key] === opt.leaf;
                                             return (
                                                 <button key={String(opt.leaf)} onClick={() => setAiLeafMode(prev => ({ ...prev, [fieldInfoModal.key]: opt.leaf }))}
-                                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${active ? "bg-cyan-500/10 border-cyan-500/40" : "bg-neutral-800/40 border-neutral-700/40 hover:border-neutral-600/60"}`}>
-                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${active ? "border-cyan-500" : "border-neutral-600"}`}>
+                                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-left transition-all ${active ? "bg-cyan-500/10 border-cyan-500/40" : "bg-background border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"}`}>
+                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${active ? "border-cyan-500" : "border-input"}`}>
                                                         {active && <div className="w-2 h-2 rounded-full bg-cyan-500" />}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`text-sm font-medium ${active ? "text-white" : "text-neutral-400"}`}>{opt.title}</span>
-                                                            {opt.isDefault && <span className="text-[10px] text-neutral-500 bg-neutral-700/60 px-1.5 py-0.5 rounded-md">{opt.defaultLabel}</span>}
+                                                            <span className={`text-sm font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}>{opt.title}</span>
+                                                            {opt.isDefault && <span className="text-[10px] text-muted-foreground bg-accent/60 px-1.5 py-0.5 rounded-md">{opt.defaultLabel}</span>}
                                                         </div>
-                                                        <p className="text-xs text-neutral-600 mt-0.5">{opt.subtitle}</p>
+                                                        <p className="text-xs text-muted-foreground/70 mt-0.5">{opt.subtitle}</p>
                                                     </div>
-                                                    <code className={`text-[11px] font-mono px-2 py-1 rounded-lg shrink-0 ${active ? "text-cyan-300 bg-cyan-500/10 border border-cyan-500/20" : "text-neutral-500 bg-neutral-800 border border-neutral-800"}`}>{opt.example}</code>
+                                                    <code className={`text-[11px] font-mono px-2 py-1 rounded-lg shrink-0 ${active ? "text-cyan-fg-soft bg-cyan-500/10 border border-cyan-500/20" : "text-muted-foreground bg-muted border border-border"}`}>{opt.example}</code>
                                                 </button>
                                             );
                                         })}
@@ -3340,15 +3331,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
             {/* Save Modal — creates a new export, or updates the one being edited */}
             {showSaveModal && (
-                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowSaveModal(false)}>
-                    <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowSaveModal(false)}>
+                    <div className="flex w-full max-w-md flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
-                            <h3 className="text-base font-semibold text-white">{currentConfigId ? "Save changes" : "Save export"}</h3>
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-4">
+                            <h3 className="text-[13px] font-semibold text-foreground">{currentConfigId ? "Save changes" : "Save export"}</h3>
                             <button
                                 onClick={() => setShowSaveModal(false)}
                                 aria-label="Close"
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
@@ -3357,48 +3348,48 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         {/* Body */}
                         <div className="space-y-4 px-6 py-5">
                             {currentConfigId && (
-                                <div className="rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/[0.06] px-4 py-3 text-xs leading-relaxed text-neutral-300">
-                                    <span className="font-medium text-white">You are editing &quot;{savedExports.find(e => e._id === currentConfigId)?.name || exportName}&quot;.</span>{" "}
+                                <div className="rounded-xl border border-accent-brand/20 bg-accent-brand/[0.06] px-4 py-3 text-xs leading-relaxed text-foreground">
+                                    <span className="font-medium text-foreground">You are editing &quot;{savedExports.find(e => e._id === currentConfigId)?.name || exportName}&quot;.</span>{" "}
                                     Update overwrites it — Save as new creates a copy.
                                 </div>
                             )}
                             <div>
-                                <label className="mb-1.5 block text-sm font-medium text-neutral-300">Export name *</label>
+                                <label className="mb-1.5 block text-sm font-medium text-foreground">Export name *</label>
                                 <input
                                     type="text"
                                     value={exportName}
                                     onChange={(e) => setExportName(e.target.value)}
                                     placeholder="My Shopify Export"
-                                    className="w-full rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-[#01a0be] focus:outline-none"
+                                    className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:border-accent-brand focus:outline-none"
                                 />
                             </div>
                             <div>
-                                <label className="mb-1.5 block text-sm font-medium text-neutral-300">Description (optional)</label>
+                                <label className="mb-1.5 block text-sm font-medium text-foreground">Description (optional)</label>
                                 <textarea
                                     value={exportDescription}
                                     onChange={(e) => setExportDescription(e.target.value)}
                                     placeholder="Weekly export for online store"
                                     rows={3}
-                                    className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-[#01a0be] focus:outline-none"
+                                    className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground dark:bg-input/30 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 />
                             </div>
-                            <dl className="divide-y divide-neutral-800 rounded-xl border border-neutral-800">
+                            <dl className="divide-y divide-border rounded-xl border border-border">
                                 {[
                                     ["Format", currentPreset.name],
                                     ["Fields", selectedPreset === 'inventory' ? "Fixed inventory columns" : `${selectedFields.length} selected`],
                                     ["Products", `${filteredProducts.length}`],
                                 ].map(([k, v]) => (
                                     <div key={k} className="grid grid-cols-[7.5rem_1fr] gap-2 px-4 py-2.5">
-                                        <dt className="text-xs font-medium text-neutral-500">{k}</dt>
-                                        <dd className="text-xs text-neutral-300">{v}</dd>
+                                        <dt className="text-xs font-medium text-muted-foreground">{k}</dt>
+                                        <dd className="text-xs text-foreground">{v}</dd>
                                     </div>
                                 ))}
                             </dl>
                         </div>
 
                         {/* Footer */}
-                        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
-                            <span className={`min-w-0 truncate text-xs font-medium ${exportStatus ? (exportStatus.includes("!") ? "text-green-400" : "text-amber-400") : "text-transparent"}`}>
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/40 px-6 py-4">
+                            <span className={`min-w-0 truncate text-xs font-medium ${exportStatus ? (exportStatus.includes("!") ? "text-green-fg" : "text-amber-fg") :"text-transparent"}`}>
                                 {exportStatus || "·"}
                             </span>
                             <div className="flex shrink-0 items-center gap-2">
@@ -3407,14 +3398,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                     <button
                                         onClick={handleSaveExport}
                                         disabled={isSaving || !exportName.trim()}
-                                        className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="inline-flex items-center rounded-md border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50 h-8 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                                     >
                                         {isSaving ? "Saving…" : "Save as new"}
                                     </button>
                                     <button
                                         onClick={handleUpdateExport}
                                         disabled={isSaving || !exportName.trim()}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#0bb6d4] disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 h-8"
                                     >
                                         {isSaving ? "Updating…" : "Update export"}
                                     </button>
@@ -3423,14 +3414,14 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <>
                                     <button
                                         onClick={() => setShowSaveModal(false)}
-                                        className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                        className="inline-flex items-center rounded-md border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:text-foreground h-8 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         onClick={handleSaveExport}
                                         disabled={isSaving || !exportName.trim()}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#01a0be] px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#0bb6d4] disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 h-8"
                                     >
                                         {isSaving ? "Saving…" : "Save export"}
                                     </button>
@@ -3445,30 +3436,30 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
             {/* API Keys Modal */}
             {showKeysModal && (
                 <div
-                    className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
                     onClick={() => { if (!createdKeyRaw) closeKeysModal(); }}
                 >
-                    <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg" onClick={(e) => e.stopPropagation()}>
                         {/* Top gradient accent bar */}
                         <div className="h-[3px] shrink-0 bg-gradient-to-r from-purple-500 to-fuchsia-400" />
 
                         {/* Header */}
-                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-4">
                             <div className="flex min-w-0 items-center gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-400">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-fg">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                     </svg>
                                 </div>
                                 <div className="min-w-0">
-                                    <h3 className="text-base font-semibold text-white">API keys</h3>
-                                    <p className="truncate text-xs text-neutral-500">{activeExportName || "Authenticate the export endpoints"}</p>
+                                    <h3 className="text-[13px] font-semibold text-foreground">API keys</h3>
+                                    <p className="truncate text-xs text-muted-foreground">{activeExportName || "Authenticate the export endpoints"}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={closeKeysModal}
                                 aria-label="Close"
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
@@ -3480,28 +3471,28 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                 <div className="rounded-xl border border-amber-500/20 overflow-hidden">
                                     {/* Warning strip */}
                                     <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/8 border-b border-amber-500/15">
-                                        <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-3.5 h-3.5 text-amber-fg shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                         </svg>
-                                        <p className="text-amber-400 font-medium text-xs">Save this key — it won&apos;t be shown again</p>
+                                        <p className="text-amber-fg font-medium text-xs">Save this key — it won&apos;t be shown again</p>
                                     </div>
                                     {/* Tab strip */}
-                                    <div className="flex border-b border-neutral-800 bg-neutral-900/60">
+                                    <div className="flex border-b border-border bg-card">
                                         {[['key', 'Key'], ['endpoints', 'Endpoints'], ['usage', 'Usage']].map(([id, label]) => (
                                             <button key={id} onClick={() => setCreatedKeyTab(id)}
-                                                className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${createdKeyTab === id ? 'border-purple-500 text-purple-400' : 'border-transparent text-neutral-500 hover:text-neutral-300'}`}>
+                                                className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${createdKeyTab === id ? 'border-purple-500 text-purple-fg' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
                                                 {label}
                                             </button>
                                         ))}
                                     </div>
                                     {/* Tab content */}
-                                    <div className="p-4 bg-neutral-950/40">
+                                    <div className="p-4 bg-popover">
                                         {createdKeyTab === 'key' && (
                                             <div className="flex gap-2">
-                                                <code className="flex-1 text-xs text-white bg-neutral-900 px-3 py-2.5 rounded-lg break-all font-mono min-w-0 border border-neutral-800">{createdKeyRaw}</code>
+                                                <code className="flex-1 text-xs text-foreground bg-card px-3 py-2.5 rounded-lg break-all font-mono min-w-0 border border-border">{createdKeyRaw}</code>
                                                 <button
                                                     onClick={() => { navigator.clipboard.writeText(createdKeyRaw); setCopiedField('key'); setTimeout(() => setCopiedField(null), 2000); }}
-                                                    className={`shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${copiedField === 'key' ? 'bg-green-500/15 text-green-400 ring-1 ring-green-500/20' : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'}`}
+                                                    className={`shrink-0 px-3 rounded-md text-xs font-medium transition-colors h-8 ${copiedField ==='key' ? 'bg-green-500/15 text-green-fg ring-1 ring-green-500/20' : 'bg-background hover:bg-accent text-foreground border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50'}`}
                                                 >
                                                     {copiedField === 'key' ? '✓ Copied' : 'Copy'}
                                                 </button>
@@ -3509,15 +3500,15 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         )}
                                         {createdKeyTab === 'endpoints' && (
                                             <div className="space-y-2">
-                                                {[['CSV', 'csv', 'text-cyan-400'], ['JSON', 'json', 'text-emerald-400'], ['XML', 'xml', 'text-orange-400']].map(([label, fmt, color]) => (
+                                                {[['CSV', 'csv', 'text-cyan-fg'], ['JSON', 'json', 'text-emerald-fg'], ['XML', 'xml', 'text-orange-fg']].map(([label, fmt, color]) => (
                                                     <div key={fmt} className="flex items-center gap-2">
                                                         <span className={`text-xs font-mono font-semibold w-9 shrink-0 ${color}`}>{label}</span>
-                                                        <code className="flex-1 text-xs text-neutral-300 bg-neutral-900 px-2.5 py-2 rounded-lg font-mono min-w-0 truncate border border-neutral-800">
+                                                        <code className="flex-1 text-xs text-foreground bg-card px-2.5 py-2 rounded-lg font-mono min-w-0 truncate border border-border">
                                                             {`${apiUrl}/custom-export/${activeExportId}/${fmt}`}
                                                         </code>
                                                         <button
                                                             onClick={() => { navigator.clipboard.writeText(`${apiUrl}/custom-export/${activeExportId}/${fmt}`); setCopiedField(fmt); setTimeout(() => setCopiedField(null), 2000); }}
-                                                            className={`shrink-0 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${copiedField === fmt ? 'bg-green-500/15 text-green-400 ring-1 ring-green-500/20' : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'}`}
+                                                            className={`shrink-0 px-2.5 rounded-md text-xs font-medium transition-colors h-8 ${copiedField === fmt ? 'bg-green-500/15 text-green-fg ring-1 ring-green-500/20' : 'bg-background hover:bg-accent text-foreground border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50'}`}
                                                         >
                                                             {copiedField === fmt ? '✓' : 'Copy'}
                                                         </button>
@@ -3527,17 +3518,17 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         )}
                                         {createdKeyTab === 'usage' && (
                                             <div className="space-y-3">
-                                                <p className="text-xs text-neutral-400">Send the key in the <code className="text-purple-400 bg-neutral-800 px-1.5 py-0.5 rounded font-mono">X-Api-Key</code> header — never in the URL.</p>
-                                                {[['csv', 'text-cyan-400'], ['json', 'text-emerald-400'], ['xml', 'text-orange-400']].map(([fmt, color]) => (
+                                                <p className="text-xs text-muted-foreground">Send the key in the <code className="text-purple-fg bg-muted px-1.5 py-0.5 rounded font-mono">X-Api-Key</code> header — never in the URL.</p>
+                                                {[['csv', 'text-cyan-fg'], ['json', 'text-emerald-fg'], ['xml', 'text-orange-fg']].map(([fmt, color]) => (
                                                     <div key={fmt}>
                                                         <p className={`text-xs font-mono font-semibold mb-1 ${color}`}>{fmt.toUpperCase()}</p>
                                                         <div className="relative">
-                                                            <code className="block text-xs text-green-400 bg-black/60 border border-neutral-800 px-3 py-2.5 rounded-lg font-mono break-all leading-relaxed">
+                                                            <code className="block text-xs text-green-fg bg-background/60 border border-border px-3 py-2.5 rounded-lg font-mono break-all leading-relaxed">
                                                                 {`curl -H "X-Api-Key: ${createdKeyRaw}" \\\n  ${apiUrl}/custom-export/${activeExportId}/${fmt}`}
                                                             </code>
                                                             <button
                                                                 onClick={() => { navigator.clipboard.writeText(`curl -H "X-Api-Key: ${createdKeyRaw}" \\\n  ${apiUrl}/custom-export/${activeExportId}/${fmt}`); setCopiedField(`curl-${fmt}`); setTimeout(() => setCopiedField(null), 2000); }}
-                                                                className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium transition-colors ${copiedField === `curl-${fmt}` ? 'bg-green-500/15 text-green-400' : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400'}`}
+                                                                className={`absolute top-2 right-2 px-2 rounded text-xs font-medium transition-colors h-7 ${copiedField ===`curl-${fmt}` ? 'bg-green-500/15 text-green-fg' : 'bg-background hover:bg-accent text-muted-foreground border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50'}`}
                                                             >
                                                                 {copiedField === `curl-${fmt}` ? '✓' : 'Copy'}
                                                             </button>
@@ -3552,7 +3543,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
                             {/* ── Create new key ── */}
                             <div>
-                                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">New key</p>
+                                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">New key</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -3560,12 +3551,12 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         onChange={(e) => setNewKeyName(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
                                         placeholder="e.g. Shopify Integration"
-                                        className="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-purple-500/60 focus:outline-none"
+                                        className="flex-1 rounded-md border border-input bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground h-9 dark:bg-input/30 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                     />
                                     <button
                                         onClick={handleCreateKey}
                                         disabled={isKeyLoading || !newKeyName.trim()}
-                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-3.5 py-2 text-sm font-medium text-purple-400 transition-colors hover:bg-purple-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-purple-500/20 bg-purple-500/10 px-3.5 text-sm font-medium text-purple-fg transition-colors hover:bg-purple-500/20 disabled:pointer-events-none disabled:opacity-50 h-9"
                                     >
                                         {isKeyLoading ? (
                                             <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -3580,21 +3571,21 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         Generate
                                     </button>
                                 </div>
-                                <p className="mt-1.5 text-xs text-neutral-600">Shown once on creation — send it in the <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-purple-400">X-Api-Key</code> header.</p>
+                                <p className="mt-1.5 text-xs text-muted-foreground/70">Shown once on creation — send it in the <code className="rounded bg-muted px-1 py-0.5 font-mono text-purple-fg">X-Api-Key</code> header.</p>
                             </div>
 
                             {/* ── Key list ── */}
                             <div>
                                 <div className="mb-2 flex items-center justify-between">
-                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Keys</p>
+                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Keys</p>
                                     {exportKeys.filter(k => k.isActive).length > 0 && (
-                                        <span className="inline-flex items-center rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-400">
+                                        <span className="inline-flex items-center rounded-full border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-fg">
                                             {exportKeys.filter(k => k.isActive).length} active
                                         </span>
                                     )}
                                 </div>
                                 {isKeyLoading ? (
-                                    <div className="flex items-center justify-center py-10 text-neutral-600 text-sm gap-2">
+                                    <div className="flex items-center justify-center py-10 text-muted-foreground/70 text-sm gap-2">
                                         <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -3602,25 +3593,25 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         Loading...
                                     </div>
                                 ) : exportKeys.length === 0 ? (
-                                    <div className="text-center py-10 text-neutral-600">
+                                    <div className="text-center py-10 text-muted-foreground/70">
                                         <svg className="w-7 h-7 mx-auto mb-2.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                         </svg>
                                         <p className="text-sm font-medium">No API keys yet</p>
-                                        <p className="text-xs text-neutral-700 mt-1">Generate one above to get started</p>
+                                        <p className="text-xs text-muted-foreground/40 mt-1">Generate one above to get started</p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-800">
+                                    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                                         {exportKeys.map(key => (
-                                            <div key={key.keyId} className={`transition-opacity ${key.isActive ? 'bg-neutral-900/40' : 'bg-neutral-900/20 opacity-40'}`}>
+                                            <div key={key.keyId} className={`transition-opacity ${key.isActive ? 'bg-muted/40' : 'bg-muted/40 opacity-40'}`}>
                                                 {/* Key row */}
                                                 <div className="flex items-center gap-3 px-4 py-3">
-                                                    <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${key.isActive ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
+                                                    <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${key.isActive ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`} />
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="truncate text-sm font-medium leading-tight text-white">{key.name}</p>
-                                                        <p className="mt-0.5 truncate text-xs leading-tight text-neutral-500">
+                                                        <p className="truncate text-sm font-medium leading-tight text-foreground">{key.name}</p>
+                                                        <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">
                                                             <span className="font-mono">{key.keyPrefix}···</span>
-                                                            <span className="ml-2 text-neutral-600">
+                                                            <span className="ml-2 text-muted-foreground/70">
                                                                 Created {formatDate(key.createdAt)}
                                                                 {key.lastUsedAt && ` · Last used ${formatDate(key.lastUsedAt)}`}
                                                             </span>
@@ -3631,7 +3622,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                             <button
                                                                 onClick={() => setExpandedKeyId(expandedKeyId === key.keyId ? null : key.keyId)}
                                                                 title="Show endpoints"
-                                                                className={`rounded-lg border p-1.5 text-xs transition-colors ${expandedKeyId === key.keyId ? 'border-purple-500/20 bg-purple-500/20 text-purple-400' : 'border-transparent text-neutral-500 hover:bg-neutral-800 hover:text-neutral-300'}`}
+                                                                className={`rounded-md border p-1.5 text-xs transition-colors ${expandedKeyId === key.keyId ? 'border-purple-500/20 bg-purple-500/20 text-purple-fg' : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                                                             >
                                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -3641,30 +3632,30 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                                         {key.isActive ? (
                                                             <button
                                                                 onClick={() => handleRevokeKey(key.keyId)}
-                                                                className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20"
+                                                                className="rounded-md border border-red-500/40 bg-red-500/10 px-2.5 text-xs font-medium text-red-fg-soft transition-colors hover:bg-red-500/20 h-7"
                                                             >
                                                                 Revoke
                                                             </button>
                                                         ) : (
-                                                            <span className="rounded-lg bg-neutral-800 px-2.5 py-1 text-xs text-neutral-600">Revoked</span>
+                                                            <span className="rounded-lg bg-muted px-2.5 py-1 text-xs text-muted-foreground/70">Revoked</span>
                                                         )}
                                                     </div>
                                                 </div>
                                                 {/* Expandable endpoints panel */}
                                                 {expandedKeyId === key.keyId && (
-                                                    <div className="space-y-2 border-t border-neutral-800 px-4 pb-3 pt-3">
-                                                        <p className="mb-2 text-xs text-neutral-500">
-                                                            Set header <code className="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-purple-400">X-Api-Key: &lt;your-key&gt;</code>
+                                                    <div className="space-y-2 border-t border-border px-4 pb-3 pt-3">
+                                                        <p className="mb-2 text-xs text-muted-foreground">
+                                                            Set header <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-purple-fg">X-Api-Key: &lt;your-key&gt;</code>
                                                         </p>
-                                                        {[['CSV', 'csv', 'text-cyan-400'], ['JSON', 'json', 'text-emerald-400'], ['XML', 'xml', 'text-orange-400']].map(([label, fmt, color]) => (
+                                                        {[['CSV', 'csv', 'text-cyan-fg'], ['JSON', 'json', 'text-emerald-fg'], ['XML', 'xml', 'text-orange-fg']].map(([label, fmt, color]) => (
                                                             <div key={fmt} className="flex items-center gap-2">
                                                                 <span className={`text-xs font-mono font-semibold w-9 shrink-0 ${color}`}>{label}</span>
-                                                                <code className="flex-1 text-xs text-neutral-400 bg-neutral-900/80 px-2.5 py-1.5 rounded-lg font-mono min-w-0 truncate border border-neutral-800">
+                                                                <code className="flex-1 text-xs text-muted-foreground bg-card px-2.5 py-1.5 rounded-lg font-mono min-w-0 truncate border border-border">
                                                                     {`${apiUrl}/custom-export/${activeExportId}/${fmt}`}
                                                                 </code>
                                                                 <button
                                                                     onClick={() => { navigator.clipboard.writeText(`${apiUrl}/custom-export/${activeExportId}/${fmt}`); setCopiedField(`${key.keyId}-${fmt}`); setTimeout(() => setCopiedField(null), 2000); }}
-                                                                    className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${copiedField === `${key.keyId}-${fmt}` ? 'bg-green-500/15 text-green-400 ring-1 ring-green-500/20' : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-400'}`}
+                                                                    className={`shrink-0 px-2.5 rounded-md text-xs font-medium transition-colors h-7 ${copiedField ===`${key.keyId}-${fmt}` ? 'bg-green-500/15 text-green-fg ring-1 ring-green-500/20' : 'bg-background hover:bg-accent text-muted-foreground border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50'}`}
                                                                 >
                                                                     {copiedField === `${key.keyId}-${fmt}` ? '✓' : 'Copy'}
                                                                 </button>
@@ -3680,10 +3671,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         </div>
 
                         {/* Footer */}
-                        <div className="flex shrink-0 justify-end border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+                        <div className="flex shrink-0 justify-end border-t border-border bg-muted/40 px-6 py-4">
                             <button
                                 onClick={closeKeysModal}
-                                className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                className="inline-flex items-center rounded-md border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:text-foreground h-8 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                             >
                                 Close
                             </button>
@@ -3694,28 +3685,28 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
 
             {/* Access Control Modal */}
             {showAccessModal && (
-                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeAccessModal}>
-                    <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeAccessModal}>
+                    <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg" onClick={(e) => e.stopPropagation()}>
                         {/* Top gradient accent bar */}
                         <div className="h-[3px] shrink-0 bg-gradient-to-r from-blue-500 to-sky-400" />
 
                         {/* Header */}
-                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-6 py-4">
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-4">
                             <div className="flex min-w-0 items-center gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-fg">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
                                 </div>
                                 <div className="min-w-0">
-                                    <h3 className="text-base font-semibold text-white">Access</h3>
-                                    <p className="truncate text-xs text-neutral-500">{activeExportName || "Share this export with other users"}</p>
+                                    <h3 className="text-[13px] font-semibold text-foreground">Access</h3>
+                                    <p className="truncate text-xs text-muted-foreground">{activeExportName || "Share this export with other users"}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={closeAccessModal}
                                 aria-label="Close"
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 transition-colors hover:border-neutral-700 hover:bg-neutral-800 hover:text-white"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:bg-muted hover:text-foreground"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
@@ -3724,7 +3715,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5">
                             {/* Grant access */}
                             <div>
-                                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Grant access</p>
+                                <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Grant access</p>
                                 <div className="flex gap-2">
                                     <input
                                         type="email"
@@ -3732,12 +3723,12 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         onChange={(e) => setNewGrantEmail(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleGrantAccess()}
                                         placeholder="user@example.com"
-                                        className="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-blue-500/60 focus:outline-none"
+                                        className="flex-1 rounded-md border border-input bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground h-9 dark:bg-input/30 shadow-xs focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                     />
                                     <button
                                         onClick={handleGrantAccess}
                                         disabled={isAccessLoading || !newGrantEmail.trim()}
-                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3.5 py-2 text-sm font-medium text-blue-400 transition-colors hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-blue-500/20 bg-blue-500/10 px-3.5 text-sm font-medium text-blue-fg transition-colors hover:bg-blue-500/20 disabled:pointer-events-none disabled:opacity-50 h-9"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -3745,21 +3736,21 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         Grant
                                     </button>
                                 </div>
-                                <p className="mt-1.5 text-xs text-neutral-600">User must also have the export role in Auth0.</p>
+                                <p className="mt-1.5 text-xs text-muted-foreground/70">User must also have the export role in Auth0.</p>
                             </div>
 
                             {/* Access list */}
                             <div>
                                 <div className="mb-2 flex items-center justify-between">
-                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Users with access</p>
+                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Users with access</p>
                                     {exportAccess.length > 0 && (
-                                        <span className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">
+                                        <span className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-fg">
                                             {exportAccess.length} {exportAccess.length === 1 ? 'user' : 'users'}
                                         </span>
                                     )}
                                 </div>
                                 {isAccessLoading ? (
-                                    <div className="flex items-center justify-center py-8 text-neutral-500 text-sm gap-2">
+                                    <div className="flex items-center justify-center py-8 text-muted-foreground text-sm gap-2">
                                         <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -3767,35 +3758,35 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                                         Loading...
                                     </div>
                                 ) : exportAccess.length === 0 ? (
-                                    <div className="text-center py-8 text-neutral-600">
+                                    <div className="text-center py-8 text-muted-foreground/70">
                                         <svg className="w-8 h-8 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
                                         <p className="text-sm">No access grants yet</p>
-                                        <p className="text-xs text-neutral-700 mt-1">Enter an email above to grant access</p>
+                                        <p className="text-xs text-muted-foreground/40 mt-1">Enter an email above to grant access</p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-800">
+                                    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                                         {exportAccess.map(entry => {
                                             const initials = entry.email.split('@')[0].slice(0, 2).toUpperCase();
                                             return (
-                                                <div key={entry.email} className="flex items-center gap-3 bg-neutral-900/40 px-4 py-3">
+                                                <div key={entry.email} className="flex items-center gap-3 bg-muted/40 px-4 py-3">
                                                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/15">
-                                                        <span className="text-xs font-semibold text-blue-400">{initials}</span>
+                                                        <span className="text-xs font-semibold text-blue-fg">{initials}</span>
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="truncate text-sm font-medium text-white">{entry.email}</p>
-                                                        <p className="text-xs text-neutral-500">
+                                                        <p className="truncate text-sm font-medium text-foreground">{entry.email}</p>
+                                                        <p className="text-xs text-muted-foreground">
                                                             Granted {formatDate(entry.grantedAt)}
                                                             {' · '}
-                                                            <span className={entry.sub ? 'text-emerald-400' : 'text-neutral-600'}>
+                                                            <span className={entry.sub ?'text-emerald-fg':'text-muted-foreground/70'}>
                                                                 {entry.sub ? 'Active' : 'Pending login'}
                                                             </span>
                                                         </p>
                                                     </div>
                                                     <button
                                                         onClick={() => handleRevokeAccess(entry.email)}
-                                                        className="shrink-0 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20"
+                                                        className="shrink-0 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 text-xs font-medium text-red-fg-soft transition-colors hover:bg-red-500/20 h-7"
                                                     >
                                                         Revoke
                                                     </button>
@@ -3808,10 +3799,10 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                         </div>
 
                         {/* Footer */}
-                        <div className="flex shrink-0 justify-end border-t border-neutral-800 bg-neutral-900/40 px-6 py-4">
+                        <div className="flex shrink-0 justify-end border-t border-border bg-muted/40 px-6 py-4">
                             <button
                                 onClick={closeAccessModal}
-                                className="inline-flex items-center rounded-lg border border-neutral-700 bg-neutral-800/60 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
+                                className="inline-flex items-center rounded-md border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:text-foreground h-8 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
                             >
                                 Close
                             </button>
@@ -3819,6 +3810,7 @@ export default function ExportPage({ initialProducts = [], apiUrl = '', allowedE
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 }
