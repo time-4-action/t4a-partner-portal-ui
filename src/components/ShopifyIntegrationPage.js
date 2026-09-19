@@ -37,6 +37,10 @@ import {
   normalizePriceRounding, applyPriceRounding, describePriceRounding,
   matchRoundingPreset, offsetOptionsForStep, roundingEndingLabel,
 } from "../lib/priceRounding";
+import {
+  DEFAULT_PRICE_FIELDS, DEFAULT_EXISTING_SALE_POLICY, PRICE_FIELD_OPTIONS, EXISTING_SALE_OPTIONS,
+  normalizeCompareAtPricelist, normalizePriceFields, normalizeExistingSalePolicy, describeExistingSalePolicy,
+} from "../lib/comparePrice";
 
 // Client-only "now" snapshot (server = 0, client = a single cached timestamp) — lets us
 // flag future-dated pricelists without a hydration mismatch, a setState-in-effect, or an
@@ -95,6 +99,9 @@ const MOCK_CONNECTION = {
     priceFactor: 1, // multiplier applied to every pushed price (1 = unchanged)
     priceRounding: { ...DEFAULT_PRICE_ROUNDING }, // shelf-price rule applied after the factor
     futureDatedGuard: true,
+    compareAtPricelist: null, // pricelist pushed as the struck-through "was" price; null = off
+    priceFields: DEFAULT_PRICE_FIELDS, // which of price / compare-at the portal maintains
+    existingSalePolicy: DEFAULT_EXISTING_SALE_POLICY, // what to do with a merchant-made sale
     syncStock: true,
     syncNewProducts: true,
     syncPrices: true,
@@ -291,6 +298,8 @@ const RUN_COUNT_LABELS = [
   ["createdProducts", "Products created"],
   ["createdVariants", "Variants created"],
   ["pricesPushed", "Prices pushed"],
+  ["compareAtPushed", "Compare-at pushed"],
+  ["salesLeft", "Sales left alone"],
   ["contentPushed", "Content pushed"],
   ["optionsRenamed", "Options renamed"],
   ["optionValuesFixed", "Option values fixed"],
@@ -1515,6 +1524,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       priceFactor: parsePriceFactor(cfg.priceFactor),
       priceRounding: normalizePriceRounding(cfg.priceRounding),
       futureDatedGuard: cfg.futureDatedGuard ?? true,
+      compareAtPricelist: normalizeCompareAtPricelist(cfg.compareAtPricelist),
+      priceFields: normalizePriceFields(cfg.priceFields),
+      existingSalePolicy: normalizeExistingSalePolicy(cfg.existingSalePolicy),
       variantOptionName: cfg.variantOptionName ?? "",
       titlePrefix: cfg.titlePrefix ?? "",
     };
@@ -1529,6 +1541,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         syncTags: pick("syncTags"), priceVatMode: pick("priceVatMode"), futureDatedGuard: pick("futureDatedGuard"),
         priceFactor: parsePriceFactor(pick("priceFactor")),
         priceRounding: normalizePriceRounding(pick("priceRounding")),
+        compareAtPricelist: normalizeCompareAtPricelist(pick("compareAtPricelist")),
+        priceFields: normalizePriceFields(pick("priceFields")),
+        existingSalePolicy: normalizeExistingSalePolicy(pick("existingSalePolicy")),
         variantOptionName: pick("variantOptionName") ?? "",
         titlePrefix: pick("titlePrefix") ?? "",
         pricelistPriority: buildPricelistPriority(pricelists, s.pricelistPriority ?? (inheritBase ? cfg.pricelistPriority : undefined)),
@@ -1558,6 +1573,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       // Explicit, NOT left to the `...cfg` spread above: the raw server object would otherwise
       // land in `config` un-normalized and drift from `savedConfig` on the first edit.
       priceRounding: normalizePriceRounding(active.priceRounding),
+      compareAtPricelist: normalizeCompareAtPricelist(active.compareAtPricelist),
+      priceFields: normalizePriceFields(active.priceFields),
+      existingSalePolicy: normalizeExistingSalePolicy(active.existingSalePolicy),
       variantOptionName: active.variantOptionName ?? "",
       titlePrefix: active.titlePrefix ?? "",
       pricelistPriority: active.pricelistPriority,
@@ -1815,7 +1833,7 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
   const sourceScopes = config.scopes || [];
   const activeIdx = Math.min(activeScopeIdx, Math.max(0, sourceScopes.length - 1));
   const activeScope = sourceScopes[activeIdx] || null;
-  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "priceFactor", "priceRounding", "futureDatedGuard", "pricelistPriority", "publicationIds", "variantOptionName", "titlePrefix"];
+  const MIRROR_KEYS = ["ownership", "syncStock", "syncNewProducts", "syncPrices", "syncDescriptions", "syncImages", "syncTags", "priceVatMode", "priceFactor", "priceRounding", "futureDatedGuard", "compareAtPricelist", "priceFields", "existingSalePolicy", "pricelistPriority", "publicationIds", "variantOptionName", "titlePrefix"];
   const pickMirror = (c) => Object.fromEntries(MIRROR_KEYS.map((k) => [k, c[k]]));
   // After any change to a mirrored field, copy the whole set into the active scope.
   const mirrorActive = (c) => ({ ...c, scopes: (c.scopes || []).map((s, i) => (i === activeIdx ? { ...s, ...pickMirror(c) } : s)) });
@@ -1836,6 +1854,10 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       )
     );
   const setVatMode = (v) => setConfig((c) => mirrorActive({ ...c, priceVatMode: v }));
+  // "" from the picker = off; stored as null so it round-trips the API's normalizer unchanged.
+  const setCompareAtPricelist = (v) => setConfig((c) => mirrorActive({ ...c, compareAtPricelist: normalizeCompareAtPricelist(v) }));
+  const setPriceFields = (v) => setConfig((c) => mirrorActive({ ...c, priceFields: normalizePriceFields(v) }));
+  const setExistingSalePolicy = (v) => setConfig((c) => mirrorActive({ ...c, existingSalePolicy: normalizeExistingSalePolicy(v) }));
   // The stored factor is always a clean number — `factorText` below holds what's being typed.
   const setPriceFactor = (v) => setConfig((c) => mirrorActive({ ...c, priceFactor: parsePriceFactor(v) }));
   // Patches the rounding rule. Always REPLACES the object (never mutates): `pickMirror` copies by
@@ -1868,6 +1890,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       mirror.publicationIds = s.publicationIds || [];
       mirror.priceFactor = parsePriceFactor(s.priceFactor);
       mirror.priceRounding = normalizePriceRounding(s.priceRounding);
+      mirror.compareAtPricelist = normalizeCompareAtPricelist(s.compareAtPricelist);
+      mirror.priceFields = normalizePriceFields(s.priceFields);
+      mirror.existingSalePolicy = normalizeExistingSalePolicy(s.existingSalePolicy);
       return { ...c, ...mirror };
     });
   };
@@ -1878,7 +1903,8 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     ownership: "create_then_handoff", syncStock: true, syncNewProducts: true, syncPrices: true,
     syncDescriptions: true, syncImages: true, syncTags: true,
     priceVatMode: "inclusive", priceFactor: 1, priceRounding: { ...DEFAULT_PRICE_ROUNDING },
-    futureDatedGuard: true, variantOptionName: "", titlePrefix: "",
+    futureDatedGuard: true, compareAtPricelist: null, priceFields: DEFAULT_PRICE_FIELDS, existingSalePolicy: DEFAULT_EXISTING_SALE_POLICY,
+    variantOptionName: "", titlePrefix: "",
     pricelistPriority: buildPricelistPriority(pricelists, []), publicationIds: publications.map((p) => p.id),
   });
   const addScope = () => {
@@ -2168,9 +2194,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
     }
     setSaving(true);
     try {
-      const { pricelistPriority, priceVatMode, priceFactor, priceRounding, futureDatedGuard, syncStock, syncNewProducts,
-        syncPrices, syncDescriptions, syncTags, syncImages, ownership, scopes, publicationIds, variantOptionName,
-        titlePrefix } = config;
+      const { pricelistPriority, priceVatMode, priceFactor, priceRounding, futureDatedGuard, compareAtPricelist, priceFields,
+        existingSalePolicy, syncStock, syncNewProducts, syncPrices, syncDescriptions, syncTags, syncImages, ownership, scopes,
+        publicationIds, variantOptionName, titlePrefix } = config;
       // Each source pushes with its OWN full config to its own location. Persist the cleaned
       // scopes (incl. per-source ownership / toggles / pricing / channels) and mirror the first
       // source's location onto the connection-level field (back-compat / summary line).
@@ -2195,6 +2221,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
           // the connection-level one, i.e. silently push with another source's rounding.
           priceRounding: normalizePriceRounding(s.priceRounding),
           futureDatedGuard: s.futureDatedGuard ?? true,
+          // Always present (null = off) so a source can't inherit another source's compare-at list
+          // or sale policy through the connection-level fallback.
+          compareAtPricelist: normalizeCompareAtPricelist(s.compareAtPricelist),
+          priceFields: normalizePriceFields(s.priceFields),
+          existingSalePolicy: normalizeExistingSalePolicy(s.existingSalePolicy),
           // Always present (even "") so a source never inherits another source's option name
           // through the connection-level fallback. "" = use the default (export setting / Size).
           variantOptionName: (s.variantOptionName || "").trim(),
@@ -2222,6 +2253,8 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
           shopifyLocationId,
           config: { pricelistPriority: minimalPricelistPriority, priceVatMode, priceFactor: parsePriceFactor(priceFactor),
             priceRounding: normalizePriceRounding(priceRounding), futureDatedGuard,
+            compareAtPricelist: normalizeCompareAtPricelist(compareAtPricelist), priceFields: normalizePriceFields(priceFields),
+            existingSalePolicy: normalizeExistingSalePolicy(existingSalePolicy),
             syncStock, syncNewProducts, syncPrices, syncDescriptions, syncTags: syncTags !== false, syncImages, ownership, scopes: cleanScopes, publicationIds,
             variantOptionName: (variantOptionName || "").trim(), titlePrefix: (titlePrefix || "").trim() },
         }),
@@ -2715,6 +2748,8 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
                     {modeLabel}{locName ? ` · ${locName}` : ""} · {[s.syncStock && "stock", s.syncPrices && "prices", s.syncDescriptions && "content", s.syncTags && "tags", s.syncImages && "images", s.syncNewProducts && "new"].filter(Boolean).join(", ") || "nothing selected"}
                     {parsePriceFactor(s.priceFactor) !== 1 ? ` · prices ×${formatPriceFactor(s.priceFactor)}` : ""}
                     {normalizePriceRounding(s.priceRounding).enabled ? ` · ${describePriceRounding(s.priceRounding)}` : ""}
+                    {normalizeCompareAtPricelist(s.compareAtPricelist) ? ` · compare-at: ${normalizeCompareAtPricelist(s.compareAtPricelist)}` : ""}
+                    {normalizeExistingSalePolicy(s.existingSalePolicy) !== "overwrite" ? ` · merchant sales: ${describeExistingSalePolicy(s.existingSalePolicy)}` : ""}
                     {aiName && <span className="text-cyan-fg-deep/90"> · AI tags: {aiName}</span>}
                   </p>
                 </div>
@@ -3327,6 +3362,77 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
               </span>
               <ToggleSwitch checked={config.futureDatedGuard} onChange={() => toggleFlag("futureDatedGuard")} ariaLabel="Future-dated price guard" />
             </label>
+          </div>
+
+          {/* compare-at ("was") price — a second pricelist pushed as Shopify's struck-through price */}
+          <div className="mt-8">
+            <p className="mb-1 text-sm font-medium text-foreground">Compare-at price (sale)</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Push a second pricelist as the struck-through &ldquo;was&rdquo; price next to the selling price, so the store shows a sale.
+              It goes through the same VAT, factor and rounding as the price, and is only sent when it ends up <span className="font-medium text-foreground">higher</span> than the selling price.
+            </p>
+            <div className="max-w-sm">
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Compare-at pricelist</label>
+              <Select ariaLabel="Compare-at pricelist" value={config.compareAtPricelist || ""} onChange={(e) => setCompareAtPricelist(e.target.value)}>
+                <option value="">Off — don&apos;t send a compare-at price</option>
+                {config.pricelistPriority.map((pl) => <option key={pl._id} value={pl.name}>{pl.name}</option>)}
+              </Select>
+            </div>
+            {config.compareAtPricelist && config.compareAtPricelist === config.pricelistPriority.find((pl) => pl.enabled)?.name && (
+              <p className="mt-2 flex items-start gap-2 text-xs text-amber-fg">
+                <InfoIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>This is also the first enabled pricelist, so the compare-at equals the selling price — nothing will show as a sale.</span>
+              </p>
+            )}
+
+            {config.compareAtPricelist && (
+              <div className="mt-5">
+                <p className="mb-1 text-sm font-medium text-foreground">Fields the portal maintains</p>
+                <p className="mb-3 text-xs text-muted-foreground">{(PRICE_FIELD_OPTIONS.find((o) => o.v === config.priceFields) || PRICE_FIELD_OPTIONS[0]).hint}</p>
+                <div className="inline-flex w-full flex-wrap gap-1 rounded-xl border border-input/50 bg-card p-1 sm:w-auto shadow-sm">
+                  {PRICE_FIELD_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setPriceFields(opt.v)}
+                      className={`flex-1 rounded-md px-3 text-xs font-medium transition-all sm:flex-none sm:px-4 sm:text-sm h-8 ${
+ config.priceFields === opt.v
+ ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-xs"
+ :"text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+ }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* existing-sale policy — a merchant-made sale in Shopify (live compare-at the portal didn't set) */}
+          <div className="mt-8">
+            <p className="mb-1 text-sm font-medium text-foreground">When a variant is already on sale in Shopify</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Applies to a variant whose compare-at price in Shopify was set by the merchant, not by the portal.
+              {" "}{(EXISTING_SALE_OPTIONS.find((o) => o.v === config.existingSalePolicy) || EXISTING_SALE_OPTIONS[0]).hint}
+              {" "}Automatic (cart) discounts aren&apos;t detected.
+            </p>
+            <div className="inline-flex w-full flex-wrap gap-1 rounded-xl border border-input/50 bg-card p-1 sm:w-auto shadow-sm">
+              {EXISTING_SALE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => setExistingSalePolicy(opt.v)}
+                  className={`flex-1 rounded-md px-3 text-xs font-medium transition-all sm:flex-none sm:px-4 sm:text-sm h-8 ${
+ config.existingSalePolicy === opt.v
+ ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-xs"
+ :"text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+ }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </fieldset>
       </section>
