@@ -17,6 +17,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import AdditionalContent from "./AdditionalContent";
 import ProductImageGallery from "@/components/ProductImageGallery";
 
 /**
@@ -200,6 +201,9 @@ export default function ProductVariants({ product }) {
           className="text-muted-foreground prose prose-invert"
           dangerouslySetInnerHTML={{ __html: product.detailed_description }}
         />
+
+        {/* PNV "Dodatna vsebina" blocks — spec tables, extra text, links. */}
+        <AdditionalContent product={product} className="mt-8" />
       </div>
     </div>
   );
