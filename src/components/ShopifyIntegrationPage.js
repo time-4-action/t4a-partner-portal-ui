@@ -29,7 +29,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Select from "./ui/Select";
 import PageHeader from "@/components/ui/PageHeader";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, KeyRound, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { btn, countPill } from "@/lib/ui";
 import {
@@ -510,6 +510,147 @@ function ToggleSwitch({ checked, onChange, ariaLabel }) {
         className="w-10 h-6 rounded-full bg-accent transition-all duration-200 peer-checked:bg-gradient-to-r peer-checked:from-cyan-500 peer-checked:to-blue-500 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:duration-200 peer-checked:after:translate-x-[16px]"
       />
     </span>
+  );
+}
+
+/**
+ * API access — keys for the Sources API (`docs/sources-api.md` in the API repo).
+ *
+ * A key lets another product configure and run THIS store's sources over the portal's API:
+ * today that is Recharge Hub, whose "Sources" area is a view onto what this page shows. The raw
+ * key is shown exactly once, on create; the list afterwards carries only a prefix and the last
+ * four characters. Revoking is immediate and keeps the record, so "which key did that" survives.
+ */
+function ApiKeysSection({ connectionId, shopDomain, onNotice }) {
+  const [keys, setKeys] = useState(null);
+  const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [fresh, setFresh] = useState(null); // { rawKey, name } shown once
+  const [copied, setCopied] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(null);
+
+  const load = async () => {
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connectionId}/keys`, { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      setKeys(res.ok ? (data.keys || []) : []);
+    } catch {
+      setKeys([]);
+    }
+  };
+  useEffect(() => { setKeys(null); setFresh(null); load(); }, [connectionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const create = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connectionId}/keys`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() || "API key" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { onNotice({ tone: "error", text: data.error || "Could not create the key." }); return; }
+      setFresh({ rawKey: data.key.rawKey, name: data.key.name });
+      setName("");
+      setCopied(false);
+      await load();
+    } catch {
+      onNotice({ tone: "error", text: "Could not reach the server to create the key." });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const revoke = async (keyId) => {
+    try {
+      const res = await fetch(`/nextapi/export/shopify/connection/${connectionId}/keys/${keyId}`, { method: "DELETE" });
+      if (!res.ok) { const data = await res.json().catch(() => ({})); onNotice({ tone: "error", text: data.error || "Could not revoke the key." }); return; }
+      if (fresh && keys?.find((k) => k.keyId === keyId)?.name === fresh.name) setFresh(null);
+      onNotice({ tone: "success", text: "Key revoked. Anything using it is refused from now on." });
+      await load();
+    } catch {
+      onNotice({ tone: "error", text: "Could not reach the server to revoke the key." });
+    } finally {
+      setConfirmRevoke(null);
+    }
+  };
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(fresh.rawKey); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* the field is selectable */ }
+  };
+
+  const active = (keys || []).filter((k) => k.isActive);
+  const revoked = (keys || []).filter((k) => !k.isActive);
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 lg:p-8">
+      <SectionHeading
+        icon={<KeyRound className="h-4 w-4 text-muted-foreground" />}
+        title="API access"
+        desc={<>Let another product — such as Recharge Hub — configure and run this store&apos;s sources over the portal&apos;s API. A key works for <span className="font-medium text-foreground">{shopLabel(shopDomain)}</span> only.</>}
+      />
+
+      {fresh && (
+        <div className="mb-5 rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-4">
+          <p className="text-sm font-medium text-foreground">Copy the key for &ldquo;{fresh.name}&rdquo; now — it is not shown again.</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input readOnly value={fresh.rawKey} onFocus={(e) => e.target.select()} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-xs text-foreground" />
+            <button type="button" onClick={copy} className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">Paste it into the other product under its export portal connection, together with this store&apos;s domain.</p>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") create(); }}
+          placeholder="Key name, e.g. Recharge Hub"
+          maxLength={60}
+          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+        />
+        <button type="button" onClick={create} disabled={creating} className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-input bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50">
+          {creating ? <SpinnerIcon className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
+          {creating ? "Creating…" : "Create key"}
+        </button>
+      </div>
+
+      <div className="mt-4">
+        {keys === null ? (
+          <p className="text-sm text-muted-foreground">Loading keys…</p>
+        ) : active.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No keys yet. Nothing outside the portal can change this store&apos;s sources.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-xl border border-border">
+            {active.map((k) => (
+              <li key={k.keyId} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">{k.name}</p>
+                  <p className="mt-0.5 font-mono text-xs text-muted-foreground">{k.keyPrefix}…{k.last4}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Created {fmtDate(k.createdAt)} · {k.lastUsedAt ? `last used ${fmtDateTime(k.lastUsedAt)}` : "never used"}
+                  </p>
+                </div>
+                {confirmRevoke === k.keyId ? (
+                  <div className="flex shrink-0 gap-2">
+                    <button type="button" onClick={() => setConfirmRevoke(null)} className="h-8 rounded-md border border-input bg-card px-3 text-xs font-medium text-foreground hover:bg-muted">Keep</button>
+                    <button type="button" onClick={() => revoke(k.keyId)} className="h-8 rounded-md bg-destructive px-3 text-xs font-medium text-white hover:bg-destructive/90 dark:bg-destructive/60">Yes, revoke</button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setConfirmRevoke(k.keyId)} className="h-8 shrink-0 rounded-md border border-red-500/40 bg-red-500/5 px-3 text-xs font-medium text-red-fg hover:bg-red-500/10">Revoke</button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {revoked.length > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">{revoked.length} revoked {revoked.length === 1 ? "key" : "keys"} kept for the record.</p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -1535,6 +1676,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
       const pick = (k) => (s[k] !== undefined ? s[k] : (inheritBase ? base[k] : base[k]));
       return {
         type: s.type, exportConfigId: s.exportConfigId, feedId: s.feedId,
+        // Scope identity for the Sources API (id, optional name, on/off): carried through the
+        // panel untouched so a save here never strips what another client addresses by.
+        ...(s.id ? { id: s.id } : {}),
+        ...(s.name ? { name: s.name } : {}),
+        ...(typeof s.enabled === "boolean" ? { enabled: s.enabled } : {}),
         locationId: validLoc(s.locationId ?? locationId),
         ownership: pick("ownership"), syncStock: pick("syncStock"), syncNewProducts: pick("syncNewProducts"),
         syncPrices: pick("syncPrices"), syncDescriptions: pick("syncDescriptions"), syncImages: pick("syncImages"),
@@ -2205,6 +2351,11 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
         .map((s) => ({
           type: s.type,
           ...(s.type === "own_source" ? { feedId: s.feedId } : { exportConfigId: s.exportConfigId }),
+          // Identity keys the Sources API set (the backend also re-attaches them by matching, but
+          // sending them is what keeps a source's id stable when it is moved to another location).
+          ...(s.id ? { id: s.id } : {}),
+          ...(s.name ? { name: s.name } : {}),
+          ...(typeof s.enabled === "boolean" ? { enabled: s.enabled } : {}),
           locationId: s.locationId,
           ownership: s.ownership ?? "stock_only",
           syncStock: s.syncStock ?? true,
@@ -3898,6 +4049,9 @@ function ConnectionPanel({ connection: initialConn, variant = "standard", export
           </div>
         </div>
       )}
+
+      {/* ------------------------ API access -------------------------- */}
+      {!isDemo && <ApiKeysSection connectionId={connection._id} shopDomain={connection.shopDomain} onNotice={onNotice} />}
 
       {/* ------------------------ Danger zone -------------------------- */}
       <section className="rounded-2xl border border-red-500/30 bg-card p-4 sm:p-6 lg:p-8">
