@@ -5,7 +5,8 @@ import { useState, useEffect } from "react";
 /**
  * Shared product-detail modal — opened from the Export preview and the Own Sources preview
  * (both pass products in the internal parent/`child_products` shape). Read-only: image gallery,
- * status, meta, description, and a per-variant table (SKU · barcode · option · stock · price).
+ * status, meta, description, a collapsible "More details" block (PNV `additional_content[]`
+ * HTML — spec tables, text, links), and a per-variant table (SKU · barcode · option · stock · price).
  *
  * Works for both Patrik products (PNV) and imported feed products — they use the same fields.
  */
@@ -31,6 +32,14 @@ function priceRange(product) {
 
 const fmtPrice = (n) => `€${Number(n).toFixed(2)}`;
 
+// Shared styling for PNV-authored HTML (description + additional content). The source markup
+// carries inline widths/colours from the Patrik site, so tables are forced fluid and any
+// inline `color` is neutralised to keep it readable on both themes.
+const HTML_CLS =
+  "prose-sm max-w-none text-sm leading-relaxed text-foreground [&_a]:text-accent-brand [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:my-0.5 [&_ul]:list-disc [&_ul]:pl-5 " +
+  "[&_*]:!text-inherit [&_a]:!text-accent-brand [&_p]:my-2 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-md " +
+  "[&_table]:my-2 [&_table]:!h-auto [&_table]:!w-full [&_table]:border-collapse [&_table]:text-xs [&_td]:border [&_td]:border-border [&_td]:!w-auto [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border [&_th]:bg-card [&_th]:px-2 [&_th]:py-1 [&_th]:text-left";
+
 const PlaceholderImg = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -42,6 +51,7 @@ export default function ProductDetailModal({ product, onClose }) {
   const variants = product.child_products || [];
   const images = [...new Set([...(product.images || []), ...variants.flatMap((v) => v.images || [])])].filter(Boolean);
   const [active, setActive] = useState(0);
+  const [showMore, setShowMore] = useState(false);
 
   // Lock background scroll + close on Escape.
   useEffect(() => {
@@ -56,6 +66,8 @@ export default function ProductDetailModal({ product, onClose }) {
   const hasStock = variants.some((v) => v.stock_amount > 0) || product.stock_amount > 0;
   const labels = product.categories?.length ? product.categories : product.tags || [];
   const descriptionHtml = product.detailed_description || product.short_description || "";
+  // Extra HTML blocks from PNV ("Dodatna vsebina N"). Parent only — variants repeat the parent's.
+  const moreBlocks = (product.additional_content || []).filter((b) => typeof b === "string" && b.trim());
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -153,9 +165,41 @@ export default function ProductDetailModal({ product, onClose }) {
             <div className="mt-6">
               <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</p>
               <div
-                className="prose-sm max-w-none text-sm leading-relaxed text-foreground [&_a]:text-accent-brand [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:my-0.5 [&_ul]:list-disc [&_ul]:pl-5"
+                className={HTML_CLS}
                 dangerouslySetInnerHTML={{ __html: descriptionHtml }}
               />
+            </div>
+          )}
+
+          {/* More details — PNV additional content blocks, collapsed by default */}
+          {moreBlocks.length > 0 && (
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => setShowMore((v) => !v)}
+                aria-expanded={showMore}
+                className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-2.5 text-left transition-colors hover:border-input hover:bg-muted/60"
+              >
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  More details
+                  <span className="ml-2 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] normal-case tracking-normal">{moreBlocks.length}</span>
+                </span>
+                <svg
+                  className={`h-4 w-4 text-muted-foreground transition-transform ${showMore ? "rotate-180" : ""}`}
+                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showMore && (
+                <div className="mt-2 divide-y divide-border/60 rounded-xl border border-border px-4">
+                  {moreBlocks.map((html, i) => (
+                    <div key={i} className="overflow-x-auto py-3">
+                      <div className={HTML_CLS} dangerouslySetInnerHTML={{ __html: html }} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
