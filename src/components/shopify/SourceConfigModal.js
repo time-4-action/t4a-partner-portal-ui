@@ -56,6 +56,7 @@ export function normalizeScope(s, pricelists) {
     existingSalePolicy: normalizeExistingSalePolicy(s.existingSalePolicy),
     variantOptionName: (s.variantOptionName || "").trim(),
     titlePrefix: (s.titlePrefix || "").trim(),
+    reviewNewProducts: !!s.reviewNewProducts,
     pricelistPriority: buildPricelistPriority(pricelists, s.pricelistPriority).map((p, i) => ({ _id: p._id, name: p.name, vat: p.vat, valid_from: p.valid_from, enabled: p.enabled !== false, priority: i })),
     publicationIds: Array.isArray(s.publicationIds) ? [...s.publicationIds] : [],
     aiExportId: s.aiExportId || undefined,
@@ -131,7 +132,9 @@ export default function SourceConfigModal({
   /* ----- summaries for the collapsed groups ----- */
   const aiLabel = isFeed ? feedAiSet?.name : exportAiSet?.name;
   const contentSummary = [draft.titlePrefix ? `Prefix “${draft.titlePrefix}”` : "No title prefix", aiLabel ? `AI tags: ${aiLabel}` : "Catalogue tags"].join(" · ");
-  const creationSummary = createsProducts ? `Variant option “${draft.variantOptionName || optionDefault}”` : "Off — this source doesn't create products";
+  const creationSummary = createsProducts
+    ? [`Variant option “${draft.variantOptionName || optionDefault}”`, draft.reviewNewProducts && "held for review"].filter(Boolean).join(" · ")
+    : "Off — this source doesn't create products";
   const pricingSummary = !draft.syncPrices
     ? "Off — prices aren't synced"
     : [firstEnabledPricelist ? `${firstEnabledPricelist.name} first` : "No pricelist enabled", draft.priceVatMode === "inclusive" ? "incl. VAT" : "excl. VAT", draft.priceFactor !== 1 && `×${formatPriceFactor(draft.priceFactor)}`, rounding.enabled && describePriceRounding(rounding), draft.compareAtPricelist && `compare-at ${draft.compareAtPricelist}`].filter(Boolean).join(" · ");
@@ -297,6 +300,13 @@ export default function SourceConfigModal({
               <Field label="Variant option name" htmlFor="cfg-option" hint={isFeed ? "Leave blank to use “Size”." : srcExport?.option1Name ? `Leave blank to use “${optionDefault}” — the Variant Option set on the ${srcExport.name} export.` : "Leave blank to use “Size”. Set a Variant Option on the export to change the default."}>
                 <input id="cfg-option" value={draft.variantOptionName} onChange={(e) => patch({ variantOptionName: e.target.value })} maxLength={255} placeholder={optionDefault} className={cn(input)} />
               </Field>
+              <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-medium text-foreground">Hold new products for review</span>
+                  <span className="block text-xs text-muted-foreground">New products are created as drafts tagged awaiting-review and go live only when someone approves them (in Recharge Hub, or by setting them Active in Shopify). Variants added to a product already in your store are not held.</span>
+                </span>
+                <Toggle checked={!!draft.reviewNewProducts} onChange={(v) => patch({ reviewNewProducts: v })} ariaLabel="Hold new products for review" />
+              </label>
             </Disclosure>
 
             {/* Pricing */}

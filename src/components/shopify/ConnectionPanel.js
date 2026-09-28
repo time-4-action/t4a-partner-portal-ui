@@ -60,7 +60,7 @@ function makeConfig(conn, locs, pubs, validate, pricelists) {
       syncDescriptions: pick("syncDescriptions"), syncImages: pick("syncImages"), syncTags: pick("syncTags"),
       priceVatMode: pick("priceVatMode"), futureDatedGuard: pick("futureDatedGuard"), priceFactor: pick("priceFactor"), priceRounding: pick("priceRounding"),
       compareAtPricelist: pick("compareAtPricelist"), priceFields: pick("priceFields"), existingSalePolicy: pick("existingSalePolicy"),
-      variantOptionName: pick("variantOptionName"), titlePrefix: pick("titlePrefix"),
+      variantOptionName: pick("variantOptionName"), titlePrefix: pick("titlePrefix"), reviewNewProducts: pick("reviewNewProducts"),
       pricelistPriority: s.pricelistPriority ?? (inheritBase ? cfg.pricelistPriority : undefined),
       publicationIds: validPubs(s.publicationIds ?? (inheritBase ? cfg.publicationIds : [])),
     }, pricelists);
@@ -101,6 +101,8 @@ function buildConfigPayload(scopes, previous) {
     existingSalePolicy: normalizeExistingSalePolicy(s.existingSalePolicy),
     variantOptionName: (s.variantOptionName || "").trim(),
     titlePrefix: (s.titlePrefix || "").trim(),
+    // Review before publish: new products are created as drafts for a person to approve.
+    reviewNewProducts: !!s.reviewNewProducts,
     // Only the resolution-relevant fields; vat/valid_from are re-derived from the catalogue.
     pricelistPriority: (s.pricelistPriority || []).map((p, i) => ({ name: p.name, enabled: p.enabled !== false, priority: p.priority ?? i })),
     publicationIds: s.publicationIds || [],

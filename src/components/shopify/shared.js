@@ -273,7 +273,7 @@ export const DEFAULT_SCOPE_CONFIG = {
   syncStock: true, syncNewProducts: false, syncPrices: false, syncDescriptions: false, syncImages: false, syncTags: true,
   priceVatMode: "inclusive", priceFactor: 1, priceRounding: { ...DEFAULT_PRICE_ROUNDING }, futureDatedGuard: true,
   compareAtPricelist: null, priceFields: DEFAULT_PRICE_FIELDS, existingSalePolicy: DEFAULT_EXISTING_SALE_POLICY,
-  variantOptionName: "", titlePrefix: "", publicationIds: [],
+  variantOptionName: "", titlePrefix: "", publicationIds: [], reviewNewProducts: false,
 };
 
 export const MOCK_CONNECTION = {
