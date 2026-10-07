@@ -64,10 +64,6 @@ export default async function ProductPage() {
   const products = productsData?.data ?? [];
 
   return (
-    <div className="relative bg-transparent py-6 lg:py-8">
-      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-        <ProductGrid initialProducts={products} />
-      </div>
-    </div>
+    <ProductGrid initialProducts={products} />
   );
 }

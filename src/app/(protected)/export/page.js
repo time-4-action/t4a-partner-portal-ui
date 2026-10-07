@@ -56,14 +56,14 @@ export default async function ExportPageRoute() {
 
   if (!roles.includes("export")) {
     return (
-      <div className="relative py-6 lg:py-8">
-        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-          <div className="p-6 bg-neutral-800/50 border border-neutral-700/50 rounded-2xl text-center sm:p-8">
-            <svg className="w-12 h-12 text-neutral-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="p-4 md:p-8">
+        <div className="contents">
+          <div className="p-6 bg-muted/50 border border-input/50 rounded-2xl text-center sm:p-8">
+            <svg className="w-12 h-12 text-muted-foreground mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
-            <h2 className="text-xl font-semibold text-white mb-2">Access Restricted</h2>
-            <p className="text-neutral-400">You do not have access to the Export feature. Contact your administrator to request access.</p>
+            <h2 className="text-[15px] font-semibold text-foreground mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground">You do not have access to the Export feature. Contact your administrator to request access.</p>
           </div>
         </div>
       </div>
@@ -76,17 +76,17 @@ export default async function ExportPageRoute() {
   ]);
 
   return (
-    <div className="relative bg-transparent py-6 lg:py-8">
-      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full">
+      <div className="contents">
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+          <div className="m-4 md:m-8 mb-0 md:mb-0 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
             <div className="flex items-center gap-3">
-              <svg className="w-5 h-5 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-red-fg shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div>
-                <p className="text-red-400 font-medium">Failed to load products</p>
-                <p className="text-red-400/70 text-sm mt-0.5">{error}</p>
+                <p className="text-red-fg font-medium">Failed to load products</p>
+                <p className="text-red-fg/70 text-sm mt-0.5">{error}</p>
               </div>
             </div>
           </div>

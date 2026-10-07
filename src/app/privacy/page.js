@@ -23,6 +23,8 @@ export const metadata = {
   description:
     'Privacy policy for the Patrik Partner Portal and the Time 4 Action Product Sync Shopify app.',
 };
+import PageHeader from "@/components/ui/PageHeader";
+import { countPill } from "@/lib/ui";
 
 const LEGAL_NOTE = `<!-- Not legal advice. Controller/processor classification under GDPR (EU/Slovenia)
 should be confirmed by a lawyer before publishing. -->`;
@@ -96,33 +98,33 @@ function TrashIcon({ className }) {
 /** "At a glance" stat card — the promises a partner/merchant/reviewer cares about most. */
 function GlanceCard({ icon: Icon, title, text }) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 backdrop-blur-sm transition-colors hover:border-[#01a0be]/40">
+    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-colors hover:border-accent-brand/40 shadow-sm">
       <div
-        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-[#01a0be]/10 blur-2xl opacity-0 transition-opacity group-hover:opacity-100"
+        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent-brand/10 blur-2xl opacity-0 transition-opacity group-hover:opacity-100"
         aria-hidden="true"
       />
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#01a0be]/25 bg-[#01a0be]/10">
-        <Icon className="h-4.5 w-4.5 text-[#01a0be]" />
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent-brand/25 bg-accent-brand/10">
+        <Icon className="h-4.5 w-4.5 text-accent-brand" />
       </div>
-      <p className="mt-3 text-sm font-semibold text-white">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-neutral-500">{text}</p>
+      <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{text}</p>
     </div>
   );
 }
 
 function Section({ n, title, children }) {
   return (
-    <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 backdrop-blur-sm sm:p-8">
+    <section className="rounded-2xl border border-border bg-card p-6 sm:p-8">
       <div className="flex items-baseline gap-3">
         <span
-          className="text-xs font-bold tracking-widest text-[#01a0be]"
-          style={{ fontFamily: 'var(--font-orbitron)' }}
+          className="text-xs font-bold tracking-widest text-accent-brand"
+         
         >
           {n}
         </span>
-        <h2 className="text-base font-semibold tracking-tight text-white">{title}</h2>
+        <h2 className="text-[14px] font-semibold tracking-tight text-foreground">{title}</h2>
       </div>
-      <div className="mt-4 space-y-3 text-sm leading-relaxed text-neutral-400">{children}</div>
+      <div className="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">{children}</div>
     </section>
   );
 }
@@ -132,7 +134,7 @@ function Li({ label, children }) {
   return (
     <li className="flex items-start gap-3">
       <svg
-        className="mt-1 h-3.5 w-3.5 shrink-0 text-[#01a0be]"
+        className="mt-1 h-3.5 w-3.5 shrink-0 text-accent-brand"
         fill="none"
         stroke="currentColor"
         strokeWidth={2.5}
@@ -141,7 +143,7 @@ function Li({ label, children }) {
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
       </svg>
       <span>
-        {label && <span className="font-medium text-neutral-300">{label} — </span>}
+        {label && <span className="font-medium text-foreground">{label} — </span>}
         {children}
       </span>
     </li>
@@ -150,7 +152,7 @@ function Li({ label, children }) {
 
 function ContactLink() {
   return (
-    <a href={`mailto:${CONTACT_EMAIL}`} className="text-[#01a0be] hover:underline">
+    <a href={`mailto:${CONTACT_EMAIL}`} className="text-accent-brand hover:underline">
       {CONTACT_EMAIL}
     </a>
   );
@@ -160,30 +162,19 @@ function ContactLink() {
 
 export default function PrivacyPage() {
   return (
-    <div className="relative bg-transparent py-8">
+    <div className="flex flex-col min-h-full">
       {/* Lawyer-review note required in the page source — rendered as an HTML comment. */}
       <div dangerouslySetInnerHTML={{ __html: LEGAL_NOTE }} />
 
       {/* Same container as Navbar.js so edges align pixel-precise */}
-      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+      <div className="contents">
         {/* ----------------------------- Header ----------------------------- */}
-        <header className="mb-6 flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
-            <ShieldIcon className="h-5 w-5 text-[#01a0be]" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-white">Privacy Policy</h1>
-              <span className="inline-flex items-center rounded-full border border-[#01a0be]/25 bg-[#01a0be]/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-widest text-[#01a0be]">
-                Legal
-              </span>
-            </div>
-            <p className="truncate text-xs text-neutral-500">
-              Patrik Partner Portal &amp; the Time 4 Action Product Sync Shopify app · Last
-              updated: 10 June 2026
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="Privacy Policy"
+          badge={<span className={countPill}>Legal</span>}
+          description={"Patrik Partner Portal & the Time 4 Action Product Sync Shopify app · Last updated: 10 June 2026"}
+        />
+        <div className="flex-1 p-4 md:p-8">
 
         {/* --------------------------- At a glance --------------------------- */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -214,8 +205,8 @@ export default function PrivacyPage() {
           <Section n="01" title="Who we are">
             <p>
               The Patrik Partner Portal (product browsing, exports, catalogue integrations) and
-              its Shopify app, <span className="text-neutral-300">Time 4 Action Product Sync</span>,
-              are operated by <span className="text-neutral-300">Time 4 Action d.o.o.</span>,
+              its Shopify app, <span className="text-foreground">Time 4 Action Product Sync</span>,
+              are operated by <span className="text-foreground">Time 4 Action d.o.o.</span>,
               Koprska ulica 74, 1000 Ljubljana, Slovenia. For any question or request about your
               data, contact us at <ContactLink />{" "}or through the portal&apos;s contact page.
             </p>
@@ -284,7 +275,7 @@ export default function PrivacyPage() {
               settings (location, sales channels, price list priority), a SKU-to-Shopify-ID
               mapping table, sync run history, and the portal account the store belongs to.
             </p>
-            <p className="rounded-xl border border-[#01a0be]/20 bg-[#01a0be]/5 px-4 py-3 text-neutral-300">
+            <p className="rounded-xl border border-accent-brand/20 bg-accent-brand/5 px-4 py-3 text-foreground">
               The app does <strong>not</strong>{" "}request access to — and therefore never collects,
               stores or processes — your customers&apos; personal data, orders, or payment
               information.
@@ -395,6 +386,7 @@ export default function PrivacyPage() {
               changes will be announced to affected partners by email.
             </p>
           </Section>
+        </div>
         </div>
       </div>
     </div>

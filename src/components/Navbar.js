@@ -1,524 +1,438 @@
 /**
- * Navbar Component
+ * Navbar — the portal's primary navigation: a left sidebar that is a direct
+ * port of t4a-admin's `components/nav.tsx` (same chrome, sizes, accordion
+ * sections with coloured icon chips, collapsed 60px rail, mobile top bar +
+ * slide-out drawer, theme toggle and user block at the bottom).
  *
- * Main navigation bar with Auth0 integration for user authentication.
- * Features include:
- * - Responsive desktop and mobile layouts
- * - Grouped navigation: catalog tools collapse into a "Products" dropdown and
- *   third-party connectors into an "Integrations" dropdown
- * - Active-route highlighting (desktop + mobile)
- * - Auth0 user authentication status
- * - Profile dropdown menu (desktop)
- * - Mobile hamburger menu with grouped sections
- * - Sticky positioning with backdrop blur
+ * Only the section catalogue differs: the portal's catalog tools, integrations
+ * and support links, gated by the Auth0 `export` role.
  *
  * @module Navbar
  */
 
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
+import {
+  Home,
+  Boxes,
+  Download,
+  Tags,
+  Blocks,
+  Store,
+  Rss,
+  Mail,
+  History,
+  ShieldCheck,
+  LifeBuoy,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  LogOut,
+  LogIn,
+  Menu,
+  X,
+} from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
+import { cn } from "@/lib/utils";
 
 /**
- * Outline icon paths (Heroicons v2) keyed by name, rendered by <NavIcon />.
+ * Section catalogue. `section` keys map to SECTION_STYLE; `exportOnly`
+ * sections need the Auth0 `export` role.
  */
-const ICON_PATHS = {
-  home: [
-    "m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25",
-  ],
-  products: [
-    "M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z",
-  ],
-  exports: [
-    "M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-.98.626-1.813 1.5-2.122",
-  ],
-  contact: [
-    "M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75",
-  ],
-  export: [
-    "M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5",
-    "M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3",
-  ],
-  categories: [
-    "M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z",
-    "M6 6h.008v.008H6V6Z",
-  ],
-  shopify: [
-    "M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z",
-  ],
-  privacy: [
-    "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z",
-  ],
-  integrations: [
-    "M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .37-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z",
-  ],
+const sections = [
+  {
+    label: "Products",
+    section: "products",
+    exportOnly: true,
+    links: [
+      { href: "/product", label: "View All", icon: Boxes, matchPrefix: true },
+      { href: "/export", label: "Export", icon: Download, matchPrefix: true },
+      { href: "/categories", label: "Categories", icon: Tags, matchPrefix: true },
+    ],
+  },
+  {
+    label: "Integrations",
+    section: "integrations",
+    exportOnly: true,
+    links: [
+      { href: "/integrations/shopify", label: "Shopify", icon: Store, matchPrefix: true },
+      { href: "/integrations/shopify-deprecated", label: "Shopify Deprecated", icon: Store, matchPrefix: true, badge: "Beta" },
+      { href: "/integrations/own-sources", label: "Own sources", icon: Rss, matchPrefix: true },
+    ],
+  },
+  {
+    label: "Catalog",
+    section: "catalog",
+    browseOnly: true,
+    links: [{ href: "/product", label: "Products", icon: Boxes, matchPrefix: true }],
+  },
+  {
+    label: "Support",
+    section: "support",
+    links: [
+      { href: "/contact", label: "Contact", icon: Mail },
+      { href: "/changelog", label: "Changelog", icon: History },
+      { href: "/privacy", label: "Privacy", icon: ShieldCheck },
+    ],
+  },
+];
+
+// Per-section identity: a coloured icon chip so each group reads at a glance
+// (same palette as the admin: sky = catalog/general, indigo = partners).
+const SECTION_STYLE = {
+  products: { icon: Boxes, color: "text-sky-500", bg: "bg-sky-500/10" },
+  catalog: { icon: Boxes, color: "text-sky-500", bg: "bg-sky-500/10" },
+  integrations: { icon: Blocks, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+  support: { icon: LifeBuoy, color: "text-slate-500", bg: "bg-slate-500/10" },
 };
 
-/**
- * Renders a stroked SVG icon by name. Returns null for unknown names.
- */
-function NavIcon({ name, className = "h-5 w-5" }) {
-  const paths = ICON_PATHS[name];
-  if (!paths) return null;
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      {paths.map((d, i) => (
-        <path key={i} strokeLinecap="round" strokeLinejoin="round" d={d} />
-      ))}
-    </svg>
-  );
-}
+const OPEN_SECTIONS_KEY = "t4a-nav-open-sections";
+const APP_NAME = "Partner Portal";
 
-/**
- * Small pill used to flag a nav item's status (e.g. "Alpha" for the
- * not-yet-wired Shopify integration). Amber to read as "experimental".
- */
-// Tier badges match the TierGate program chips: alpha = violet, beta = cyan.
+// Tier badges match the TierGate program chips: alpha = violet, beta = brand.
 const BADGE_STYLES = {
-  alpha: "bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 ring-violet-400/30",
-  beta: "bg-gradient-to-r from-[#01a0be]/20 to-cyan-400/20 text-cyan-300 ring-cyan-400/30",
+  alpha: "bg-violet-500/10 text-violet-fg ring-violet-500/20",
+  beta: "bg-accent-brand/10 text-accent-brand ring-accent-brand/20",
 };
 
 function NavBadge({ label, className = "" }) {
-  const style = BADGE_STYLES[String(label).toLowerCase()] || "bg-amber-400/15 text-amber-300 ring-amber-400/30";
+  const style = BADGE_STYLES[String(label).toLowerCase()] || "bg-amber-500/10 text-amber-fg ring-amber-500/20";
   return (
-    <span
-      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${style} ${className}`}
-    >
+    <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1", style, className)}>
       {label}
     </span>
   );
 }
 
-/**
- * Returns navigation items. For export-role users the catalog tools are grouped
- * under a "Products" dropdown (View All, Export, Categories) and third-party
- * connectors under an "Integrations" dropdown (Shopify), keeping the top bar
- * compact. Non-export users see a plain "Products" link.
- * Roles are injected into the ID token via an Auth0 Post Login Action.
- *
- * Item shape:
- * - Plain link:   { href, label }
- * - Group:        { label, children: [{ href, label, description, icon }] }
- */
-function getNavLinks(user) {
-  const roles = user?.["https://time-4-action.com/roles"] ?? [];
-  const links = [{ href: "/", label: "Home", icon: "home" }];
-  if (roles.includes("export")) {
-    links.push({
-      label: "Products",
-      icon: "products",
-      children: [
-        {
-          href: "/product",
-          label: "View All",
-          description: "Browse the full catalog",
-          icon: "products",
-        },
-        {
-          href: "/export",
-          label: "Export",
-          description: "Presets & custom export configs",
-          icon: "export",
-        },
-        {
-          href: "/categories",
-          label: "Categories",
-          description: "AI category management",
-          icon: "categories",
-        },
-      ],
-    });
-    links.push({
-      label: "Integrations",
-      icon: "integrations",
-      children: [
-        {
-          href: "/integrations/shopify",
-          label: "Shopify",
-          description: "Sync products to your store",
-          icon: "shopify",
-        },
-        {
-          href: "/integrations/shopify-deprecated",
-          label: "Shopify Deprecated",
-          description: "Legacy custom-app connect",
-          icon: "shopify",
-          badge: "Beta",
-        },
-        {
-          href: "/integrations/own-sources",
-          label: "Own sources",
-          description: "Push your own brand feeds",
-          icon: "integrations",
-        },
-      ],
-    });
-  } else {
-    links.push({ href: "/product", label: "Products", icon: "products" });
+function UserAvatar({ user, size }) {
+  if (user?.picture) {
+    return (
+      <Image
+        src={user.picture}
+        alt={user.name ?? "avatar"}
+        width={size}
+        height={size}
+        className="rounded-full shrink-0 object-cover ring-1 ring-border"
+        style={{ width: size, height: size }}
+      />
+    );
   }
-  links.push({ href: "/contact", label: "Contact", icon: "contact" });
-  links.push({ href: "/privacy", label: "Privacy", icon: "privacy" });
-  return links;
+  const initials = (user?.name ?? user?.email ?? "?")
+    .split(/\s+/)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .slice(0, 2)
+    .join("");
+  return (
+    <span
+      className="rounded-full shrink-0 flex items-center justify-center bg-muted text-muted-foreground font-semibold select-none ring-1 ring-border"
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+    >
+      {initials}
+    </span>
+  );
 }
 
-/**
- * True when `href` matches the current path. The root ("/") matches exactly;
- * everything else matches itself and any nested route (e.g. /integrations/shopify/x).
- */
-function isActive(pathname, href) {
-  if (!pathname) return false;
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(href + "/");
+function NavLink({ href, label, icon: Icon, active, open, indent, badge, onClick }) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      title={!open ? label : undefined}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+"group relative flex items-center gap-2.5 rounded-md text-[13px] transition-all duration-150 h-9",
+"",
+ open ? (indent ?"pl-3.5 pr-3":"px-3") :"justify-center px-2",
+ active ?"bg-background text-foreground font-medium border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50":"text-muted-foreground hover:bg-accent hover:text-foreground",
+ )}
+    >
+      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-accent-brand rounded-r-full" />}
+      <Icon className={cn("w-[15px] h-[15px] shrink-0 transition-colors", active ?"text-foreground":"text-muted-foreground/70 group-hover:text-foreground")} />
+      {open && <span className="truncate">{label}</span>}
+      {open && badge && <NavBadge label={badge} className="ml-auto" />}
+    </Link>
+  );
 }
 
-/**
- * Desktop dropdown for a grouped nav item. Opens on click, closes on outside
- * click or Escape. The trigger is highlighted when open or when one of its
- * children is the active route.
- */
-function NavDropdown({ group, pathname }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const groupActive = group.children.some((c) => isActive(pathname, c.href));
+// Compute whether a link is the active one (exact / prefix match), ceding to a
+// more-specific sibling so e.g. /integrations/shopify isn't highlighted on
+// /integrations/shopify-deprecated.
+function isLinkActive(link, links, pathname) {
+  const exact = pathname === link.href;
+  const prefixHit = !!link.matchPrefix && pathname.startsWith(link.href + "/");
+  const siblingTakesIt = links.some(
+    (s) => s.href !== link.href && (pathname === s.href || pathname.startsWith(s.href + "/")) && s.href.length > link.href.length,
+  );
+  return (exact || prefixHit) && !siblingTakesIt;
+}
+
+export default function Navbar() {
+  const [open, setOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname() || "/";
+  const { user, isLoading } = useUser();
+
+  const roles = user?.["https://time-4-action.com/roles"] ?? [];
+  const canExport = roles.includes("export");
+  const visibleSections = sections.filter((s) => (s.exportOnly ? canExport : s.browseOnly ? !canExport : true));
+
+  // Which section contains the current route — used to auto-open it.
+  const activeSectionKey = useMemo(() => {
+    const hit = sections.find((s) => s.links.some((l) => pathname === l.href || pathname.startsWith(l.href + "/")));
+    return hit?.section ?? null;
+  }, [pathname]);
+
+  // Accordion open/closed state, persisted. A section with no explicit entry
+  // defaults to open iff it's the active section.
+  const [openSections, setOpenSections] = useState({});
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
-    };
-    const handleKey = (event) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKey);
+    let stored = null;
+    try {
+      const raw = localStorage.getItem(OPEN_SECTIONS_KEY);
+      if (raw) stored = JSON.parse(raw);
+    } catch {
+      /* ignore */
+    }
+    // Deferred so the first paint keeps the SSR markup (no hydration mismatch).
+    const id = window.setTimeout(() => {
+      if (stored) setOpenSections(stored);
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(OPEN_SECTIONS_KEY, JSON.stringify(openSections));
+    } catch {
+      /* ignore */
+    }
+  }, [openSections, hydrated]);
+
+  // Navigating into a section opens it.
+  useEffect(() => {
+    if (!activeSectionKey) return;
+    const id = window.setTimeout(
+      () => setOpenSections((prev) => (prev[activeSectionKey] ? prev : { ...prev, [activeSectionKey]: true })),
+      0,
+    );
+    return () => window.clearTimeout(id);
+  }, [activeSectionKey]);
+
+  const isExpanded = (key) => openSections[key] ?? key === activeSectionKey;
+  const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !(prev[key] ?? key === activeSectionKey) }));
+
+  // Navigating closes the mobile drawer; the drawer locks page scroll while open.
+  useEffect(() => {
+    const id = window.setTimeout(() => setMobileOpen(false), 0);
+    return () => window.clearTimeout(id);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = "";
     };
-  }, [open]);
+  }, [mobileOpen]);
 
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className={`flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#01a0be]/60 ${
-          groupActive || open
-            ? "text-[#01a0be]"
-            : "text-neutral-300 hover:text-[#01a0be]"
-        }`}
-      >
-        <NavIcon name={group.icon} className="h-4 w-4" />
-        {group.label}
-        <svg
-          className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
+  const brand = (compact) => (
+    <Link href="/" className="flex items-center gap-2.5 min-w-0">
+      <Image
+        src="https://imgs.pnvnet.si/img/615/301/75/2/c/www.patrikinternational.com/assets/page_info/0308183001671536508.png"
+        alt="Patrik International"
+        width={120}
+        height={60}
+        className={cn("brand-logo w-auto object-contain shrink-0", compact ?"h-5":"h-6")}
+      />
+      <span className="text-[13px] font-semibold text-foreground truncate">{APP_NAME}</span>
+    </Link>
+  );
 
-      {open && (
-        <div
-          className="animate-dropdown origin-top-left absolute left-0 mt-2 w-64 rounded-xl bg-neutral-900/95 backdrop-blur-md p-1.5 shadow-xl shadow-black/40 ring-1 ring-neutral-700/60"
-          role="menu"
-          aria-label={group.label}
-        >
-          {group.children.map((child) => {
-            const active = isActive(pathname, child.href);
+  const navContent = (isMobile) => {
+    const isOpen = isMobile ? true : open;
+    const homeActive = pathname === "/";
+    return (
+      <>
+        {/* Brand header */}
+        <div className={cn("flex items-center h-[57px] shrink-0 px-3 border-b border-border", isOpen ?"justify-between":"justify-center")}>
+          {isOpen && brand(false)}
+          {isMobile ? (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              {open ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+          )}
+        </div>
+
+        {/* Nav sections */}
+        <div className={cn("flex-1 overflow-y-auto px-2 py-3", isOpen ?"space-y-1":"space-y-4")}>
+          <NavLink href="/" label="Home" icon={Home} active={homeActive} open={isOpen} />
+
+          {visibleSections.map((section) => {
+            const style = SECTION_STYLE[section.section];
+            const SectionIcon = style.icon;
+
+            // Collapsed rail: no headers, just the link icons.
+            if (!isOpen) {
+              return (
+                <div key={section.label} className="space-y-0.5">
+                  {section.links.map((link) => (
+                    <NavLink key={link.href} {...link} active={isLinkActive(link, section.links, pathname)} open={false} />
+                  ))}
+                </div>
+              );
+            }
+
+            // Expanded: collapsible accordion group with a coloured section icon.
+            const expanded = isExpanded(section.section);
             return (
-              <Link
-                key={child.href}
-                href={child.href}
-                onClick={() => setOpen(false)}
-                role="menuitem"
-                aria-current={active ? "page" : undefined}
-                className={`group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors ${
-                  active
-                    ? "bg-[#01a0be]/10 text-[#01a0be]"
-                    : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
-                }`}
-              >
-                <span
-                  className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors ${
-                    active
-                      ? "bg-[#01a0be]/15 text-[#01a0be] ring-[#01a0be]/30"
-                      : "bg-neutral-800 text-neutral-400 ring-neutral-700 group-hover:text-[#01a0be]"
-                  }`}
+              <div key={section.label}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.section)}
+                  aria-expanded={expanded}
+                  className="flex items-center gap-2.5 w-full rounded-md px-3 text-[13px] font-medium text-foreground hover:bg-accent transition-colors h-9"
                 >
-                  <NavIcon name={child.icon} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2 text-sm font-medium">
-                    <span className="truncate">{child.label}</span>
-                    {child.badge && <NavBadge label={child.badge} />}
+                  <span className={cn("w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0", style.bg)}>
+                    <SectionIcon className={cn("w-3.5 h-3.5", style.color)} />
                   </span>
-                  <span className="block truncate text-xs text-neutral-500">{child.description}</span>
-                </span>
-              </Link>
+                  <span className="flex-1 text-left truncate">{section.label}</span>
+                  <ChevronDown
+                    className={cn("w-4 h-4 text-muted-foreground/60 transition-transform duration-150 shrink-0", expanded ?"":"-rotate-90")}
+                    aria-hidden
+                  />
+                </button>
+                {expanded && (
+                  <div className="mt-0.5 mb-1 ml-[18px] pl-2 border-l border-border/60 space-y-0.5">
+                    {section.links.map((link) => (
+                      <NavLink key={link.href} {...link} active={isLinkActive(link, section.links, pathname)} open indent />
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
-      )}
-    </div>
-  );
-}
 
-/**
- * Navbar Component
- *
- * Renders the application's main navigation with Auth0 authentication integration.
- * Displays user profile when logged in, or login button when logged out.
- *
- * Mobile Behavior:
- * - Hamburger menu with overlay
- * - Grouped sections (e.g. "Exports") with indented sub-links
- * - Simplified auth buttons
- *
- * Desktop Behavior:
- * - Inline navigation links with hover/active underline
- * - Grouped items render as a dropdown with icons and descriptions
- * - Profile dropdown with user info and logout
- * - Click-outside / Escape detection to close menus
- *
- * @returns {JSX.Element} Navigation bar with authentication
- */
-const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const { user, isLoading } = useUser(); // Auth0 hook for user state
-  const profileMenuRef = useRef(null);
-  const pathname = usePathname();
-  const navLinks = getNavLinks(user);
+        {/* Theme + user */}
+        <div className="px-2 pb-2 pt-1 border-t border-border shrink-0 space-y-1.5">
+          <div className={cn("px-1", !isOpen &&"flex justify-center")}>{isOpen ? <ThemeToggle /> : <ThemeToggle collapsed />}</div>
 
-  /**
-   * Effect to close profile dropdown when clicking outside.
-   * Uses ref detection to identify clicks outside the dropdown element.
-   */
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
-        setIsProfileMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+          {isLoading ? (
+            <div className={cn("flex items-center rounded-xl px-3 py-2 gap-2.5", !isOpen &&"justify-center px-2")}>
+              <div className="skeleton h-[26px] w-[26px] rounded-full" />
+              {isOpen && (
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="skeleton h-3 w-24 rounded" />
+                  <div className="skeleton h-2.5 w-32 rounded" />
+                </div>
+              )}
+            </div>
+          ) : user ? (
+            <div className={cn("flex items-center rounded-xl px-3 py-2 gap-2.5", !isOpen &&"justify-center px-2")}>
+              {isOpen ? (
+                <>
+                  <UserAvatar user={user} size={26} />
+                  <div className="flex-1 min-w-0">
+                    {user.name && <p className="text-[12px] font-medium text-foreground truncate leading-tight">{user.name}</p>}
+                    {user.email && <p className="text-[10px] text-muted-foreground truncate leading-tight">{user.email}</p>}
+                  </div>
+                  <a
+                    href="/auth/logout"
+                    title="Logout"
+                    aria-label="Logout"
+                    className="p-1 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                  </a>
+                </>
+              ) : (
+                <a href="/auth/logout" title="Logout" aria-label="Logout">
+                  <UserAvatar user={user} size={26} />
+                </a>
+              )}
+            </div>
+          ) : (
+            <a
+              href="/auth/login"
+              title={!isOpen ? "Partner Login" : undefined}
+              className={cn(
+"flex items-center justify-center gap-2 rounded-md bg-primary text-[13px] font-medium text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+ isOpen ?"h-9 mx-1":"h-9 w-9 mx-auto",
+ )}
+            >
+              <LogIn className="h-3.5 w-3.5 shrink-0" />
+              {isOpen && "Partner Login"}
+            </a>
+          )}
+        </div>
+      </>
+    );
+  };
 
   return (
-    <div>
-      {/* Overlay for mobile menu */}
-      {isMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-40 md:hidden"
-          onClick={() => setIsMenuOpen(false)}
-        ></div>
+    <>
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-12 bg-sidebar border-b border-border flex items-center px-3 z-40">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="ml-2 min-w-0">{brand(true)}</div>
+      </div>
+
+      {/* Mobile drawer overlay */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50" onClick={() => setMobileOpen(false)} aria-hidden />
       )}
-      <nav className="bg-black/60 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex-shrink-0">
-              <Link href="/" className="flex items-center gap-4">
-                <Image
-                  src="https://imgs.pnvnet.si/img/615/301/75/2/c/www.patrikinternational.com/assets/page_info/0308183001671536508.png"
-                  alt="Patrik International Logo"
-                  width={120}
-                  height={60}
-                />
-                <span className="hidden sm:block font-orbitron font-semibold text-white text-lg tracking-wide">
-                  Partner Portal
-                </span>
-              </Link>
-            </div>
-            {/* Desktop Menu & Auth */}
-            <div className="hidden md:flex md:items-center md:gap-x-6">
-              <div className="flex items-center space-x-1">
-                {navLinks.map((link) =>
-                  link.children ? (
-                    <NavDropdown key={link.label} group={link} pathname={pathname} />
-                  ) : (
-                    <Link
-                      key={link.label}
-                      href={link.href}
-                      aria-current={isActive(pathname, link.href) ? "page" : undefined}
-                      className={`relative inline-flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors after:content-[''] after:absolute after:left-3 after:right-3 after:bottom-[6px] after:h-[2px] after:bg-[#01a0be] after:origin-left after:transition-transform after:duration-300 ${
-                        isActive(pathname, link.href)
-                          ? "text-[#01a0be] after:scale-x-100"
-                          : "text-neutral-300 hover:text-[#01a0be] after:scale-x-0 hover:after:scale-x-100"
-                      }`}
-                    >
-                      <NavIcon name={link.icon} className="h-4 w-4" />
-                      {link.label}
-                    </Link>
-                  )
-                )}
-              </div>
-              <div className="flex items-center">
-                {isLoading ? (
-                  <div className="w-8 h-8 bg-neutral-700 rounded-full animate-pulse"></div>
-                ) : user ? (
-                  <div className="ml-3 relative" ref={profileMenuRef}>
-                    <button
-                      onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                      type="button"
-                      className="flex items-center gap-x-2 rounded-full bg-neutral-800/50 hover:bg-neutral-700/80 p-1 pr-3 text-sm text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-800 focus:ring-white"
-                      id="user-menu-button"
-                      aria-expanded={isProfileMenuOpen}
-                      aria-haspopup="true"
-                    >
-                      <span className="sr-only">Open user menu</span>
-                      <div className="relative h-8 w-8">
-                        <Image
-                          className="h-8 w-8 rounded-full"
-                          src={user.picture}
-                          alt={user.name}
-                          layout="fill"
-                          objectFit="cover"
-                        />
-                      </div>
-                      <span className="hidden sm:block font-medium truncate max-w-[150px]">{user.name}</span>
-                    </button>
-                    {isProfileMenuOpen && (
-                      <div
-                        className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-neutral-800 ring-1 ring-black ring-opacity-5 focus:outline-none"
-                        role="menu"
-                        aria-orientation="vertical"
-                        aria-labelledby="user-menu-button"
-                      >
-                        <div className="px-4 py-2 text-sm text-neutral-300 border-b border-neutral-700 cursor-pointer">
-                          <p className="font-semibold truncate">{user.name}</p>
-                          <p className="text-xs text-neutral-400 truncate">{user.email}</p>
-                        </div>
-                        <a
-                          href="/auth/logout"
-                          className="block px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-700 hover:text-white w-full text-left"
-                          role="menuitem"
-                        >
-                          Log Out
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <a
-                    href="/auth/login"
-                    className="rounded-md bg-[#01a0be] px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#018a9f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#01a0be]"
-                  >
-                    Partner Login
-                  </a>
-                )}
-              </div>
-            </div>
-            {/* Mobile Menu Button */}
-            <div className="-mr-2 flex md:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                type="button"
-                className="inline-flex items-center justify-center p-2 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-800 focus:ring-white"
-                aria-controls="mobile-menu"
-                aria-expanded={isMenuOpen}
-              >
-                <span className="sr-only">Open main menu</span>
-                {isMenuOpen ? (
-                  <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                ) : (
-                  <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
 
-        {/* Mobile Menu, show/hide based on menu state. */}
-        {isMenuOpen && (
-          <div className="md:hidden" id="mobile-menu">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              {navLinks.map((link) =>
-                link.children ? (
-                  <div key={link.label} className="pt-2">
-                    <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                      {link.label}
-                    </p>
-                    {link.children.map((child) => {
-                      const active = isActive(pathname, child.href);
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={() => setIsMenuOpen(false)}
-                          aria-current={active ? "page" : undefined}
-                          className={`flex items-center gap-3 rounded-md px-3 py-2 text-base font-medium ${
-                            active
-                              ? "bg-[#01a0be]/10 text-[#01a0be]"
-                              : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
-                          }`}
-                        >
-                          <NavIcon name={child.icon} className="h-5 w-5 shrink-0" />
-                          {child.label}
-                          {child.badge && <NavBadge label={child.badge} className="ml-auto" />}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <Link
-                    key={link.label}
-                    href={link.href}
-                    onClick={() => setIsMenuOpen(false)}
-                    aria-current={isActive(pathname, link.href) ? "page" : undefined}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-base font-medium ${
-                      isActive(pathname, link.href)
-                        ? "bg-[#01a0be]/10 text-[#01a0be]"
-                        : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
-                    }`}
-                  >
-                    <NavIcon name={link.icon} className="h-5 w-5 shrink-0" />
-                    {link.label}
-                  </Link>
-                )
-              )}
-              {/* Auth buttons for mobile */}
-              <div className="border-t border-neutral-700 pt-4 mt-4">
-                {user ? (
-                   <a href="/auth/logout" className="text-neutral-300 hover:bg-neutral-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">
-                     Log Out
-                   </a>
-                ) : (
-                  <a href="/auth/login" className="text-neutral-300 hover:bg-neutral-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium">
-                    Partner Login
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Mobile slide-out nav */}
+      <nav
+        aria-label="Primary"
+        className={cn(
+"md:hidden fixed top-0 left-0 bottom-0 w-[260px] bg-sidebar border-r border-border z-50 flex flex-col transition-transform duration-200",
+ mobileOpen ?"translate-x-0":"-translate-x-full",
+ )}
+      >
+        {navContent(true)}
       </nav>
-    </div>
-  );
-};
 
-export default Navbar;
+      {/* Desktop sidebar */}
+      <nav
+        aria-label="Primary"
+        className={cn(
+"hidden md:flex h-screen flex-col shrink-0 bg-sidebar border-r border-border transition-all duration-200",
+ open ?"w-[220px]":"w-[60px]",
+ )}
+      >
+        {navContent(false)}
+      </nav>
+    </>
+  );
+}

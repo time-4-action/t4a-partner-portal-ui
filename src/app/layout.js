@@ -1,40 +1,34 @@
 /**
  * Root Layout Component
  *
- * The main layout wrapper for the entire Next.js application.
- * Configures global fonts, metadata, animated background, and navigation.
+ * The main layout wrapper for the entire Next.js application. Shares its
+ * chrome with t4a-admin: Geist Sans / Geist Mono, the same design tokens
+ * (globals.css) and the same light / system / dark theme plumbing.
  *
  * Features:
- * - Custom Google Fonts (Orbitron for headings, Montserrat for body)
- * - Animated blob background with multiple layers
- * - Persistent navigation bar
- * - CSS custom properties for font access
+ * - Geist fonts exposed as --font-geist-sans / --font-geist-mono
+ * - Theme bootstrap: an inline <head> script applies `.dark` on <html> before
+ *   first paint (stored choice, else prefers-color-scheme) so there is no flash
+ *   of the wrong theme; ThemeProvider then keeps React in sync
+ * - Admin app shell: left sidebar (Navbar) + a single scrolling <main>
  *
  * @module RootLayout
  */
 
-import { Orbitron, Montserrat } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import { ThemeProvider } from "@/lib/theme-context";
+import { THEME_BOOTSTRAP } from "@/lib/theme";
 
-/**
- * Orbitron font configuration for headings and branding.
- * Exposed via CSS custom property --font-orbitron.
- */
-const orbitron = Orbitron({
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  variable: "--font-orbitron",
-  weight: ["400", "700"],
 });
 
-/**
- * Montserrat font configuration for body text.
- * Exposed via CSS custom property --font-montserrat.
- */
-const montserrat = Montserrat({
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-  variable: "--font-montserrat",
-  weight: ["400", "500", "600", "700"],
 });
 
 /**
@@ -52,40 +46,24 @@ export const metadata = {
 /**
  * Root Layout Component
  *
- * Renders the HTML structure with animated background blobs and navigation.
- *
- * Background Implementation:
- * - 8 animated blob elements with varying sizes, colors, and positions
- * - Uses CSS custom animations (animate-blob, animate-blob2, animate-blob3)
- * - Blobs are positioned absolutely and layered behind content (z-index)
- * - Blue/cyan color scheme with low opacity for subtle effect
- * - Blur filters create soft, organic shapes
- *
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Page content to render
- * @returns {JSX.Element} HTML document structure with background and navigation
+ * @returns {JSX.Element} HTML document structure with navigation
  */
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${orbitron.variable} ${montserrat.variable}`}>
-      <body>
-        <div className="relative min-h-screen overflow-hidden">
-          {/* Animated Background Blobs - Creates depth and visual interest */}
-          <div className="absolute top-[-10%] left-[5%] w-72 h-72 bg-blue-500/20 rounded-full filter blur-3xl animate-blob animation-delay-2000"></div>
-          <div className="absolute top-[10%] right-[5%] w-80 h-80 bg-cyan-500/20 rounded-full filter blur-3xl animate-blob2"></div>
-          <div className="absolute bottom-[-10%] left-[20%] w-96 h-96 bg-sky-500/20 rounded-full filter blur-3xl animate-blob animation-delay-4000"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[28rem] bg-blue-700/10 rounded-full filter blur-2xl animate-blob3 animation-delay-2000"></div>
-          <div className="absolute bottom-[15%] right-[15%] w-64 h-64 bg-cyan-400/20 rounded-full filter blur-3xl animate-blob2 animation-delay-6000"></div>
-          <div className="absolute bottom-[40%] left-[10%] w-56 h-56 bg-sky-400/20 rounded-full filter blur-3xl animate-blob animation-delay-2000"></div>
-          <div className="absolute top-[25%] left-[30%] w-48 h-48 bg-blue-400/10 rounded-full filter blur-2xl animate-blob3"></div>
-          <div className="absolute bottom-[5%] right-[35%] w-72 h-72 bg-cyan-600/10 rounded-full filter blur-3xl animate-blob animation-delay-4000"></div>
-
-          {/* Main Content Layer - Positioned above background */}
-          <div className="relative z-10 flex min-h-screen flex-col">
-            <Navbar />
-            <main className="flex-grow">{children}</main>
-          </div>
-        </div>
+    // suppressHydrationWarning: the bootstrap script sets the .dark class and
+    // color-scheme before React hydrates, so <html> intentionally differs from SSR.
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+      </head>
+      <body className="antialiased flex h-screen overflow-hidden bg-background text-foreground">
+        <ThemeProvider>
+          {/* Same shell as the admin: sidebar + one scrolling main region. */}
+          <Navbar />
+          <main className="flex-1 min-w-0 overflow-y-auto bg-background pt-12 md:pt-0">{children}</main>
+        </ThemeProvider>
       </body>
     </html>
   );

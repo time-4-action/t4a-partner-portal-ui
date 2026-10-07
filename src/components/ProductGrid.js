@@ -18,6 +18,10 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useDebounce } from "use-debounce";
 import Image from "next/image";
+import { Search, X, LayoutGrid, List } from "lucide-react";
+import PageHeader from "@/components/ui/PageHeader";
+import { cn } from "@/lib/utils";
+import { input } from "@/lib/ui";
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Search scoring
@@ -52,20 +56,20 @@ const STOCK_BADGE = {
   full: {
     label: "In Stock",
     dot: "●",
-    list: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20",
+    list: "bg-emerald-500/15 text-emerald-fg border border-emerald-500/20",
     card: "bg-emerald-500/90 text-white",
   },
   partial: {
     label: "Partial Stock",
     dot: "◐",
-    list: "bg-amber-500/15 text-amber-400 border border-amber-500/20",
+    list: "bg-amber-500/15 text-amber-fg border border-amber-500/20",
     card: "bg-amber-500/90 text-white",
   },
   none: {
     label: "No Stock",
     dot: "○",
-    list: "bg-neutral-800 text-neutral-600 border border-neutral-700/40",
-    card: "bg-neutral-700/90 text-neutral-400",
+    list: "bg-muted text-muted-foreground/70 border border-input/40",
+    card: "bg-accent/90 text-muted-foreground",
   },
 };
 
@@ -130,8 +134,8 @@ function scoreProduct(product, rawQuery) {
 // Fallback artwork when a product (and its variants) have no image.
 function PlaceholderImg() {
   return (
-    <div className="w-full h-full flex items-center justify-center bg-neutral-800">
-      <svg className="w-10 h-10 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="w-full h-full flex items-center justify-center bg-muted">
+      <svg className="w-10 h-10 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     </div>
@@ -168,10 +172,10 @@ function ProductCard({
   if (view === "list") {
     return (
       <div
-        className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group bg-neutral-900/60 border border-neutral-800/50 hover:border-neutral-700/60 hover:bg-neutral-800/40"
+        className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group bg-card border border-border/50 hover:border-input/60 hover:bg-muted/40 shadow-sm"
         onClick={() => onProductNameClick(product.token)}
       >
-        <div className="relative w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-neutral-800">
+        <div className="relative w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-muted">
           {imgSrc ? (
             <Image src={imgSrc} alt={product.product_name} fill sizes="56px" className="object-cover" />
           ) : (
@@ -179,12 +183,12 @@ function ProductCard({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white truncate">{product.product_name}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{product.product_name}</p>
           <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
-            <span className="text-[11px] text-neutral-500">{variations} {variations === 1 ? "variant" : "variants"}</span>
-            {minPrice !== null && <span className="text-[11px] font-semibold text-cyan-400">€{minPrice.toFixed(2)}</span>}
+            <span className="text-[11px] text-muted-foreground">{variations} {variations === 1 ? "variant" : "variants"}</span>
+            {minPrice !== null && <span className="text-[11px] font-semibold text-cyan-fg">€{minPrice.toFixed(2)}</span>}
             {product.categories?.slice(0, 2).map(cat => (
-              <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-600 rounded border border-neutral-700/40 truncate max-w-[100px]">{cat}</span>
+              <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground/70 rounded border border-input/40 truncate max-w-[100px]">{cat}</span>
             ))}
           </div>
         </div>
@@ -194,7 +198,7 @@ function ProductCard({
           </span>
           <button
             onClick={e => { e.stopPropagation(); onProductNameClick(product.token); }}
-            className="py-1.5 px-3 bg-neutral-800 hover:bg-cyan-600/80 text-neutral-300 hover:text-white rounded-lg text-xs font-medium transition-all border border-neutral-700/50 hover:border-cyan-500/40"
+            className="px-3 bg-background hover:bg-cyan-600/80 text-foreground hover:text-white rounded-md text-xs font-medium transition-all border h-7 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
           >
             Details
           </button>
@@ -206,10 +210,10 @@ function ProductCard({
   // Grid view
   return (
     <div
-      className="group relative bg-neutral-900/70 border border-neutral-800/60 hover:border-neutral-600/60 rounded-xl overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:shadow-black/30"
+      className="group relative bg-card border border-border/60 hover:border-input/60 rounded-xl overflow-hidden cursor-pointer transition-all hover:shadow-lg"
       onClick={() => onProductNameClick(product.token)}
     >
-      <div className="relative aspect-square bg-neutral-800">
+      <div className="relative aspect-square bg-muted">
         {imgSrc ? (
           <Image src={imgSrc} alt={product.product_name} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw" className="object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
@@ -222,21 +226,21 @@ function ProductCard({
         </div>
       </div>
       <div className="p-3">
-        <p className="text-xs font-semibold text-white line-clamp-2 leading-snug mb-2">{product.product_name}</p>
+        <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug mb-2">{product.product_name}</p>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] text-neutral-500">{variations} {variations === 1 ? "variant" : "variants"}</span>
-          {minPrice !== null && <span className="text-xs font-semibold text-cyan-400">€{minPrice.toFixed(2)}</span>}
+          <span className="text-[11px] text-muted-foreground">{variations} {variations === 1 ? "variant" : "variants"}</span>
+          {minPrice !== null && <span className="text-xs font-semibold text-cyan-fg">€{minPrice.toFixed(2)}</span>}
         </div>
         {product.categories?.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2.5">
             {product.categories.slice(0, 2).map(cat => (
-              <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-500 rounded-md border border-neutral-700/50 truncate max-w-[90px]">{cat}</span>
+              <span key={cat} className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded-md border border-input/50 truncate max-w-[90px]">{cat}</span>
             ))}
           </div>
         )}
         <button
           onClick={e => { e.stopPropagation(); onProductNameClick(product.token); }}
-          className="w-full py-1.5 bg-neutral-800 hover:bg-cyan-600/80 text-neutral-300 hover:text-white rounded-lg text-xs font-medium transition-all border border-neutral-700/50 hover:border-cyan-500/40"
+          className="w-full py-1.5 bg-background hover:bg-cyan-600/80 text-foreground hover:text-white rounded-md text-xs font-medium transition-all border shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
         >
           Details
         </button>
@@ -300,84 +304,70 @@ export default function ProductGrid({ initialProducts = [] }) {
   const isSearching = debouncedQuery.trim().length > 0;
 
   return (
-    <>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        {/* Compact header — small icon + title + badge on one line, matching the Export / Shopify pages. */}
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#01a0be]/30 bg-[#01a0be]/10">
-            <svg className="h-5 w-5 text-[#01a0be]" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <h1 className="mb-0 text-xl font-bold leading-none tracking-tight text-white">Products Overview</h1>
-            <p className="mt-1 text-xs text-neutral-500">
-              {isSearching
-                ? `${results.length} of ${products.length} products`
-                : `${products.length} products`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="relative flex-1 sm:w-72 sm:flex-none">
-            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-              </svg>
-            </span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, SKU or EAN…"
-              aria-label="Search products"
-              className="w-full rounded-xl border border-neutral-700/50 bg-neutral-800/80 py-2 pl-9 pr-9 text-sm text-white placeholder-neutral-500 transition-colors focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
-            />
-            {query && (
-              <button
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500 transition-colors hover:text-white"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-          <div className="flex bg-neutral-800/80 border border-neutral-700/50 rounded-xl p-1 gap-0.5">
-            <button
-              onClick={() => setView("grid")}
-              className={`p-2 rounded-lg transition-all ${view === "grid" ? "bg-neutral-700 text-white" : "text-neutral-500 hover:text-neutral-300"}`}
-              aria-label="Grid view"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setView("list")}
-              className={`p-2 rounded-lg transition-all ${view === "list" ? "bg-neutral-700 text-white" : "text-neutral-500 hover:text-neutral-300"}`}
-              aria-label="List view"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="flex flex-col min-h-full">
+      <PageHeader
+        title="Products"
+        count={isSearching ? `${results.length} / ${products.length}` : products.length}
+        right={
+          <>
+            {/* Search — same recipe as the admin list headers */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" aria-hidden />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by name, SKU or EAN…"
+                aria-label="Search products"
+                className={cn(input, "pl-8 pr-8 h-8 w-44 md:w-64 text-xs bg-background")}
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {/* Grid / list — the admin segmented-control recipe (see ThemeToggle) */}
+            <div role="radiogroup" aria-label="View" className="flex items-center rounded-lg bg-muted p-0.5">
+              {[
+                { value: "grid", icon: LayoutGrid, label: "Grid view" },
+                { value: "list", icon: List, label: "List view" },
+              ].map(({ value, icon: Icon, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={view === value}
+                  onClick={() => setView(value)}
+                  title={label}
+                  aria-label={label}
+                  className={cn(
+                    "flex items-center justify-center h-7 w-8 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    view === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5" aria-hidden />
+                </button>
+              ))}
+            </div>
+          </>
+        }
+      />
+      <div className="flex-1 p-4 md:p-8">
       {results.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-800 bg-neutral-900/40 py-20 text-center">
-          <svg className="mb-4 h-10 w-10 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40 py-20 text-center">
+          <svg className="mb-4 h-10 w-10 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
           </svg>
-          <p className="text-sm font-medium text-neutral-300">No products match “{debouncedQuery.trim()}”</p>
-          <p className="mt-1 text-xs text-neutral-500">Try a different name, SKU, or EAN code.</p>
+          <p className="text-sm font-medium text-foreground">No products match “{debouncedQuery.trim()}”</p>
+          <p className="mt-1 text-xs text-muted-foreground">Try a different name, SKU, or EAN code.</p>
           <button
             onClick={() => setQuery("")}
-            className="mt-4 rounded-lg border border-neutral-700/50 bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-cyan-500/40 hover:text-white"
+            className="mt-4 rounded-md border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:text-foreground h-7 shadow-xs dark:border-input dark:bg-input/30 dark:hover:bg-input/50"
           >
             Clear search
           </button>
@@ -385,10 +375,10 @@ export default function ProductGrid({ initialProducts = [] }) {
       ) : (
         <div
           className={`grid gap-3 ${
-            view === "grid"
-              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
-              : "grid-cols-1"
-          }`}
+ view ==="grid"
+ ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+ :"grid-cols-1"
+ }`}
         >
           {results.map(({ product }) => (
             <ProductCard
@@ -400,6 +390,7 @@ export default function ProductGrid({ initialProducts = [] }) {
           ))}
         </div>
       )}
-    </>
+      </div>
+    </div>
   );
 }

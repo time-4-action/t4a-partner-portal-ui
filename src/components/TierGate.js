@@ -22,14 +22,12 @@ import RequestAccessForm from "@/components/RequestAccessForm";
 const TIER_META = {
   alpha: {
     label: "Alpha program",
-    chip: "from-violet-500/20 to-fuchsia-500/20 text-violet-300 ring-violet-400/30",
-    glow: "from-violet-500/25 via-fuchsia-500/10",
+    chip: "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300",
     desc: "hands-on early access — features are functional but still being shaped, and your feedback steers them",
   },
   beta: {
     label: "Beta program",
-    chip: "from-[#01a0be]/20 to-cyan-400/20 text-cyan-300 ring-cyan-400/30",
-    glow: "from-[#01a0be]/25 via-cyan-500/10",
+    chip: "bg-accent-brand/10 text-accent-brand",
     desc: "near-final features in real-world validation before general availability",
   },
 };
@@ -69,38 +67,33 @@ export default function TierGate({ featureKey, userEmail, userName, declineShop,
 
   return (
     <div className="relative flex min-h-[70vh] items-center justify-center py-16">
-      {/* ambient glow behind the card */}
-      <div className={`pointer-events-none absolute inset-x-0 top-10 mx-auto h-72 w-72 rounded-full bg-gradient-to-br ${meta.glow} to-transparent blur-3xl`} />
 
       {/* full container width — lines up with the navbar/content column */}
-      <div className="relative w-full overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-900/60 shadow-2xl backdrop-blur-sm">
-        {/* gradient hairline */}
-        <div className="h-1 w-full bg-gradient-to-r from-[#01a0be] via-violet-500 to-fuchsia-500" />
+      <div className="relative w-full overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
 
         <div className="flex flex-col items-center px-6 py-12 text-center sm:px-14">
           <div className="relative mb-6">
-            <div className={`absolute -inset-3 rounded-3xl bg-gradient-to-br ${meta.glow} to-transparent blur-xl`} />
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-neutral-700/60 bg-neutral-900 text-violet-300">
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-input/60 bg-card text-violet-fg-soft shadow-sm">
               <FlaskIcon className="h-8 w-8" />
             </div>
           </div>
 
-          <span className={`mb-4 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${meta.chip} px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ring-1`}>
+          <span className={`mb-4 inline-flex items-center gap-1.5 rounded-full ${meta.chip} px-2.5 py-1 text-[11px] font-medium`}>
             {meta.label}
           </span>
 
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {feature.name} is in early access
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-neutral-400">{feature.tagline}</p>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{feature.tagline}</p>
 
           {/* what testers get */}
           {feature.perks?.length > 0 && (
             <ul className="mt-8 w-full max-w-md space-y-2.5 text-left">
               {feature.perks.map((p) => (
-                <li key={p} className="flex items-start gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-3">
-                  <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#01a0be]" />
-                  <span className="text-sm text-neutral-300">{p}</span>
+                <li key={p} className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
+                  <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-brand" />
+                  <span className="text-sm text-foreground">{p}</span>
                 </li>
               ))}
             </ul>
@@ -109,17 +102,17 @@ export default function TierGate({ featureKey, userEmail, userName, declineShop,
           {/* Clean-break notice — shown when a Shopify install couldn't be connected for this account */}
           {declineShop && (
             <div className="mt-8 w-full max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left">
-              <p className="text-sm font-medium text-amber-200">We couldn&apos;t connect {declineShop}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-amber-300/80">
+              <p className="text-sm font-medium text-amber-fg-softer">We couldn&apos;t connect {declineShop}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-fg-soft/80">
                 Your account isn&apos;t approved for the {feature.name} yet, so the app has been removed from
                 your store. Request access below and we&apos;ll reconnect it once you&apos;re set up.
               </p>
             </div>
           )}
 
-          <p className="mt-8 max-w-md text-xs leading-relaxed text-neutral-500">
+          <p className="mt-8 max-w-md text-xs leading-relaxed text-muted-foreground">
             This feature is currently limited to {tier} testers — {meta.desc}. Tell us about your
-            business and we&apos;ll enable it for <span className="font-medium text-neutral-300">{userEmail || "your account"}</span>.
+            business and we&apos;ll enable it for <span className="font-medium text-foreground">{userEmail || "your account"}</span>.
           </p>
 
           {/* request access form */}

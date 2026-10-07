@@ -1,58 +1,295 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Design tokens — shared vocabulary with t4a-admin (app/globals.css there).
+   The base palette (background / foreground / card / muted / border / primary /
+   accent-brand …) is copied verbatim from the admin so both apps render the
+   same surfaces, text and chrome. Light is the default, `.dark` on <html>
+   switches (set before paint by THEME_BOOTSTRAP in src/lib/theme.js).
+
+   The portal adds a few tokens the admin doesn't need: status hues as text,
+   tinted toast panels, shadow shades and the Shopify brand pair.
+   ────────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-geist-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-brand: var(--accent-brand);
+  --color-accent-brand-foreground: var(--accent-brand-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  /* status hues as text (admin idiom: 600 on light, 400 on dark) */
+  --color-cyan-fg: var(--cyan-fg);       --color-cyan-fg-soft: var(--cyan-fg-soft);       --color-cyan-fg-softer: var(--cyan-fg-softer);       --color-cyan-fg-deep: var(--cyan-fg-deep);
+  --color-amber-fg: var(--amber-fg);     --color-amber-fg-soft: var(--amber-fg-soft);     --color-amber-fg-softer: var(--amber-fg-softer);     --color-amber-fg-deep: var(--amber-fg-deep);
+  --color-red-fg: var(--red-fg);         --color-red-fg-soft: var(--red-fg-soft);         --color-red-fg-softer: var(--red-fg-softer);         --color-red-fg-deep: var(--red-fg-deep);
+  --color-emerald-fg: var(--emerald-fg); --color-emerald-fg-soft: var(--emerald-fg-soft); --color-emerald-fg-softer: var(--emerald-fg-softer); --color-emerald-fg-deep: var(--emerald-fg-deep);
+  --color-green-fg: var(--green-fg);     --color-green-fg-soft: var(--green-fg-soft);     --color-green-fg-softer: var(--green-fg-softer);     --color-green-fg-deep: var(--green-fg-deep);
+  --color-purple-fg: var(--purple-fg);   --color-purple-fg-soft: var(--purple-fg-soft);   --color-purple-fg-softer: var(--purple-fg-softer);   --color-purple-fg-deep: var(--purple-fg-deep);
+  --color-violet-fg: var(--violet-fg);   --color-violet-fg-soft: var(--violet-fg-soft);   --color-violet-fg-softer: var(--violet-fg-softer);   --color-violet-fg-deep: var(--violet-fg-deep);
+  --color-blue-fg: var(--blue-fg);       --color-blue-fg-soft: var(--blue-fg-soft);       --color-blue-fg-softer: var(--blue-fg-softer);       --color-blue-fg-deep: var(--blue-fg-deep);
+  --color-orange-fg: var(--orange-fg);   --color-orange-fg-soft: var(--orange-fg-soft);   --color-orange-fg-softer: var(--orange-fg-softer);   --color-orange-fg-deep: var(--orange-fg-deep);
+  --color-pink-fg: var(--pink-fg);       --color-pink-fg-soft: var(--pink-fg-soft);       --color-pink-fg-softer: var(--pink-fg-softer);       --color-pink-fg-deep: var(--pink-fg-deep);
+
+  --color-emerald-tint: var(--emerald-tint);
+  --color-red-tint: var(--red-tint);
+  --color-cyan-tint: var(--cyan-tint);
+  --color-emerald-shadow: var(--emerald-shadow);
+  --color-red-shadow: var(--red-shadow);
+  --color-shopify-fg: var(--shopify-fg);
+  --color-shopify-deep: var(--shopify-deep);
+  --color-shade-30: var(--shade-30);
+  --color-shade-40: var(--shade-40);
+  --color-shade-50: var(--shade-50);
+  --color-shade-60: var(--shade-60);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  --radius: 0.625rem;
+  /* Subtle warmth in the off-white — feels paper-like instead of clinical */
+  --background: oklch(0.985 0.003 80);
+  --foreground: oklch(0.208 0.042 264);
+  --surface: oklch(1 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.208 0.042 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.208 0.042 264);
+  --primary: oklch(0.208 0.042 264);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0.002 80);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.965 0.003 80);
+  --muted-foreground: oklch(0.50 0.015 240);
+  --accent: oklch(0.97 0.002 80);
+  --accent-foreground: oklch(0.205 0 0);
+  --accent-brand: oklch(0.48 0.10 200);
+  --accent-brand-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.91 0.005 80);
+  --input: oklch(0.91 0.005 80);
+  --ring: oklch(0.48 0.10 200);
+  --sidebar: oklch(0.99 0.003 80);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-border: oklch(0.91 0.005 80);
+
+  --cyan-fg: #0891b2;    --cyan-fg-soft: #0e7490;    --cyan-fg-softer: #155e75;    --cyan-fg-deep: #0891b2;
+  --amber-fg: #d97706;   --amber-fg-soft: #b45309;   --amber-fg-softer: #92400e;   --amber-fg-deep: #d97706;
+  --red-fg: #dc2626;     --red-fg-soft: #b91c1c;     --red-fg-softer: #991b1b;     --red-fg-deep: #dc2626;
+  --emerald-fg: #059669; --emerald-fg-soft: #047857; --emerald-fg-softer: #065f46; --emerald-fg-deep: #059669;
+  --green-fg: #16a34a;   --green-fg-soft: #15803d;   --green-fg-softer: #166534;   --green-fg-deep: #16a34a;
+  --purple-fg: #9333ea;  --purple-fg-soft: #7e22ce;  --purple-fg-softer: #6b21a8;  --purple-fg-deep: #9333ea;
+  --violet-fg: #7c3aed;  --violet-fg-soft: #6d28d9;  --violet-fg-softer: #5b21b6;  --violet-fg-deep: #7c3aed;
+  --blue-fg: #2563eb;    --blue-fg-soft: #1d4ed8;    --blue-fg-softer: #1e40af;    --blue-fg-deep: #2563eb;
+  --orange-fg: #ea580c;  --orange-fg-soft: #c2410c;  --orange-fg-softer: #9a3412;  --orange-fg-deep: #ea580c;
+  --pink-fg: #db2777;    --pink-fg-soft: #be185d;    --pink-fg-softer: #9d174d;    --pink-fg-deep: #db2777;
+
+  --emerald-tint: #ecfdf5;
+  --red-tint: #fef2f2;
+  --cyan-tint: #ecfeff;
+  --emerald-shadow: rgb(0 0 0 / 0.08);
+  --red-shadow: rgb(0 0 0 / 0.08);
+  --shopify-fg: #3f6b1e;
+  --shopify-deep: #eaf3df;
+  --shade-30: rgb(0 0 0 / 0.05);
+  --shade-40: rgb(0 0 0 / 0.07);
+  --shade-50: rgb(0 0 0 / 0.09);
+  --shade-60: rgb(0 0 0 / 0.11);
+}
+
+.dark {
+  --background: oklch(0.155 0.008 240);
+  --foreground: oklch(0.97 0 0);
+  --surface: oklch(0.205 0.008 240);
+  --card: oklch(0.205 0.008 240);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.205 0.008 240);
+  --popover-foreground: oklch(0.97 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0.005 240);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.24 0.006 240);
+  --muted-foreground: oklch(0.68 0 0);
+  --accent: oklch(0.269 0.005 240);
+  --accent-foreground: oklch(0.985 0 0);
+  --accent-brand: oklch(0.66 0.13 200);
+  --accent-brand-foreground: oklch(0.14 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.66 0.13 200);
+  --sidebar: oklch(0.18 0.006 240);
+  --sidebar-foreground: oklch(0.97 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+
+  --cyan-fg: #22d3ee;    --cyan-fg-soft: #67e8f9;    --cyan-fg-softer: #a5f3fc;    --cyan-fg-deep: #06b6d4;
+  --amber-fg: #fbbf24;   --amber-fg-soft: #fcd34d;   --amber-fg-softer: #fde68a;   --amber-fg-deep: #f59e0b;
+  --red-fg: #f87171;     --red-fg-soft: #fca5a5;     --red-fg-softer: #fecaca;     --red-fg-deep: #ef4444;
+  --emerald-fg: #34d399; --emerald-fg-soft: #6ee7b7; --emerald-fg-softer: #a7f3d0; --emerald-fg-deep: #10b981;
+  --green-fg: #4ade80;   --green-fg-soft: #86efac;   --green-fg-softer: #bbf7d0;   --green-fg-deep: #22c55e;
+  --purple-fg: #c084fc;  --purple-fg-soft: #d8b4fe;  --purple-fg-softer: #e9d5ff;  --purple-fg-deep: #a855f7;
+  --violet-fg: #a78bfa;  --violet-fg-soft: #c4b5fd;  --violet-fg-softer: #ddd6fe;  --violet-fg-deep: #8b5cf6;
+  --blue-fg: #60a5fa;    --blue-fg-soft: #93c5fd;    --blue-fg-softer: #bfdbfe;    --blue-fg-deep: #3b82f6;
+  --orange-fg: #fb923c;  --orange-fg-soft: #fdba74;  --orange-fg-softer: #fed7aa;  --orange-fg-deep: #f97316;
+  --pink-fg: #f472b6;    --pink-fg-soft: #f9a8d4;    --pink-fg-softer: #fbcfe8;    --pink-fg-deep: #ec4899;
+
+  --emerald-tint: rgb(2 44 34 / 0.9);
+  --red-tint: rgb(69 10 10 / 0.9);
+  --cyan-tint: rgb(8 51 68 / 0.6);
+  --emerald-shadow: rgb(6 78 59 / 0.3);
+  --red-shadow: rgb(127 29 29 / 0.3);
+  --shopify-fg: #b6df84;
+  --shopify-deep: #16210f;
+  --shade-30: rgb(0 0 0 / 0.3);
+  --shade-40: rgb(0 0 0 / 0.4);
+  --shade-50: rgb(0 0 0 / 0.5);
+  --shade-60: rgb(0 0 0 / 0.6);
+}
+
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   html,
   body {
-    @apply h-full w-full bg-black text-neutral-300 antialiased;
-    font-family: var(--font-montserrat);
+    @apply h-full w-full bg-background text-foreground antialiased;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
     line-height: 1.6;
   }
-
+  body {
+    transition: background-color 200ms ease, color 200ms ease;
+  }
   h1,
   h2,
   h3 {
-    font-family: var(--font-orbitron), sans-serif;
-    @apply text-neutral-100 mb-2;
+    @apply font-display font-semibold tracking-tight text-foreground mb-2;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  a {
+    cursor: pointer;
+  }
+  hr {
+    @apply border-t border-border;
+  }
+  .font-display {
+    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   }
 
-  /* Custom Scrollbar styling */
-  ::-webkit-scrollbar {
-    width: 8px;
+  /* The brand logo is a white-on-transparent PNG; flip it to ink on light */
+  html:not(.dark) .brand-logo {
+    filter: invert(1) hue-rotate(180deg);
   }
 
-  ::-webkit-scrollbar-track {
-    @apply bg-neutral-900;
+  /* Brief cross-fade of every colour when the theme is switched. ThemeProvider
+     adds the class and removes it once the transition ends, so it never
+     interferes with the app's own motion the rest of the time. */
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition:
+      background-color 0.3s ease,
+      border-color 0.3s ease,
+      color 0.3s ease,
+      fill 0.3s ease,
+      stroke 0.3s ease,
+      box-shadow 0.3s ease,
+      opacity 0.3s ease !important;
   }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-neutral-700 rounded-lg;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: #01a0be;
+  @media (prefers-reduced-motion: reduce) {
+    html.theme-transition,
+    html.theme-transition *,
+    html.theme-transition *::before,
+    html.theme-transition *::after {
+      transition: none !important;
+    }
   }
 }
 
-@layer utilities {
-  .animation-delay-2000 {
-    animation-delay: 2s;
-  }
-  .animation-delay-4000 {
-    animation-delay: 4s;
-  }
-  .animation-delay-6000 {
-    animation-delay: 6s;
-  }
+/* Loading shimmer — same as the admin's skeleton leaves. */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, oklch(0.93 0 0) 25%, oklch(0.97 0 0) 50%, oklch(0.93 0 0) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+.dark .skeleton {
+  background: linear-gradient(90deg, oklch(0.22 0 0) 25%, oklch(0.28 0 0) 50%, oklch(0.22 0 0) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
 
-  .animate-blob {
-    animation: blob 25s infinite;
-  }
-  .animate-blob2 {
-    animation: blob2 30s infinite;
-  }
-  .animate-blob3 {
-    animation: blob3 35s infinite;
-  }
+/* Editorial small-caps overline for section labels. */
+.overline {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* Scrollable rows that must not show a scrollbar (tab strips, pill rows). */
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* Page-load stagger reveal. Pair with style={{animationDelay:`${i*40}ms`}}. */
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.reveal {
+  opacity: 0;
+  animation: reveal 0.4s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { animation: none; opacity: 1; transform: none; }
+  .skeleton { animation: none; }
+}
+
+@layer utilities {
   .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out;
   }
@@ -69,54 +306,6 @@
   20%, 80% { transform: translateX(4px); }
   30%, 50%, 70% { transform: translateX(-7px); }
   40%, 60% { transform: translateX(7px); }
-}
-
-@keyframes blob {
-  0% {
-    transform: translate(0px, 0px) scale(1);
-  }
-  33% {
-    transform: translate(20vw, -15vh) scale(1.1) rotate(40deg);
-  }
-  66% {
-    transform: translate(-15vw, 10vh) scale(0.9) rotate(-20deg);
-  }
-  100% {
-    transform: translate(0px, 0px) scale(1);
-  }
-}
-
-@keyframes blob2 {
-  0% {
-    transform: translate(0px, 0px) scale(1);
-  }
-  25% {
-    transform: translate(-25vw, 10vh) scale(0.8) rotate(-30deg);
-  }
-  50% {
-    transform: translate(10vw, 20vh) scale(1.2) rotate(80deg);
-  }
-  75% {
-    transform: translate(5vw, -15vh) scale(1) rotate(-10deg);
-  }
-  66% {
-    transform: translate(0px, 0px) scale(1);
-  }
-}
-
-@keyframes blob3 {
-  0% {
-    transform: translate(0px, 0px) scale(1);
-  }
-  33% {
-    transform: translate(15vw, 25vh) scale(1.1) rotate(60deg);
-  }
-  66% {
-    transform: translate(-20vw, -10vh) scale(0.9) rotate(-40deg);
-  }
-  100% {
-    transform: translate(0px, 0px) scale(1);
-  }
 }
 
 @keyframes fadeIn {
