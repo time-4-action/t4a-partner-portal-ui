@@ -1,0 +1,12 @@
+# Production compose for /data/stack/apps/time-4-action/export/ui on the VM (DEPLOY_DIR in the
+# workflow). CI exports APP_IMAGE=ghcr.io/time-4-action/t4a-partner-portal-ui:<commit sha>;
+# without it this runs :latest. The VM never builds: images come from GHCR. Copy changes to the
+# server by hand; the deploy only swaps images.
+services:
+  t4a-partner-portal-ui:
+    image: ${APP_IMAGE:-ghcr.io/time-4-action/t4a-partner-portal-ui:latest}
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    env_file:
+      - .env

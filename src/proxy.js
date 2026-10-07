@@ -91,6 +91,7 @@ export async function proxy(request) {
  * - favicon.ico: Site favicon
  * - sitemap.xml: Sitemap file
  * - robots.txt: Robots exclusion file
+ * - healthz: liveness probe for the CI deploy (no session needed)
  *
  * All other routes will be processed by the Auth0 middleware.
  *
@@ -99,6 +100,6 @@ export async function proxy(request) {
  */
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|healthz).*)",
   ],
 };

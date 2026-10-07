@@ -60,6 +60,13 @@ EXPOSE 3000
 
 ENV PORT=3000
 
+# Set by CI to the commit SHA; the deploy checks it after rollout.
+ARG GIT_SHA=unknown
+ENV APP_VERSION=$GIT_SHA
+LABEL org.opencontainers.image.revision=$GIT_SHA
+# Links the GHCR package to the repository (visibility + access follow it).
+LABEL org.opencontainers.image.source=https://github.com/time-4-action/t4a-partner-portal-ui
+
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/config/next-config-js/output
 ENV HOSTNAME="0.0.0.0"
