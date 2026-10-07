@@ -102,9 +102,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 npm run build
 npm start
 
-# Or with Docker
-docker build -t patrik-products-ui .
-docker run -p 3000:3000 --env-file .env patrik-products-ui
+# Or with Docker (production images are built by CI, see docs/DEPLOYMENT.md)
+docker build -t t4a-partner-portal-ui .
+docker run -p 3000:3000 --env-file .env t4a-partner-portal-ui
 ```
 
 ---
