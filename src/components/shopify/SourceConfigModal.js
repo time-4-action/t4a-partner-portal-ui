@@ -129,6 +129,14 @@ export default function SourceConfigModal({
   const srcExport = !isFeed ? exportOptions.find((x) => x._id === draft.exportConfigId) : null;
   const optionDefault = (srcExport?.option1Name || "").trim() || "Size";
 
+  /* ----- title prefix: a pattern of fields each product fills in (API titlePattern.js) ----- */
+  const sampleVendor = isFeed ? (feedOptions.find((f) => f.feedId === draft.feedId)?.brand || "Brand") : "Patrik International";
+  const prefixSamples = { vendor: sampleVendor, brand: sampleVendor, product_type: "Product type", category: "Category", subcategory: "Subcategory", code: "CODE-1" };
+  const prefixPreview = draft.titlePrefix.trim()
+    .replace(/\{\s*([a-z_]+)[^}]*\}/gi, (whole, key) => prefixSamples[key.toLowerCase()] ?? whole)
+    .replace(/[[\]]/g, "").replace(/\s+/g, " ").trim();
+  const addPrefixField = (key) => patch({ titlePrefix: `${draft.titlePrefix.trim()} {${key}}`.trim() });
+
   /* ----- summaries for the collapsed groups ----- */
   const aiLabel = isFeed ? feedAiSet?.name : exportAiSet?.name;
   const contentSummary = [draft.titlePrefix ? `Prefix “${draft.titlePrefix}”` : "No title prefix", aiLabel ? `AI tags: ${aiLabel}` : "Catalogue tags"].join(" · ");
@@ -260,9 +268,15 @@ export default function SourceConfigModal({
             <Disclosure title="Content & tags" summary={contentSummary} open={open.content} onToggle={() => toggleOpen("content")}>
               <div className="space-y-4">
                 <Field label="Title prefix" htmlFor="cfg-prefix" hint={draft.ownership === "create_then_handoff" ? "Applied when a product is created; products already in your store keep their title." : "Titles already in your store are rewritten with the prefix on the next sync. SKUs and matching are untouched."}>
-                  <input id="cfg-prefix" value={draft.titlePrefix} onChange={(e) => patch({ titlePrefix: e.target.value })} maxLength={40} placeholder="e.g. WINDSURF -" className={cn(input)} />
-                  {draft.titlePrefix.trim() && (
-                    <p className="mt-1.5 truncate text-xs text-muted-foreground">In Shopify: <span className="font-medium text-foreground">{draft.titlePrefix.trim()}</span> Product name</p>
+                  <input id="cfg-prefix" value={draft.titlePrefix} onChange={(e) => patch({ titlePrefix: e.target.value })} maxLength={120} placeholder="e.g. {vendor} -" className={cn(input)} />
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {[["vendor", "Vendor"], ["category", "Category"], ["subcategory", "Subcategory"], ["product_type", "Product type"], ["code", "Code"]].map(([key, label]) => (
+                      <button key={key} type="button" onClick={() => addPrefixField(key)} className="rounded-md border border-border px-2 py-0.5 text-xs font-medium text-foreground hover:bg-muted">+ {label}</button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">Each product fills in its own values, so one feed can give “Dakine - …” and “Unifiber - …”. Filters like <code>{"{category|upper}"}</code> work too.</p>
+                  {prefixPreview && (
+                    <p className="mt-1 truncate text-xs text-muted-foreground">In Shopify: <span className="font-medium text-foreground">{prefixPreview}</span> Product name</p>
                   )}
                 </Field>
 
