@@ -42,6 +42,7 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
+      - run: npm test
       # The same build the Dockerfile runs, so a broken build fails the pull
       # request rather than the deploy. No env is needed: all config is read at
       # runtime from the server's .env.

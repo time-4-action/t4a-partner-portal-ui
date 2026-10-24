@@ -1,5 +1,6 @@
 import ExportPage from "@/components/ExportPage";
 import { auth0 } from "@/lib/auth0";
+import { filterVisibleExports } from "@/lib/exportAccess";
 
 // Get API URL from environment
 const apiUrl = process.env.EXPORT_API_URL || "http://localhost:3000/api/export";
@@ -38,11 +39,7 @@ async function getAllowedExports(userRoles, userId) {
     if (!res.ok) return null;
     const data = await res.json();
     const all = data?.data ?? [];
-    return all.filter(exp => {
-      const roleOk = !exp.roles?.length || exp.roles.some(r => userRoles.includes(r));
-      const userOk = !exp.users?.length || exp.users.includes(userId);
-      return roleOk && userOk;
-    });
+    return filterVisibleExports(all, userRoles, userId);
   } catch {
     return null; // null = fallback to deriving exports from product data
   }
