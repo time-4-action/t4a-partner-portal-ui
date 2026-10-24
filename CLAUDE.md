@@ -10,10 +10,11 @@ This is a Next.js 16 partner portal for Patrik International built with the App 
 
 ### Development
 ```bash
-npm run dev          # Start development server on http://localhost:3000
+npm run dev          # Start development server on http://localhost:3000 (from ~/t4a: ./dev.sh portal-ui → :3001)
 npm run build        # Build for production (output: standalone)
 npm start            # Start production server
 npm run lint         # Run ESLint
+npm test             # Unit tests (node:test, test/*.test.mjs)
 ```
 
 ## Architecture
@@ -71,6 +72,7 @@ Backend proxy endpoints:
 Exports and categories are filtered server-side before passing to client components:
 - An export is visible if: its `roles` array is empty/absent OR the user has one of the listed roles, AND its `users` array is empty/absent OR the user's Auth0 `sub` is listed
 - Filtering uses the session's `https://time-4-action.com/roles` claim and `user.sub`
+- The rule lives once, in `src/lib/exportAccess.js` (`canSeeExport` / `filterVisibleExports`); every page that lists exports uses it
 
 ### Styling
 - Tailwind CSS v4 (using `@tailwindcss/postcss` plugin); icons from `lucide-react`
@@ -117,7 +119,7 @@ The `/integrations/shopify` page manages any number of connected Shopify stores;
 - **Route:** `src/app/(protected)/integrations/shopify/page.js` (Server Component; loads connections, Shopify-preset exports, pricelists, feeds and AI exports, then renders the client page) + `loading.js` skeleton. `initialConnections === null` (fetch failed) switches the client into a mock-data demo; `[]` shows the connect screen.
 - **Page order:** header → `StoreSwitcher` → `StoreOverview` (status · last sync · sync state · issues · Sync now · overflow menu) → `SourcesSection` (read-only rows; Configure opens a modal) → `SyncActivity` (stats + latest 5 runs, run detail + history modals) → `AttentionSection` (unmatched + deleted-in-store, grouped/filterable) → `ApiAccessSection` (Sources API keys, managed in a modal) → `DangerZone` (disconnect behind a confirmation).
 - **Components** (`src/components/shopify/`): `shared.js` holds the status vocabulary (`RUN_STATUS`, `storeStatus`), `SYNC_FLAGS` / `OWNERSHIP_MODES`, UTC formatters, the demo `MOCK_*` data and the primitives (`Badge`, `Button`, `Modal` with focus trap, `Menu`, `Section`, `Field`, `Toggle`, `Segmented`, `Disclosure`, `Toasts`). `ConnectionPanel.js` owns one store's state and every mutation (`persistScopes`, sync/poll, recreate, rename, reconnect, disconnect). `SourceConfigModal.js` is the single add/configure form — it edits a **draft** scope (`normalizeScope` gives a key-ordered object so dirtiness is a JSON compare), Save is disabled until dirty, and it closes only after the parent's save resolves `{ ok: true }`. `ConnectStore.js` holds the connect screens (standard OAuth + deprecated bring-your-own-app wizard).
-- **Save contract:** there is no page-level save bar — every change is persisted from its modal. `buildConfigPayload` PUTs `{ shopifyLocationId, config: { …firstScopeFields, scopes[] } }`; each scope always carries its full per-source config (ownership, sync flags, pricing incl. `priceFactor` / `priceRounding` / compare-at / sale policy, `variantOptionName`, `titlePrefix`, `reviewNewProducts`, `pricelistPriority`, `publicationIds`, `aiExportId`) and its Sources-API identity (`id` / `name` / `enabled`) so a save can never strip or inherit another source's value. `src/lib/priceRounding.js` and `src/lib/comparePrice.js` are literal ports of the API's normalizers — change both sides together.
+- **Save contract:** there is no page-level save bar — every change is persisted from its modal. `buildConfigPayload` PUTs `{ shopifyLocationId, config: { …firstScopeFields, scopes[] } }`; each scope always carries its full per-source config (ownership, sync flags, pricing incl. `priceFactor` / `priceRounding` / compare-at / sale policy, `variantOptionName`, `titlePrefix`, `reviewNewProducts`, `pricelistPriority`, `publicationIds`, `aiExportId`) and its Sources-API identity (`id` / `name` / `enabled`) so a save can never strip or inherit another source's value. `src/lib/priceRounding.js` and `src/lib/comparePrice.js` are literal ports of the API's normalizers — change both sides together. `test/pricing.test.mjs` checks the two agree when the API repo is checked out next to this one (`../t4a-partner-portal-api`).
 - Nav link "Shopify" → `/integrations/shopify` in `src/components/Navbar.js` (export role gate).
 
 ### Client vs Server Components

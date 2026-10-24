@@ -2,6 +2,7 @@ import ShopifyIntegrationPage from "@/components/ShopifyIntegrationPage";
 import TierGate from "@/components/TierGate";
 import { FEATURE_TIERS, hasTierAccess } from "@/lib/featureTiers";
 import { auth0 } from "@/lib/auth0";
+import { filterVisibleExports } from "@/lib/exportAccess";
 
 const apiUrl = process.env.EXPORT_API_URL || "http://localhost:4000";
 
@@ -73,11 +74,7 @@ async function getAiExports(userRoles, userId) {
     if (!res.ok) return [];
     const data = await res.json();
     const all = Array.isArray(data?.data) ? data.data : [];
-    return all.filter((exp) => {
-      const roleOk = !exp.roles?.length || exp.roles.some((r) => userRoles.includes(r));
-      const userOk = !exp.users?.length || exp.users.includes(userId);
-      return roleOk && userOk;
-    });
+    return filterVisibleExports(all, userRoles, userId);
   } catch {
     return [];
   }
