@@ -11,6 +11,7 @@
  *   first paint (stored choice, else prefers-color-scheme) so there is no flash
  *   of the wrong theme; ThemeProvider then keeps React in sync
  * - Admin app shell: left sidebar (Navbar) + a single scrolling <main>
+ * - MaintenanceBanner at the top of <main> while maintenance is announced
  *
  * @module RootLayout
  */
@@ -18,6 +19,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import MaintenanceBanner from "@/components/MaintenanceBanner";
 import { ThemeProvider } from "@/lib/theme-context";
 import { THEME_BOOTSTRAP } from "@/lib/theme";
 
@@ -62,7 +64,10 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           {/* Same shell as the admin: sidebar + one scrolling main region. */}
           <Navbar />
-          <main className="flex-1 min-w-0 overflow-y-auto bg-background pt-12 md:pt-0">{children}</main>
+          <main className="flex-1 min-w-0 overflow-y-auto bg-background pt-12 md:pt-0">
+            <MaintenanceBanner />
+            {children}
+          </main>
         </ThemeProvider>
       </body>
     </html>
