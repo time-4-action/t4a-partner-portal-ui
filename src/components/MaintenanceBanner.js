@@ -1,17 +1,19 @@
 "use client";
 /**
- * MaintenanceBanner — the maintenance notice every t4a app shows, set from
- * Slack with /maintenance (time-4-action/t4a-infra, servers/t4a/README.md).
+ * MaintenanceBanner — the maintenance notices every t4a app shows, set from
+ * Slack with /maintenance or at maintenance.time-4-action.com/admin
+ * (time-4-action/t4a-maintenance).
  *
- * Reads banner.json every minute and shows its text as a strip above the page:
- * amber while maintenance is planned, red while it runs. Nothing when no
- * maintenance is on or the file can't be read.
+ * Reads banner.json for this app every minute and shows one strip per
+ * maintenance above the page, most urgent first, at most three: amber while
+ * planned, red while it runs. Nothing when none is on or the file can't be read.
  */
 import { useEffect, useState } from "react";
 import { Wrench } from "lucide-react";
 
-const BANNER_URL = "https://maintenance.time-4-action.com/banner.json";
+const BANNER_URL = "https://maintenance.time-4-action.com/banner.json?app=portal";
 const POLL_MS = 60_000;
+const MAX_ITEMS = 3;
 
 const TONES = {
   planned: "bg-amber-100 dark:bg-amber-950/50 border-amber-300/60 dark:border-amber-800/60 text-amber-900 dark:text-amber-200",
@@ -19,15 +21,15 @@ const TONES = {
 };
 
 export default function MaintenanceBanner() {
-  const [banner, setBanner] = useState(null);
+  const [items, setItems] = useState([]);
 
   useEffect(() => {
     let alive = true;
     const load = () =>
       fetch(BANNER_URL)
         .then((r) => (r.ok ? r.json() : null))
-        .then((b) => alive && setBanner(b?.active && b.text ? b : null))
-        .catch(() => alive && setBanner(null));
+        .then((b) => alive && setItems(Array.isArray(b?.items) ? b.items.filter((i) => i?.text).slice(0, MAX_ITEMS) : []))
+        .catch(() => alive && setItems([]));
     load();
     const timer = setInterval(load, POLL_MS);
     return () => {
@@ -36,11 +38,15 @@ export default function MaintenanceBanner() {
     };
   }, []);
 
-  if (!banner) return null;
+  if (!items.length) return null;
   return (
-    <div role="status" className={`flex items-center gap-2 px-4 md:px-6 py-2 border-b text-[13px] ${TONES[banner.level === "planned" ? "planned" : "now"]}`}>
-      <Wrench className="w-3.5 h-3.5 shrink-0" />
-      <span className="min-w-0">{banner.text}</span>
+    <div role="status">
+      {items.map((item) => (
+        <div key={item.id} className={`flex items-center gap-2 px-4 md:px-6 py-2 border-b text-[13px] ${TONES[item.level === "planned" ? "planned" : "now"]}`}>
+          <Wrench className="w-3.5 h-3.5 shrink-0" />
+          <span className="min-w-0">{item.text}</span>
+        </div>
+      ))}
     </div>
   );
 }
