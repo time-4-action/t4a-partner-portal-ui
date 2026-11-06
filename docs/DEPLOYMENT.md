@@ -30,3 +30,28 @@ swaps images. Roll back by re-running an older commit's workflow, or on the serv
 Organization secrets, same values as t4a-admin: `PROD_DEPLOY_HOST`,
 `PROD_DEPLOY_SSH_KEY`, `PROD_DEPLOY_FINGERPRINT`. Optional repository variables:
 `DEPLOY_USER` (default `deploy`), `DEPLOY_DIR`, `PRODUCTION_URL`.
+
+## Production on t4a (since 2026-11-06)
+
+Production moved from t2 to t4a (Hetzner, `77.42.42.60`; time-4-action/t4a-infra,
+`servers/t4a`). What points the deploy there is set on the `production` environment
+only. Environment secrets win over the organization secrets of the same name, so the
+other repos that share them are not affected:
+
+| On the `production` environment | Value |
+|---|---|
+| secret `PROD_DEPLOY_HOST` | `77.42.42.60` |
+| secret `PROD_DEPLOY_SSH_KEY` | the private key `github-actions@t4a-partner-portal-ui-t4a` (its public half is in `/home/deploy/.ssh/authorized_keys` on t4a) |
+| secret `PROD_DEPLOY_FINGERPRINT` | t4a's **ECDSA** host key, `SHA256:2wkXWs0QETKFiXKXbxbJRASeNd9I6zigPKVQGBtwfTk` (the action's Go SSH client picks ECDSA; the Ed25519 fingerprint fails with "host key fingerprint mismatch") |
+| variable `DEPLOY_DIR` | `/srv/export-ui` |
+
+On t4a, `/srv/export-ui` (owned by `deploy`) holds `docker-compose.yaml`
+(= `deploy/docker-compose.t4a.yml`: Traefik labels for `export.time-4-action.com`,
+loopback port 3002 for the health check) and `.env` (copied from t2 unchanged; every
+URL in it is public). DNS: a proxied CNAME `export` → `production.time-4-action.com`
+in the `time-4-action.com` zone, which overrides the `*` wildcard that still points
+at t2. First deploy through the pipeline: run 42220633431 (green).
+
+The t2 container is stopped, not removed (`/data/stack/apps/time-4-action/export/ui`).
+To go back: delete the DNS record and the four settings above, then
+`docker compose start` there.
