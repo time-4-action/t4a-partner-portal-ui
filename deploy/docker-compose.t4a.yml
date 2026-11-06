@@ -1,0 +1,33 @@
+# Production compose for /srv/export-ui on t4a (Hetzner; time-4-action/t4a-infra, servers/t4a).
+# Save it there as docker-compose.yaml, next to .env. CI exports
+# APP_IMAGE=ghcr.io/time-4-action/t4a-partner-portal-ui:<commit sha>; without it this runs :latest.
+# The server never builds; copy changes to this file by hand.
+#
+# Traefik (/srv/edge) routes export.time-4-action.com here, behind Cloudflare.
+services:
+  t4a-partner-portal-ui:
+    image: ${APP_IMAGE:-ghcr.io/time-4-action/t4a-partner-portal-ui:latest}
+    restart: unless-stopped
+    # Loopback only, for CI's health check on the server (the workflow reads the port with
+    # `docker compose port`). The public way in is Traefik; Docker-published ports skip ufw,
+    # so never 0.0.0.0.
+    ports:
+      - "127.0.0.1:3002:3000"
+    env_file:
+      - .env
+    mem_limit: 512m
+    networks:
+      - edge
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=edge
+      - traefik.http.routers.export-ui.rule=Host(`export.time-4-action.com`)
+      - traefik.http.services.export-ui.loadbalancer.server.port=3000
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  edge:
+    external: true
